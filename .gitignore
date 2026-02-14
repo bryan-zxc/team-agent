@@ -206,6 +206,13 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# Node.js
+node_modules/
+.next/
+
+# Playwright CLI
+.playwright-cli/
+
 # External repositories (cloned for reference)
 # Keep the README but ignore all cloned repos
 external/*
