@@ -14,7 +14,7 @@ Each service has its own Dockerfile, dependencies, and tests. They communicate v
 - When done with a ticket: transition status to **Done** on the project board and close the issue
 - If a ticket needs to change or needs to be updated, just change the description, don't add a comment to the ticket
 
-## Epic vs Story
-- **Epic** — a large user-facing goal or milestone (e.g. "Stand up a bare minimum working system"). An epic is done when its stories are all complete.
-- **Story** — a deliverable slice of work that provides value on its own (e.g. "Send and receive messages in real-time"). Stories belong to an epic.
-- Name tickets from the user's perspective (developers are users too). Describe the benefit, not the technical implementation. E.g. "Reproducible database setup across environments" not "Set up Alembic".
+## Creating Tickets
+- **Epic vs Story**: An epic is a large user-facing goal or milestone — done when its stories are all complete. A story is a deliverable slice of work that provides value on its own, belonging to an epic.
+- **Naming**: Name tickets from the user's perspective (developers are users too). Describe the benefit, not the technical implementation. E.g. "Reproducible database setup across environments" not "Set up Alembic".
+- **Context-rich descriptions**: Every ticket description must contain enough context for a brand new Claude Code session to pick it up and know exactly what to do — current state, what to build, file paths, data model references, and verification steps.
