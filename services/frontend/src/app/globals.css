@@ -1,0 +1,77 @@
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root[data-theme="light"] {
+  --bg: #F5F2ED;
+  --bg-subtle: #EDE9E3;
+  --surface: #FFFFFF;
+  --surface-hover: #F8F6F2;
+  --surface-active: #F0EDE8;
+  --accent: #7B9E87;
+  --accent-hover: #6A8B75;
+  --accent-text: #FFFFFF;
+  --accent-light: #E4EDE7;
+  --warm: #C4956A;
+  --warm-light: #F5EDE4;
+  --text-primary: #2C2A27;
+  --text-secondary: #7A756D;
+  --text-muted: #B0AAA0;
+  --border: #E4E0D8;
+  --border-light: #EEEAE4;
+  --shadow-sm: 0 1px 3px rgba(44, 42, 39, 0.04);
+  --shadow-md: 0 4px 12px rgba(44, 42, 39, 0.06);
+  --shadow-lg: 0 8px 24px rgba(44, 42, 39, 0.08);
+  --bubble-self: #E4EDE7;
+  --bubble-other: #FFFFFF;
+  --bubble-ai: #F5EDE4;
+  --scrollbar-thumb: #D4CFC7;
+  --overlay: rgba(44, 42, 39, 0.3);
+}
+
+:root[data-theme="dark"] {
+  --bg: #161514;
+  --bg-subtle: #1C1B19;
+  --surface: #222120;
+  --surface-hover: #2A2928;
+  --surface-active: #323130;
+  --accent: #8FB39A;
+  --accent-hover: #A3C4AE;
+  --accent-text: #161514;
+  --accent-light: rgba(143, 179, 154, 0.12);
+  --warm: #D4A574;
+  --warm-light: rgba(212, 165, 116, 0.12);
+  --text-primary: #E0DCD6;
+  --text-secondary: #8E8983;
+  --text-muted: #555250;
+  --border: #2E2D2B;
+  --border-light: #262524;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.25);
+  --bubble-self: rgba(143, 179, 154, 0.15);
+  --bubble-other: #2A2928;
+  --bubble-ai: rgba(212, 165, 116, 0.1);
+  --scrollbar-thumb: #3A3937;
+  --overlay: rgba(0, 0, 0, 0.5);
+}
+
+html {
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+
+a { color: inherit; text-decoration: none; }

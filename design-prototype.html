@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Agent — Design Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root[data-theme="light"] {
+    --bg: #F5F2ED;
+    --bg-subtle: #EDE9E3;
+    --surface: #FFFFFF;
+    --surface-hover: #F8F6F2;
+    --surface-active: #F0EDE8;
+    --accent: #7B9E87;
+    --accent-hover: #6A8B75;
+    --accent-text: #FFFFFF;
+    --accent-light: #E4EDE7;
+    --warm: #C4956A;
+    --warm-light: #F5EDE4;
+    --text-primary: #2C2A27;
+    --text-secondary: #7A756D;
+    --text-muted: #B0AAA0;
+    --border: #E4E0D8;
+    --border-light: #EEEAE4;
+    --shadow-sm: 0 1px 3px rgba(44, 42, 39, 0.04);
+    --shadow-md: 0 4px 12px rgba(44, 42, 39, 0.06);
+    --shadow-lg: 0 8px 24px rgba(44, 42, 39, 0.08);
+    --bubble-self: #E4EDE7;
+    --bubble-other: #FFFFFF;
+    --bubble-ai: #F5EDE4;
+    --scrollbar-track: transparent;
+    --scrollbar-thumb: #D4CFC7;
+    --overlay: rgba(44, 42, 39, 0.3);
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #161514;
+    --bg-subtle: #1C1B19;
+    --surface: #222120;
+    --surface-hover: #2A2928;
+    --surface-active: #323130;
+    --accent: #8FB39A;
+    --accent-hover: #A3C4AE;
+    --accent-text: #161514;
+    --accent-light: rgba(143, 179, 154, 0.12);
+    --warm: #D4A574;
+    --warm-light: rgba(212, 165, 116, 0.12);
+    --text-primary: #E0DCD6;
+    --text-secondary: #8E8983;
+    --text-muted: #555250;
+    --border: #2E2D2B;
+    --border-light: #262524;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.15);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.25);
+    --bubble-self: rgba(143, 179, 154, 0.15);
+    --bubble-other: #2A2928;
+    --bubble-ai: rgba(212, 165, 116, 0.1);
+    --scrollbar-track: transparent;
+    --scrollbar-thumb: #3A3937;
+    --overlay: rgba(0, 0, 0, 0.5);
+  }
+
+  html {
+    transition: background-color 0.4s ease, color 0.4s ease;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+
+  /* ── Layout ── */
+  .app {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    height: 100vh;
+    transition: all 0.4s ease;
+  }
+
+  /* ── Sidebar (Project Space) ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+
+  .sidebar-header {
+    padding: 20px 20px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-mark {
+    width: 32px;
+    height: 32px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-text);
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  .logo h1 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .theme-toggle {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 16px;
+  }
+
+  .theme-toggle:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+  }
+
+  .sidebar-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    padding: 24px 20px 8px;
+  }
+
+  .room-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 10px;
+  }
+
+  .room-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-bottom: 2px;
+  }
+
+  .room-item:hover {
+    background: var(--surface-hover);
+  }
+
+  .room-item.active {
+    background: var(--accent-light);
+  }
+
+  .room-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--bg-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+    transition: background 0.2s ease;
+  }
+
+  .room-item.active .room-icon {
+    background: var(--accent);
+    color: var(--accent-text);
+    font-size: 14px;
+  }
+
+  .room-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .room-name {
+    font-weight: 500;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .room-preview {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+  }
+
+  .room-item.active .room-name { color: var(--accent); }
+
+  .room-badge {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .new-room-btn {
+    margin: 8px 10px 16px;
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .new-room-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-light);
+  }
+
+  /* ── User Selector (sidebar footer) ── */
+  .sidebar-footer {
+    padding: 12px 10px;
+    border-top: 1px solid var(--border);
+    transition: border-color 0.4s ease;
+  }
+
+  .user-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .user-selector:hover { background: var(--surface-hover); }
+
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .avatar-human { background: var(--accent-light); color: var(--accent); }
+  .avatar-ai { background: var(--warm-light); color: var(--warm); }
+
+  .user-selector-info { flex: 1; }
+  .user-selector-name { font-weight: 500; font-size: 14px; }
+  .user-selector-role { font-size: 11px; color: var(--text-muted); }
+  .user-selector-chevron { color: var(--text-muted); font-size: 12px; }
+
+  /* ── Main Area ── */
+  .main {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    min-width: 0;
+  }
+
+  /* ── Tab Bar ── */
+  .tab-bar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 12px 20px 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+
+  .tab {
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s ease;
+    border-radius: 8px 8px 0 0;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tab:hover {
+    color: var(--text-primary);
+    background: var(--surface-hover);
+  }
+
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--warm);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .tab-status {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  /* ── Chat Area ── */
+  .chat-area {
+    display: grid;
+    grid-template-columns: 1fr 240px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .chat-main {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .message-group {
+    display: flex;
+    gap: 10px;
+    max-width: 640px;
+    animation: msgIn 0.3s ease;
+  }
+
+  .message-group.self {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+  }
+
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 11px;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+
+  .msg-body { flex: 1; min-width: 0; }
+
+  .msg-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 3px;
+    padding: 0 4px;
+  }
+
+  .message-group.self .msg-header {
+    flex-direction: row-reverse;
+  }
+
+  .msg-author {
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .msg-time {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .msg-ai-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--warm-light);
+    color: var(--warm);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .msg-bubble {
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.55;
+    background: var(--bubble-other);
+    box-shadow: var(--shadow-sm);
+    transition: background 0.4s ease;
+    word-wrap: break-word;
+  }
+
+  .message-group.self .msg-bubble {
+    background: var(--bubble-self);
+    border-bottom-right-radius: 6px;
+    box-shadow: none;
+  }
+
+  .message-group:not(.self) .msg-bubble {
+    border-bottom-left-radius: 6px;
+  }
+
+  .message-group.ai .msg-bubble {
+    background: var(--bubble-ai);
+  }
+
+  /* ── Date Divider ── */
+  .date-divider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 16px 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .date-divider::before, .date-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-light);
+  }
+
+  /* ── Input ── */
+  .input-area {
+    padding: 12px 24px 20px;
+  }
+
+  .input-wrapper {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+  }
+
+  .input-wrapper:focus-within {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-md), 0 0 0 3px var(--accent-light);
+  }
+
+  .input-field {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 14px;
+    color: var(--text-primary);
+    padding: 4px 0;
+    resize: none;
+    min-height: 24px;
+    max-height: 120px;
+    line-height: 1.5;
+  }
+
+  .input-field::placeholder { color: var(--text-muted); }
+
+  .send-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    color: var(--accent-text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .send-btn:hover {
+    background: var(--accent-hover);
+    transform: scale(1.05);
+  }
+
+  /* ── Workload Panel ── */
+  .workload-panel {
+    border-left: 1px solid var(--border);
+    background: var(--bg-subtle);
+    padding: 16px;
+    overflow-y: auto;
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+
+  .workload-panel-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .workload-card {
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid var(--border-light);
+  }
+
+  .workload-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+    border-color: var(--accent);
+  }
+
+  .workload-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .workload-status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .workload-status.active {
+    background: var(--accent);
+    animation: pulse 2s infinite;
+  }
+
+  .workload-status.complete {
+    background: var(--text-muted);
+  }
+
+  .workload-name {
+    font-size: 13px;
+    font-weight: 600;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .workload-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .workload-agent-avatar {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--warm-light);
+    color: var(--warm);
+    font-size: 9px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .workload-progress {
+    height: 3px;
+    background: var(--bg-subtle);
+    border-radius: 2px;
+    margin-top: 10px;
+    overflow: hidden;
+  }
+
+  .workload-progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  /* ── Typing Indicator ── */
+  .typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+    height: 24px;
+  }
+
+  .typing-dots {
+    display: flex;
+    gap: 3px;
+  }
+
+  .typing-dots span {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    animation: typingBounce 1.2s infinite;
+  }
+
+  .typing-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+  @keyframes typingBounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-4px); opacity: 1; }
+  }
+
+  /* ── Agent Workload Tab View ── */
+  .agent-view { display: none; }
+  .agent-view.visible {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .agent-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 24px;
+    background: var(--accent-light);
+    font-size: 13px;
+    transition: background 0.4s ease;
+  }
+
+  .agent-status-bar .workload-status {
+    width: 10px;
+    height: 10px;
+  }
+
+  .agent-status-text { font-weight: 500; color: var(--accent); }
+
+  .agent-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .agent-action {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    margin-bottom: 6px;
+    font-size: 13px;
+    line-height: 1.5;
+    animation: msgIn 0.3s ease;
+  }
+
+  .agent-action-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: var(--accent-light);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .agent-action code {
+    background: var(--bg-subtle);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  /* ── Transitions ── */
+  .surface-transition {
+    transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, color 0.4s ease;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-mark">ta</div>
+        <h1>Team Agent</h1>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+        <span id="themeIcon">&#9789;</span>
+      </button>
+    </div>
+
+    <div class="sidebar-section-label">Rooms</div>
+
+    <div class="room-list">
+      <div class="room-item active" onclick="showRoom('general')">
+        <div class="room-icon">&#9900;</div>
+        <div class="room-info">
+          <div class="room-name">General</div>
+          <div class="room-preview">Claude: I'm here to help whenever...</div>
+        </div>
+        <div class="room-badge"></div>
+      </div>
+      <div class="room-item" onclick="showRoom('standups')">
+        <div class="room-icon">&#9788;</div>
+        <div class="room-info">
+          <div class="room-name">Standups</div>
+          <div class="room-preview">No messages yet</div>
+        </div>
+      </div>
+      <div class="room-item" onclick="showRoom('reporting')">
+        <div class="room-icon">&#9634;</div>
+        <div class="room-info">
+          <div class="room-name">Reporting</div>
+          <div class="room-preview">Alice: Updated the dashboard...</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="new-room-btn">+ New Room</button>
+
+    <div class="sidebar-footer">
+      <div class="user-selector">
+        <div class="user-avatar avatar-human">A</div>
+        <div class="user-selector-info">
+          <div class="user-selector-name">Alice</div>
+          <div class="user-selector-role">human</div>
+        </div>
+        <span class="user-selector-chevron">&#9660;</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <div class="tab active" onclick="switchTab(this, 'main-chat')">
+        Main Chat
+      </div>
+      <div class="tab" onclick="switchTab(this, 'agent-pr')">
+        <span class="tab-dot"></span>
+        Review PR #42
+        <span class="tab-status">running</span>
+      </div>
+      <div class="tab" onclick="switchTab(this, 'agent-tests')">
+        Fix failing tests
+        <span class="tab-status" style="color: var(--accent);">&#10003; done</span>
+      </div>
+    </div>
+
+    <!-- Main Chat View -->
+    <div class="chat-area" id="main-chat">
+      <div class="chat-main">
+        <div class="messages">
+          <div class="date-divider">Today</div>
+
+          <div class="message-group">
+            <div class="msg-avatar avatar-human">A</div>
+            <div class="msg-body">
+              <div class="msg-header">
+                <span class="msg-author">Alice</span>
+                <span class="msg-time">10:24 am</span>
+              </div>
+              <div class="msg-bubble">Hey team, how's it going?</div>
+            </div>
+          </div>
+
+          <div class="message-group">
+            <div class="msg-avatar avatar-human" style="background: #E0E4F0; color: #6B72A8;">B</div>
+            <div class="msg-body">
+              <div class="msg-header">
+                <span class="msg-author">Bob</span>
+                <span class="msg-time">10:25 am</span>
+              </div>
+              <div class="msg-bubble">All good! Just setting things up. Got the Docker environment running and the database seeded. Ready to start on the chat feature. 🚀</div>
+            </div>
+          </div>
+
+          <div class="message-group ai">
+            <div class="msg-avatar avatar-ai">C</div>
+            <div class="msg-body">
+              <div class="msg-header">
+                <span class="msg-author">Claude</span>
+                <span class="msg-ai-badge">AI</span>
+                <span class="msg-time">10:25 am</span>
+              </div>
+              <div class="msg-bubble">Hello! I'm here to help whenever you need me. I can review code, debug issues, or help plan features — just mention me or I'll chime in when I think I can add value.</div>
+            </div>
+          </div>
+
+          <div class="message-group self">
+            <div class="msg-avatar avatar-human">A</div>
+            <div class="msg-body">
+              <div class="msg-header">
+                <span class="msg-author">Alice</span>
+                <span class="msg-time">10:28 am</span>
+              </div>
+              <div class="msg-bubble">@Claude can you review PR #42? It's the new auth middleware.</div>
+            </div>
+          </div>
+
+          <div class="message-group ai">
+            <div class="msg-avatar avatar-ai">C</div>
+            <div class="msg-body">
+              <div class="msg-header">
+                <span class="msg-author">Claude</span>
+                <span class="msg-ai-badge">AI</span>
+                <span class="msg-time">10:28 am</span>
+              </div>
+              <div class="msg-bubble">On it! I've opened a workload to review PR #42. You can follow along in the "Review PR #42" tab. I'll post a summary here when I'm done.</div>
+            </div>
+          </div>
+
+          <div class="typing-indicator">
+            <div class="typing-dots">
+              <span></span><span></span><span></span>
+            </div>
+            Bob is typing...
+          </div>
+        </div>
+
+        <div class="input-area">
+          <div class="input-wrapper">
+            <textarea class="input-field" placeholder="Message General..." rows="1" oninput="autoResize(this)"></textarea>
+            <button class="send-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Workload Panel -->
+      <div class="workload-panel">
+        <div class="workload-panel-title">Workloads</div>
+
+        <div class="workload-card" onclick="switchTab(document.querySelectorAll('.tab')[1], 'agent-pr')">
+          <div class="workload-card-header">
+            <span class="workload-status active"></span>
+            <span class="workload-name">Review PR #42</span>
+          </div>
+          <div class="workload-meta">
+            <span class="workload-agent-avatar">C</span>
+            Claude &middot; 2m ago
+          </div>
+          <div class="workload-progress">
+            <div class="workload-progress-bar" style="width: 60%;"></div>
+          </div>
+        </div>
+
+        <div class="workload-card" onclick="switchTab(document.querySelectorAll('.tab')[2], 'agent-tests')">
+          <div class="workload-card-header">
+            <span class="workload-status complete"></span>
+            <span class="workload-name">Fix failing tests</span>
+          </div>
+          <div class="workload-meta">
+            <span class="workload-agent-avatar">C</span>
+            Claude &middot; 15m ago
+          </div>
+          <div class="workload-progress">
+            <div class="workload-progress-bar" style="width: 100%; background: var(--text-muted);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agent PR Review View (hidden by default) -->
+    <div class="agent-view" id="agent-pr">
+      <div class="agent-status-bar">
+        <span class="workload-status active"></span>
+        <span class="agent-status-text">Claude is reviewing PR #42 — auth middleware</span>
+      </div>
+      <div class="agent-messages">
+        <div class="agent-action">
+          <div class="agent-action-icon">&#128269;</div>
+          <div>Reading <code>src/middleware/auth.ts</code></div>
+        </div>
+        <div class="agent-action">
+          <div class="agent-action-icon">&#128269;</div>
+          <div>Reading <code>src/middleware/auth.test.ts</code></div>
+        </div>
+        <div class="agent-action">
+          <div class="agent-action-icon">&#9881;</div>
+          <div>Running <code>npm test -- --filter auth</code></div>
+        </div>
+
+        <div class="message-group ai" style="max-width: 640px; margin-top: 8px;">
+          <div class="msg-avatar avatar-ai">C</div>
+          <div class="msg-body">
+            <div class="msg-header">
+              <span class="msg-author">Claude</span>
+              <span class="msg-ai-badge">AI</span>
+              <span class="msg-time">10:30 am</span>
+            </div>
+            <div class="msg-bubble">I've read through the auth middleware. A couple of things I noticed so far:<br><br>1. The token validation doesn't check for expiry<br>2. The error response leaks internal details in production<br><br>Running the tests now to check coverage...</div>
+          </div>
+        </div>
+
+        <div class="message-group self" style="max-width: 640px;">
+          <div class="msg-avatar avatar-human">A</div>
+          <div class="msg-body">
+            <div class="msg-header">
+              <span class="msg-author">Alice</span>
+              <span class="msg-time">10:31 am</span>
+            </div>
+            <div class="msg-bubble">Good catches. Can you suggest fixes for both?</div>
+          </div>
+        </div>
+
+        <div class="agent-action">
+          <div class="agent-action-icon">&#9998;</div>
+          <div>Editing <code>src/middleware/auth.ts</code></div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <div class="input-wrapper">
+          <textarea class="input-field" placeholder="Message this workload..." rows="1" oninput="autoResize(this)"></textarea>
+          <button class="send-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agent Tests View (hidden by default) -->
+    <div class="agent-view" id="agent-tests">
+      <div class="agent-status-bar" style="background: var(--surface-hover);">
+        <span class="workload-status complete"></span>
+        <span class="agent-status-text" style="color: var(--text-secondary);">Completed — Fix failing tests</span>
+      </div>
+      <div class="agent-messages">
+        <div class="agent-action">
+          <div class="agent-action-icon">&#128269;</div>
+          <div>Reading <code>test/integration/api.test.ts</code></div>
+        </div>
+        <div class="agent-action">
+          <div class="agent-action-icon">&#9998;</div>
+          <div>Editing <code>src/api/routes.ts</code> — fixed response format</div>
+        </div>
+        <div class="agent-action">
+          <div class="agent-action-icon">&#9881;</div>
+          <div>Running <code>npm test</code> — all 42 tests passed &#10003;</div>
+        </div>
+
+        <div class="message-group ai" style="max-width: 640px; margin-top: 8px;">
+          <div class="msg-avatar avatar-ai">C</div>
+          <div class="msg-body">
+            <div class="msg-header">
+              <span class="msg-author">Claude</span>
+              <span class="msg-ai-badge">AI</span>
+              <span class="msg-time">10:14 am</span>
+            </div>
+            <div class="msg-bubble">Done! The issue was a response format mismatch in the API routes — the tests expected <code>{ data: [...] }</code> but the route was returning a plain array. Fixed in <code>src/api/routes.ts</code>. All 42 tests passing now.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <div class="input-wrapper">
+          <textarea class="input-field" placeholder="Message this workload..." rows="1" oninput="autoResize(this)"></textarea>
+          <button class="send-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  function toggleTheme() {
+    const html = document.documentElement;
+    const icon = document.getElementById('themeIcon');
+    if (html.dataset.theme === 'light') {
+      html.dataset.theme = 'dark';
+      icon.textContent = '☀';
+    } else {
+      html.dataset.theme = 'light';
+      icon.textContent = '☽';
+    }
+  }
+
+  function switchTab(el, viewId) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+
+    document.getElementById('main-chat').style.display = 'none';
+    document.querySelectorAll('.agent-view').forEach(v => v.classList.remove('visible'));
+
+    if (viewId === 'main-chat') {
+      document.getElementById('main-chat').style.display = 'grid';
+    } else {
+      document.getElementById(viewId).classList.add('visible');
+    }
+  }
+
+  function showRoom(name) {
+    document.querySelectorAll('.room-item').forEach(r => r.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+</script>
+
+</body>
+</html>

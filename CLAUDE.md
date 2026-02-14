@@ -9,6 +9,8 @@ This is a monorepo with three services under `services/`:
 
 Each service has its own Dockerfile, dependencies, and tests. They communicate via Redis Pub/Sub and share a PostgreSQL database.
 
+When working on the frontend, read `services/frontend/FRONTEND.md` first and follow its design system, styling, and component guidelines.
+
 ## Ticket Workflow
 - When picking up a ticket: transition status to **In progress** on the project board
 - When done with a ticket: transition status to **Done** on the project board and close the issue
