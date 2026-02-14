@@ -2,6 +2,8 @@
 
 Read this file before making any frontend changes.
 
+Always use the `/playwright-cli` skill to verify frontend changes work correctly in the browser before committing.
+
 ## Aesthetic Direction
 
 Soft/ambient — warm, approachable, rounded. Think Arc browser meets Campfire. Supports dark and light modes. See `design-prototype.html` in the repo root for the visual reference.
