@@ -4,6 +4,7 @@ import logging
 import redis.asyncio as aioredis
 
 from src.ai.config import settings
+from src.ai.listener import listen
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ai-service")
@@ -19,11 +20,8 @@ async def main():
         logger.error("Failed to connect to Redis: %s", e)
         return
 
-    logger.info("AI service listening (idle — no triggers configured yet)")
-
     try:
-        while True:
-            await asyncio.sleep(60)
+        await listen(client)
     except asyncio.CancelledError:
         pass
     finally:

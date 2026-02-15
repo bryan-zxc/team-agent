@@ -1,7 +1,7 @@
+import json
 import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from sqlalchemy import select
 
 from src.api.database import async_session
 from src.api.models.message import Message
@@ -9,6 +9,11 @@ from src.api.models.user import User
 from src.api.websocket.manager import manager
 
 router = APIRouter()
+
+
+def _get_redis():
+    from src.api.main import redis_client
+    return redis_client
 
 
 @router.websocket("/ws/{chat_id}")
@@ -42,14 +47,20 @@ async def websocket_endpoint(
                 await session.commit()
                 await session.refresh(message)
 
-            # Broadcast to all connections in this chat
-            await manager.broadcast(chat_id, {
+            msg_data = {
                 "id": str(message.id),
                 "chat_id": str(chat_id),
                 "user_id": str(user_id),
                 "display_name": display_name,
                 "content": message.content,
                 "created_at": message.created_at.isoformat(),
-            })
+            }
+
+            # Broadcast to all connections in this chat
+            await manager.broadcast(chat_id, msg_data)
+
+            # Publish to Redis for AI service
+            await _get_redis().publish("chat:messages", json.dumps(msg_data))
+
     except WebSocketDisconnect:
         manager.disconnect(chat_id, websocket)
