@@ -7,6 +7,7 @@ import asyncpg
 import redis.asyncio as aioredis
 
 from src.ai.config import settings
+from src.ai.runner import run_agent
 
 logger = logging.getLogger("ai-service")
 
@@ -22,6 +23,21 @@ async def _load_ai_user() -> dict | None:
         if row:
             return {"id": str(row["id"]), "display_name": row["display_name"]}
         return None
+    finally:
+        await conn.close()
+
+
+async def _load_chat_history(chat_id: str) -> list[dict]:
+    """Load the full message history for a chat, ordered chronologically."""
+    conn = await asyncpg.connect(_dsn)
+    try:
+        rows = await conn.fetch(
+            "SELECT u.display_name, m.content "
+            "FROM messages m JOIN users u ON u.id = m.user_id "
+            "WHERE m.chat_id = $1 ORDER BY m.created_at",
+            uuid.UUID(chat_id),
+        )
+        return [{"display_name": r["display_name"], "content": r["content"]} for r in rows]
     finally:
         await conn.close()
 
@@ -50,18 +66,22 @@ async def listen(redis_client: aioredis.Redis):
         if msg["user_id"] == ai_user["id"]:
             continue
 
-        # Placeholder trigger: respond when message contains @ai
-        if "@ai" not in msg["content"].lower():
+        # Trigger: respond when message contains @zimomo
+        if "@zimomo" not in msg["content"].lower():
             continue
 
-        logger.info("Trigger detected — responding to @ai mention")
+        logger.info("Trigger detected — responding to @zimomo mention")
+
+        # Fetch full conversation history for context
+        conversation = await _load_chat_history(msg["chat_id"])
+        content = await run_agent(conversation)
 
         response = {
             "id": str(uuid.uuid4()),
             "chat_id": msg["chat_id"],
             "user_id": ai_user["id"],
             "display_name": ai_user["display_name"],
-            "content": f"I heard you! You said: \"{msg['content']}\"",
+            "content": content,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
 

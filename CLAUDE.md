@@ -9,6 +9,9 @@ This is a monorepo with three services under `services/`:
 
 Each service has its own Dockerfile, dependencies, and tests. They communicate via Redis Pub/Sub and share a PostgreSQL database.
 
+## Dependencies
+Always use `uv add <package>` to add Python dependencies. Never edit `pyproject.toml` directly — `uv add` resolves the latest version and updates the lock file automatically.
+
 When working on the frontend, read `services/frontend/FRONTEND.md` first and follow its design system, styling, and component guidelines.
 
 ## Ticket Workflow

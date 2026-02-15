@@ -85,9 +85,9 @@ async def seed():
         )
         await conn.execute(
             "INSERT INTO users (id, display_name, type, created_at) VALUES ($1, $2, $3, $4)",
-            agent_id, "Claude", "ai", now,
+            agent_id, "Zimomo", "ai", now,
         )
-        print("Inserted 3 users (Alice, Bob, Claude)")
+        print("Inserted 3 users (Alice, Bob, Zimomo)")
 
         await conn.execute(
             "INSERT INTO rooms (id, name, created_at) VALUES ($1, $2, $3)",
