@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{TITLE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #171719; --surface: #1f1f24; --elevated: #26262c;
+    --border: #2a2a2f; --border-subtle: #35353c;
+    --heading: #f0eff5; --subheading: #c8c8d0; --body: #8a8a95;
+    --muted: #6b6b78; --disabled: #44444f;
+    --accent: #7c8ae5; --accent-tint: rgba(124,138,229,0.1);
+    --accent-border: rgba(124,138,229,0.18);
+    --green: #5b9a7a; --green-tint: rgba(91,154,122,0.1);
+    --green-border: rgba(91,154,122,0.15);
+    --amber: #e0a05f; --amber-tint: rgba(224,160,95,0.12);
+    --rose: #d46b6b; --rose-tint: rgba(212,107,107,0.12);
+    --frame-bg: linear-gradient(160deg, #1a1a22 0%, #171719 100%);
+    --frame-border: #22223a;
+    --image-bg: linear-gradient(135deg, #1a1a24 0%, #14141a 100%);
+    --nav-bg: rgba(17,17,19,0.88);
+    --progress-track: #1f1f24;
+  }
+  html.light {
+    --bg: #faf9f7; --surface: #ffffff; --elevated: #f5f3ef;
+    --border: #e8e4dd; --border-subtle: #d9d4cc;
+    --heading: #1a1a1f; --subheading: #2a2a2f; --body: #6b6b78;
+    --muted: #8a8a95; --disabled: #b5b5be;
+    --accent: #5560c0; --accent-tint: rgba(85,96,192,0.07);
+    --accent-border: rgba(85,96,192,0.14);
+    --green: #3d8a5e; --green-tint: rgba(61,138,94,0.07);
+    --green-border: rgba(61,138,94,0.12);
+    --amber: #c49040; --amber-tint: rgba(196,144,64,0.08);
+    --rose: #c44e4e; --rose-tint: rgba(196,78,78,0.08);
+    --frame-bg: linear-gradient(160deg, #fff 0%, #f5f5fa 100%);
+    --frame-border: #dddcec;
+    --image-bg: linear-gradient(135deg, #f0eee8 0%, #e8e5de 100%);
+    --nav-bg: rgba(255,255,255,0.9);
+    --progress-track: #e8e4dd;
+  }
+
+  body {
+    font-family: 'Cabinet Grotesk', system-ui, sans-serif;
+    background: #0e0e0e; margin: 0; padding: 0;
+    min-height: 100vh; display: flex; align-items: center;
+    justify-content: center;
+  }
+  html.light body { background: #e8e5e0; }
+
+  .viewport {
+    width: 100vw; height: 100vh; position: relative;
+    overflow: hidden; background: var(--bg); outline: none;
+  }
+
+  .progress-bar {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; background: var(--progress-track); z-index: 200;
+  }
+  .progress-bar .fill {
+    height: 100%; background: var(--accent);
+    transition: width 0.25s ease;
+  }
+
+  .slide {
+    position: absolute; inset: 0; top: 3px;
+    display: none; flex-direction: column;
+    font-family: 'Cabinet Grotesk', sans-serif;
+  }
+  .slide.active { display: flex; }
+
+  /* -- Title Slide -- */
+  .slide-title {
+    justify-content: center; align-items: center; text-align: center;
+    padding: 4vh 5vw;
+  }
+  .slide-title .inner-frame {
+    position: absolute; inset: 3vh 3vw; border-radius: 18px;
+    background: var(--frame-bg); border: 1px solid var(--frame-border);
+  }
+  .slide-title .accent-dot {
+    position: absolute; top: 5vh; right: 5vw; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--accent); z-index: 2;
+  }
+  .slide-title h2 {
+    font-weight: 800; font-size: 7vw;
+    color: var(--heading); line-height: 1.05; position: relative; z-index: 1;
+    margin-bottom: 1.5vh;
+  }
+  .slide-title .subtitle {
+    font-weight: 400; font-size: 1.8vw;
+    color: var(--muted); position: relative; z-index: 1;
+  }
+  .slide-title .pill {
+    display: inline-block; font-size: 1.2vw;
+    font-weight: 500; color: var(--accent);
+    background: var(--accent-tint); border: 1px solid var(--accent-border);
+    padding: 0.4vh 1.2vw; border-radius: 100px;
+    margin-top: 2vh; position: relative; z-index: 1;
+  }
+
+  /* -- Section Divider -- */
+  .slide-section {
+    justify-content: flex-end; padding: 6vh 5vw 12vh;
+  }
+  .slide-section .section-num {
+    font-weight: 800; font-size: 20vw;
+    color: var(--accent); opacity: 0.06; position: absolute;
+    top: 5vh; right: 4vw; line-height: 1;
+  }
+  .slide-section .accent-line {
+    width: 4vw; height: 4px; background: var(--accent);
+    border-radius: 2px; margin-bottom: 2vh;
+  }
+  .slide-section h2 {
+    font-weight: 700; font-size: 6vw;
+    color: var(--heading); line-height: 1.1; position: relative; z-index: 1;
+    margin-bottom: 1vh;
+  }
+  .slide-section .section-sub {
+    font-weight: 400; font-size: 1.6vw;
+    color: var(--muted); position: relative; z-index: 1;
+  }
+
+  /* -- Floating Nav Dock -- */
+  .nav-dock {
+    position: absolute; bottom: 1.5vh; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 0.5vw;
+    background: var(--nav-bg); backdrop-filter: blur(16px);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 0.5vh 0.6vw; z-index: 300;
+    white-space: nowrap; user-select: none;
+  }
+  .nav-dock .arr {
+    width: 30px; height: 30px; border-radius: 7px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--body); cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem; font-family: 'Cabinet Grotesk', sans-serif; padding: 0;
+  }
+  .nav-dock .arr:hover { background: var(--surface); color: var(--heading); }
+  .nav-dock .sep { width: 1px; height: 20px; background: var(--border); }
+  .nav-dock .slide-title-area {
+    display: flex; align-items: center; gap: 0.4vw; min-width: 140px;
+  }
+  .nav-dock .tnum { font-size: 0.7rem; font-weight: 600; color: var(--accent); }
+  .nav-dock .ttext {
+    font-size: 0.7rem; font-weight: 500; color: var(--subheading);
+    max-width: 200px; overflow: hidden; text-overflow: ellipsis;
+  }
+  .nav-dock .page-count { font-size: 0.65rem; font-weight: 500; color: var(--muted); }
+  .nav-dock .page-count .pc-current { color: var(--subheading); font-weight: 600; }
+  .nav-dock .pips { display: flex; gap: 0.35rem; }
+  .nav-dock .pip {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--disabled); border: none; cursor: pointer;
+    transition: all 0.2s; padding: 0;
+  }
+  .nav-dock .pip.active { background: var(--accent); }
+  .nav-dock .pip:hover:not(.active) { background: var(--body); }
+  .nav-dock .theme-toggle {
+    width: 30px; height: 30px; border-radius: 7px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; padding: 0;
+  }
+  .nav-dock .theme-toggle:hover { background: var(--surface); color: var(--heading); }
+
+  /* -- Print Styles -- */
+  @media print {
+    html, html.light { color-scheme: light; }
+    body { background: white !important; padding: 0; margin: 0; display: block; }
+    .viewport { width: auto; height: auto; overflow: visible; background: white !important; }
+    .nav-dock, .progress-bar { display: none !important; }
+    .slide {
+      display: flex !important; position: relative !important;
+      width: 100vw; height: 100vh;
+      page-break-after: always; break-after: page;
+      background: #faf9f7 !important;
+      --bg: #faf9f7; --surface: #ffffff; --elevated: #f5f3ef;
+      --border: #e8e4dd; --border-subtle: #d9d4cc;
+      --heading: #1a1a1f; --subheading: #2a2a2f; --body: #6b6b78;
+      --muted: #8a8a95; --disabled: #b5b5be;
+      --accent: #5560c0; --accent-tint: rgba(85,96,192,0.07);
+      --accent-border: rgba(85,96,192,0.14);
+      --green: #3d8a5e; --green-tint: rgba(61,138,94,0.07);
+      --green-border: rgba(61,138,94,0.12);
+      --amber: #c49040; --amber-tint: rgba(196,144,64,0.08);
+      --rose: #c44e4e; --rose-tint: rgba(196,78,78,0.08);
+      --frame-bg: linear-gradient(160deg, #fff 0%, #f5f5fa 100%);
+      --frame-border: #dddcec;
+      --image-bg: linear-gradient(135deg, #f0eee8 0%, #e8e5de 100%);
+    }
+    .slide:last-child { page-break-after: auto; break-after: auto; }
+  }
+
+  {{CUSTOM_CSS}}
+</style>
+</head>
+<body>
+
+<div class="viewport" tabindex="0" id="viewport">
+  <div class="progress-bar"><div class="fill" id="progressFill"></div></div>
+
+  {{SLIDES_HTML}}
+
+  <!-- Floating Nav Dock -->
+  <div class="nav-dock" id="navDock">
+    <button class="arr" onclick="goPrev()">&#8249;</button>
+    <div class="sep"></div>
+    <div class="slide-title-area">
+      <span class="tnum" id="navNum">01</span>
+      <span class="ttext" id="navTitle"></span>
+    </div>
+    <div class="sep"></div>
+    <div class="page-count">
+      <span class="pc-current" id="navCurrent">1</span> / <span id="navTotal">0</span>
+    </div>
+    <div class="sep"></div>
+    <div class="pips" id="navPips"></div>
+    <div class="sep"></div>
+    <button class="theme-toggle" id="btnTheme" onclick="toggleTheme()" title="Toggle light/dark mode">&#9788;</button>
+    <div class="sep"></div>
+    <button class="arr" onclick="goNext()">&#8250;</button>
+  </div>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  let current = 0;
+
+  const pipsContainer = document.getElementById('navPips');
+  slides.forEach((_, i) => {
+    const pip = document.createElement('button');
+    pip.className = 'pip' + (i === 0 ? ' active' : '');
+    pip.onclick = () => goTo(i);
+    pipsContainer.appendChild(pip);
+  });
+  document.getElementById('navTotal').textContent = total;
+
+  function goTo(idx) {
+    if (idx < 0 || idx >= total) return;
+    slides[current].classList.remove('active');
+    current = idx;
+    slides[current].classList.add('active');
+    updateNav();
+  }
+  function goNext() { goTo(current + 1); }
+  function goPrev() { goTo(current - 1); }
+
+  function updateNav() {
+    const slide = slides[current];
+    document.getElementById('navNum').textContent = String(current + 1).padStart(2, '0');
+    document.getElementById('navTitle').textContent = slide.dataset.title || '';
+    document.getElementById('navCurrent').textContent = current + 1;
+    document.getElementById('progressFill').style.width = ((current + 1) / total * 100) + '%';
+    document.querySelectorAll('#navPips .pip').forEach((p, i) =>
+      p.classList.toggle('active', i === current));
+  }
+
+  let isDark = true;
+  function toggleTheme() {
+    isDark = !isDark;
+    document.documentElement.classList.toggle('light', !isDark);
+    document.getElementById('btnTheme').innerHTML = isDark ? '&#9788;' : '&#9790;';
+  }
+
+  document.getElementById('viewport').addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); goNext(); }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); goPrev(); }
+  });
+
+  document.getElementById('viewport').addEventListener('click', (e) => {
+    if (e.target.closest('.nav-dock')) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (e.clientX - rect.left > rect.width / 2) goNext(); else goPrev();
+  });
+
+  document.getElementById('viewport').focus();
+  updateNav();
+</script>
+
+</body>
+</html>
