@@ -51,7 +51,7 @@ if [ -n "$branch" ] && ! git -C "$dir" --no-optional-locks diff-index --quiet HE
 fi
 
 # Cost from Claude (already in USD)
-cost=$(echo "$input" | jq -r '.context_window.total_cost // 0')
+cost=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
 cost=$(awk "BEGIN {printf \"%.4f\", $cost}")
 
 # Build status line
