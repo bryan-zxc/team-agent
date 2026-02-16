@@ -1,23 +1,5 @@
 #!/bin/bash
 
-# Claude Code Custom Status Line — Auto-Compact Awareness
-#
-# Shows: model, directory, git branch, context usage %, tokens, and cost.
-#
-# SETUP:
-#   1. Copy this script to ~/.claude/statusline-autocompact.sh
-#   2. Make it executable: chmod +x ~/.claude/statusline-autocompact.sh
-#   3. Add to ~/.claude/settings.json:
-#      {
-#        "statusLine": {
-#          "type": "command",
-#          "command": "~/.claude/statusline-autocompact.sh"
-#        }
-#      }
-#   4. Restart Claude Code
-#
-# REQUIRES: jq (brew install jq / apt install jq)
-
 # Read JSON input from stdin
 input=$(cat)
 
@@ -68,18 +50,9 @@ if [ -n "$branch" ] && ! git -C "$dir" --no-optional-locks diff-index --quiet HE
   branch="${branch}*"
 fi
 
-# Cost estimate
-case "$model_id" in
-  *opus-4*) in_price=5; out_price=25;;
-  *sonnet-4*) in_price=3; out_price=15;;
-  *) in_price=0; out_price=0;;
-esac
-
-if [ "$in_price" -gt 0 ]; then
-  cost=$(awk "BEGIN {printf \"%.4f\", ($in_tok * $in_price + $out_tok * $out_price) / 1000000}")
-else
-  cost="0.0000"
-fi
+# Cost from Claude (already in USD)
+cost=$(echo "$input" | jq -r '.context_window.total_cost // 0')
+cost=$(awk "BEGIN {printf \"%.4f\", $cost}")
 
 # Build status line
 status=$(printf '\033[36m%s\033[0m \033[32m%s\033[0m' "$model" "$(basename "$dir")")
