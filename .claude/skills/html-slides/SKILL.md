@@ -10,7 +10,7 @@ description: >
 
 # HTML Slide Presentations
 
-Build standalone HTML presentations using the confirmed design system. Output is a single shareable `.html` file with light/dark mode, keyboard navigation, and print-to-PDF support.
+Build HTML presentations using the confirmed design system. Output is an `.html` file with light/dark mode, keyboard navigation, and print-to-PDF support.
 
 ## Architecture
 
@@ -18,13 +18,13 @@ Build standalone HTML presentations using the confirmed design system. Output is
 calculate.py  (optional — only when source data needs processing)
      |
      v
-slides.json   (structured content)
+slides.json   (structured content — the primary output)
      |
      v
-build.py      (embeds into template.html)
+presentation.html  (built from template + JSON, validated with Playwright)
      |
      v
-presentation.html  (standalone, shareable)
+build.py      (optional — creates a static standalone HTML for sharing)
 ```
 
 ## Workflow
@@ -58,19 +58,12 @@ Write a JSON file:
 - `slides_html`: all `<div class="slide ...">` elements as a single HTML string. First slide must include the `active` class. Every slide div needs class `slide` plus a layout class, and `data-title="Slide Name"`.
 - `custom_css`: any additional CSS for custom slide layouts (inserted after base styles in the template)
 
-### 4. Build standalone HTML
+### 4. Build and Validate
+
+Build the presentation HTML from the template and JSON, then **always use the `/playwright-cli` skill to visually verify output.** Start a local server and screenshot key slides:
 
 ```bash
 python {skill_path}/scripts/build.py slides.json -o presentation.html
-```
-
-The template at [assets/template.html](assets/template.html) contains the full design system CSS, floating nav dock (centred, with prev/next arrows, slide title, page count, pips, light/dark toggle), progress bar, keyboard/click navigation, and print styles (light mode forced, one slide per page, nav hidden).
-
-### 5. Validate with Playwright
-
-**Always use the `/playwright-cli` skill to visually verify output.** Start a local server and screenshot key slides:
-
-```bash
 python3 -m http.server 8787 &
 playwright-cli open http://localhost:8787/presentation.html
 playwright-cli screenshot
@@ -78,7 +71,19 @@ playwright-cli press ArrowRight
 playwright-cli screenshot
 ```
 
-Check: font sizes fill the screen, content is well-positioned, colours match the design system, cards fit their content without unnecessary stretching.
+The template at [assets/template.html](assets/template.html) contains the full design system CSS, floating nav dock (centred, with prev/next arrows, slide title, page count, pips, light/dark toggle), progress bar, keyboard/click navigation, and print styles.
+
+Check: font sizes fill the screen, content is well-positioned, colours match the design system, cards fit their content without unnecessary stretching. Iterate on slides.json and rebuild until the presentation is confirmed.
+
+### 5. Package for Sharing (optional)
+
+Once the presentation is confirmed, the user can optionally create a static standalone HTML for easy sharing:
+
+```bash
+python {skill_path}/scripts/build.py slides.json -o presentation.html
+```
+
+The output is a single self-contained `.html` file that works in any browser with no dependencies (except Google Fonts).
 
 ### 6. Export to PDF (if requested)
 
