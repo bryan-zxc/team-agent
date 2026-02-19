@@ -3,8 +3,8 @@ import logging
 
 import redis.asyncio as aioredis
 
-from src.ai.config import settings
-from src.ai.listener import listen
+from .config import settings
+from .listener import listen
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ai-service")

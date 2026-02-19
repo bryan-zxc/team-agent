@@ -1,48 +1,53 @@
 import logging
 
-from claude_agent_sdk import (
-    AssistantMessage,
-    ClaudeAgentOptions,
-    TextBlock,
-    query,
-)
-
-from src.ai.config import settings
+from .llm import LLM
 
 logger = logging.getLogger("ai-service")
 
+# Module-level LLM instance (initialised once)
+_llm: LLM | None = None
+
+
+def _get_llm() -> LLM:
+    """Lazy-initialise the LLM service."""
+    global _llm
+    if _llm is None:
+        _llm = LLM()
+    return _llm
+
 
 async def run_agent(conversation: list[dict]) -> str:
-    """Run a Claude agent with the full conversation as context.
+    """Run Zimomo agent with the full conversation as context.
 
     Each entry in *conversation* should have 'display_name' and 'content' keys.
     Returns the agent's text response.
     """
+    llm = _get_llm()
+
+    # Build transcript for context
     transcript = "\n".join(
         f"{m['display_name']}: {m['content']}" for m in conversation
     )
 
-    prompt = (
+    system_instruction = (
         "You are Zimomo, an AI team member in a group chat. "
-        "Below is the conversation so far. Respond naturally and concisely "
-        "to the latest message that mentioned you (@zimomo).\n\n"
-        f"{transcript}"
+        "Respond naturally and concisely to the latest message "
+        "that mentioned you (@zimomo)."
     )
 
-    options = ClaudeAgentOptions(
-        model=settings.model,
-        allowed_tools=[],
-    )
+    messages = [{"role": "user", "content": transcript}]
 
-    parts: list[str] = []
     try:
-        async for msg in query(prompt=prompt, options=options):
-            if isinstance(msg, AssistantMessage):
-                for block in msg.content:
-                    if isinstance(block, TextBlock):
-                        parts.append(block.text)
+        result = await llm.a_get_response(
+            messages=messages,
+            system_instruction=system_instruction,
+        )
+
+        # Handle TextResponse or plain string
+        if hasattr(result, "output_text"):
+            return result.output_text
+        return str(result)
+
     except Exception:
         logger.exception("Agent query failed")
         return "Sorry, I encountered an error processing your request."
-
-    return "".join(parts)

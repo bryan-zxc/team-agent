@@ -43,8 +43,15 @@ team-agent/
 │       │       ├── main.py             # Entry point — starts the Listener
 │       │       ├── config.py           # Environment/config loading
 │       │       ├── listener.py         # Redis subscriber, trigger/filter logic
-│       │       ├── runner.py           # Spawns ephemeral ClaudeSDKClient per task
+│       │       ├── runner.py           # Runs Zimomo via Google Gemini LLM
 │       │       ├── transcript.py       # Read/save transcripts to PostgreSQL
+│       │       ├── llm/               # LLM provider abstraction
+│       │       │   ├── base.py        # BaseLLMProvider ABC
+│       │       │   ├── config.py      # Model mappings and pricing
+│       │       │   ├── google.py      # Google Gemini provider
+│       │       │   ├── openai.py     # OpenAI provider (backup for 503s)
+│       │       │   ├── models.py      # TextResponse model
+│       │       │   └── service.py     # LLM service (primary entry point)
 │       │       ├── personas/           # Persona loading and registry
 │       │       └── skills/             # Custom agent skills (.md files)
 │       └── tests/

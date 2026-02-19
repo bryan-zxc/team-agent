@@ -9,13 +9,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from src.api.config import settings
-from src.api.database import async_session, engine
-from src.api.models.message import Message
-from src.api.routes.rooms import router as rooms_router
-from src.api.routes.users import router as users_router
-from src.api.websocket.handler import router as ws_router
-from src.api.websocket.manager import manager
+from .config import settings
+from .database import async_session, engine
+from .models.message import Message
+from .routes.rooms import router as rooms_router
+from .routes.users import router as users_router
+from .websocket.handler import router as ws_router
+from .websocket.manager import manager
 
 logger = logging.getLogger("api")
 

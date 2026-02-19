@@ -4,11 +4,11 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from src.api.database import async_session
-from src.api.models.room import Room
-from src.api.models.chat import Chat
-from src.api.models.message import Message
-from src.api.models.user import User
+from ..database import async_session
+from ..models.room import Room
+from ..models.chat import Chat
+from ..models.message import Message
+from ..models.user import User
 
 router = APIRouter()
 

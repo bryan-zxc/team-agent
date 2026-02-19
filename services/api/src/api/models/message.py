@@ -4,7 +4,7 @@ from sqlalchemy import ForeignKey, Index, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.api.models.base import Base, UUIDPrimaryKey, TimestampMixin
+from .base import Base, UUIDPrimaryKey, TimestampMixin
 
 
 class Message(UUIDPrimaryKey, TimestampMixin, Base):

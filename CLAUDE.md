@@ -17,7 +17,7 @@ When working on the frontend, read `services/frontend/FRONTEND.md` first and fol
 ## Ticket Workflow
 - When picking up a ticket: transition status to **In progress** on the project board
 - When done with a ticket: transition status to **Done** on the project board and close the issue
-- If a ticket needs to change or needs to be updated, just change the description, don't add a comment to the ticket
+- If a ticket needs to change or needs to be updated, just edit the description to the correct version — describe clearly what is eventually done, not what changed from before. Never add comments to tickets.
 
 ## Creating Tickets
 - **Epic vs Story**: An epic is a large user-facing goal or milestone — done when its stories are all complete. A story is a deliverable slice of work that provides value on its own, belonging to an epic.

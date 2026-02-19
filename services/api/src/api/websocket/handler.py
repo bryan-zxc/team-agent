@@ -3,16 +3,16 @@ import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 
-from src.api.database import async_session
-from src.api.models.message import Message
-from src.api.models.user import User
-from src.api.websocket.manager import manager
+from ..database import async_session
+from ..models.message import Message
+from ..models.user import User
+from .manager import manager
 
 router = APIRouter()
 
 
 def _get_redis():
-    from src.api.main import redis_client
+    from ..main import redis_client
     return redis_client
 
 

@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 import asyncpg
 import redis.asyncio as aioredis
 
-from src.ai.config import settings
-from src.ai.runner import run_agent
+from .config import settings
+from .runner import run_agent
 
 logger = logging.getLogger("ai-service")
 
