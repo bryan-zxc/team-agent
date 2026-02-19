@@ -2,7 +2,7 @@ import logging
 
 from .llm import LLM
 
-logger = logging.getLogger("ai-service")
+logger = logging.getLogger(__name__)
 
 # Module-level LLM instance (initialised once)
 _llm: LLM | None = None

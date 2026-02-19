@@ -15,6 +15,8 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://teamagent:teamagent_dev@postgres:5432/teamagent}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-text}
     volumes:
       - ./db:/app/db
     depends_on:
@@ -33,6 +35,8 @@ services:
       - MODEL=${MODEL:-claude-opus-4-6}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3-pro-preview}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-5.2}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-text}
     volumes:
       - claude_auth:/root/.claude
     depends_on:

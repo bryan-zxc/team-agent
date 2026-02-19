@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from .config import settings
+from .config import settings, setup_logging
 from .database import async_session, engine
 from .models.message import Message
 from .routes.rooms import router as rooms_router
@@ -17,7 +17,8 @@ from .routes.users import router as users_router
 from .websocket.handler import router as ws_router
 from .websocket.manager import manager
 
-logger = logging.getLogger("api")
+setup_logging()
+logger = logging.getLogger(__name__)
 
 redis_client = aioredis.from_url(settings.redis_url)
 

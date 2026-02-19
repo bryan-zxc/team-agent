@@ -9,7 +9,7 @@ import redis.asyncio as aioredis
 from .config import settings
 from .runner import run_agent
 
-logger = logging.getLogger("ai-service")
+logger = logging.getLogger(__name__)
 
 # asyncpg uses postgresql:// not postgresql+asyncpg://
 _dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
