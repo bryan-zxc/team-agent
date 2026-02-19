@@ -74,7 +74,10 @@ async def listen(redis_client: aioredis.Redis):
 
         # Fetch full conversation history for context
         conversation = await _load_chat_history(msg["chat_id"])
+        logger.info("Loaded %d messages from database", len(conversation))
+
         content = await run_agent(conversation)
+        logger.info("Agent returned %d chars", len(content))
 
         response = {
             "id": str(uuid.uuid4()),
