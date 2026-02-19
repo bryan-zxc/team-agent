@@ -56,6 +56,10 @@ team-agent/
 │       │       └── skills/             # Custom agent skills (.md files)
 │       └── tests/
 │
+├── docs/
+│   └── adr/                            # Architecture Decision Records
+│       └── adr.md                      # Index of all active decisions
+│
 ├── db/
 │   └── migrations/                     # Database migrations (shared schema for api + ai)
 │
@@ -81,6 +85,7 @@ team-agent/
 | Looking for... | Go to |
 |---|---|
 | Overall architecture and design decisions | `architecture.md` |
+| Architecture decision records (ADRs) | `docs/adr/adr.md` |
 | REST API endpoints | `services/api/src/api/routes/` |
 | WebSocket handling | `services/api/src/api/websocket/` |
 | Database schema / models | `services/api/src/api/models/` |
