@@ -17,21 +17,21 @@ export default function ChatPage() {
   const [room, setRoom] = useState<Room | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [memberId, setMemberId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const chatId = room?.primary_chat_id ?? null;
-  const { messages, sendMessage, setMessages } = useWebSocket(chatId, userId);
+  const { messages, sendMessage, setMessages } = useWebSocket(chatId, memberId);
 
   // Load user from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem("user_id");
+    const stored = localStorage.getItem("member_id");
     if (!stored) {
       router.push("/");
       return;
     }
-    setUserId(stored);
+    setMemberId(stored);
   }, [router]);
 
   // Fetch rooms, users, and message history
@@ -57,7 +57,7 @@ export default function ChatPage() {
   }, [messages]);
 
   const userMap = new Map(users.map((u) => [u.id, u]));
-  const currentUser = userId ? userMap.get(userId) : null;
+  const currentUser = memberId ? userMap.get(memberId) : null;
 
   const handleSend = useCallback(() => {
     if (!input.trim()) return;
@@ -136,8 +136,8 @@ export default function ChatPage() {
 
         <div className={styles.messages}>
           {messages.map((msg) => {
-            const author = userMap.get(msg.user_id);
-            const isSelf = msg.user_id === userId;
+            const author = userMap.get(msg.member_id);
+            const isSelf = msg.member_id === memberId;
             const isAi = author?.type === "ai";
 
             return (

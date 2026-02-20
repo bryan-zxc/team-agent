@@ -8,7 +8,7 @@ export type Room = {
 export type Message = {
   id: string;
   chat_id: string;
-  user_id: string;
+  member_id: string;
   display_name: string;
   content: string;
   created_at: string;

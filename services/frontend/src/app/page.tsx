@@ -20,7 +20,7 @@ export default function Home() {
   useEffect(() => {
     fetch(`${API_URL}/rooms`).then((r) => r.json()).then(setRooms);
     fetch(`${API_URL}/users`).then((r) => r.json()).then(setUsers);
-    const stored = localStorage.getItem("user_id");
+    const stored = localStorage.getItem("member_id");
     if (stored) setSelectedUser(stored);
   }, []);
 
@@ -28,7 +28,7 @@ export default function Home() {
 
   const selectUser = useCallback((id: string) => {
     setSelectedUser(id);
-    localStorage.setItem("user_id", id);
+    localStorage.setItem("member_id", id);
     setShowUserPicker(false);
   }, []);
 

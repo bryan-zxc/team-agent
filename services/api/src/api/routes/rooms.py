@@ -8,7 +8,7 @@ from ..database import async_session
 from ..models.room import Room
 from ..models.chat import Chat
 from ..models.message import Message
-from ..models.user import User
+from ..models.project_member import ProjectMember
 
 router = APIRouter()
 
@@ -43,7 +43,11 @@ async def list_rooms():
 @router.post("/rooms")
 async def create_room(req: CreateRoomRequest):
     async with async_session() as session:
-        room = Room(name=req.name)
+        # Use the first project for now
+        from ..models.project import Project
+        project = (await session.execute(select(Project).limit(1))).scalar_one()
+
+        room = Room(name=req.name, project_id=project.id)
         session.add(room)
         await session.flush()
 
@@ -75,8 +79,8 @@ async def get_room_messages(room_id: uuid.UUID):
 
         rows = (
             await session.execute(
-                select(Message, User.display_name)
-                .join(User, Message.user_id == User.id)
+                select(Message, ProjectMember.display_name, ProjectMember.type)
+                .join(ProjectMember, Message.member_id == ProjectMember.id)
                 .where(Message.chat_id == primary_chat.id)
                 .order_by(Message.created_at)
             )
@@ -86,10 +90,11 @@ async def get_room_messages(room_id: uuid.UUID):
             {
                 "id": str(msg.id),
                 "chat_id": str(msg.chat_id),
-                "user_id": str(msg.user_id),
+                "member_id": str(msg.member_id),
                 "display_name": display_name,
+                "type": member_type,
                 "content": msg.content,
                 "created_at": msg.created_at.isoformat(),
             }
-            for msg, display_name in rows
+            for msg, display_name, member_type in rows
         ]

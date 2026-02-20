@@ -39,6 +39,7 @@ services:
       - LOG_FORMAT=${LOG_FORMAT:-text}
     volumes:
       - claude_auth:/root/.claude
+      - ./agents:/app/agents
     depends_on:
       postgres:
         condition: service_healthy

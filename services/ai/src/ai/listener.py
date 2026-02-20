@@ -15,11 +15,13 @@ logger = logging.getLogger(__name__)
 _dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
 
 
-async def _load_ai_user() -> dict | None:
-    """Load the first AI user from the database."""
+async def _load_ai_member() -> dict | None:
+    """Load the first AI project member from the database."""
     conn = await asyncpg.connect(_dsn)
     try:
-        row = await conn.fetchrow("SELECT id, display_name FROM users WHERE type = 'ai' LIMIT 1")
+        row = await conn.fetchrow(
+            "SELECT id, display_name FROM project_members WHERE type = 'ai' LIMIT 1"
+        )
         if row:
             return {"id": str(row["id"]), "display_name": row["display_name"]}
         return None
@@ -32,8 +34,8 @@ async def _load_chat_history(chat_id: str) -> list[dict]:
     conn = await asyncpg.connect(_dsn)
     try:
         rows = await conn.fetch(
-            "SELECT u.display_name, m.content "
-            "FROM messages m JOIN users u ON u.id = m.user_id "
+            "SELECT pm.display_name, m.content "
+            "FROM messages m JOIN project_members pm ON pm.id = m.member_id "
             "WHERE m.chat_id = $1 ORDER BY m.created_at",
             uuid.UUID(chat_id),
         )
@@ -44,12 +46,12 @@ async def _load_chat_history(chat_id: str) -> list[dict]:
 
 async def listen(redis_client: aioredis.Redis):
     """Subscribe to chat:messages and handle incoming messages."""
-    ai_user = await _load_ai_user()
-    if not ai_user:
-        logger.error("No AI user found in database — cannot respond")
+    ai_member = await _load_ai_member()
+    if not ai_member:
+        logger.error("No AI member found in database — cannot respond")
         return
 
-    logger.info("Listener started as %s (id=%s)", ai_user["display_name"], ai_user["id"])
+    logger.info("Listener started as %s (id=%s)", ai_member["display_name"], ai_member["id"])
 
     pubsub = redis_client.pubsub()
     await pubsub.subscribe("chat:messages")
@@ -62,8 +64,8 @@ async def listen(redis_client: aioredis.Redis):
         msg = json.loads(raw["data"])
         logger.info("[%s] %s: %s", msg["chat_id"][:8], msg["display_name"], msg["content"])
 
-        # Skip messages from AI users to avoid loops
-        if msg["user_id"] == ai_user["id"]:
+        # Skip messages from AI members to avoid loops
+        if msg["member_id"] == ai_member["id"]:
             continue
 
         # Trigger: respond when message contains @zimomo
@@ -76,14 +78,21 @@ async def listen(redis_client: aioredis.Redis):
         conversation = await _load_chat_history(msg["chat_id"])
         logger.info("Loaded %d messages from database", len(conversation))
 
-        content = await run_agent(conversation)
+        agent_response = await run_agent(conversation)
+        content = agent_response.response
         logger.info("Agent returned %d chars", len(content))
+
+        if agent_response.workloads:
+            logger.info(
+                "Workloads assigned: %s",
+                ", ".join(f"{w.owner}: {w.title}" for w in agent_response.workloads),
+            )
 
         response = {
             "id": str(uuid.uuid4()),
             "chat_id": msg["chat_id"],
-            "user_id": ai_user["id"],
-            "display_name": ai_user["display_name"],
+            "member_id": ai_member["id"],
+            "display_name": ai_member["display_name"],
             "content": content,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }

@@ -40,7 +40,7 @@ async def _listen_for_ai_responses():
             message = Message(
                 id=uuid.UUID(msg_data["id"]),
                 chat_id=uuid.UUID(msg_data["chat_id"]),
-                user_id=uuid.UUID(msg_data["user_id"]),
+                member_id=uuid.UUID(msg_data["member_id"]),
                 content=msg_data["content"],
             )
             async with async_session() as session:

@@ -6,16 +6,16 @@ import type { Message } from "@/types";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const WS_URL = API_URL.replace(/^http/, "ws");
 
-export function useWebSocket(chatId: string | null, userId: string | null) {
+export function useWebSocket(chatId: string | null, memberId: string | null) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const connect = useCallback(() => {
-    if (!chatId || !userId) return;
+    if (!chatId || !memberId) return;
 
-    const ws = new WebSocket(`${WS_URL}/ws/${chatId}?user_id=${userId}`);
+    const ws = new WebSocket(`${WS_URL}/ws/${chatId}?member_id=${memberId}`);
     wsRef.current = ws;
 
     ws.onopen = () => setIsConnected(true);
@@ -29,7 +29,7 @@ export function useWebSocket(chatId: string | null, userId: string | null) {
       setIsConnected(false);
       reconnectTimer.current = setTimeout(connect, 2000);
     };
-  }, [chatId, userId]);
+  }, [chatId, memberId]);
 
   useEffect(() => {
     connect();

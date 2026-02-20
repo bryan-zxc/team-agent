@@ -8,4 +8,3 @@ class User(UUIDPrimaryKey, TimestampMixin, Base):
     __tablename__ = "users"
 
     display_name: Mapped[str] = mapped_column(String, nullable=False)
-    type: Mapped[str] = mapped_column(String, nullable=False)

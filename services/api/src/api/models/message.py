@@ -14,7 +14,7 @@ class Message(UUIDPrimaryKey, TimestampMixin, Base):
     chat_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("chats.id"), nullable=False
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    member_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("project_members.id"), nullable=False
     )
     content: Mapped[str] = mapped_column(String, nullable=False)

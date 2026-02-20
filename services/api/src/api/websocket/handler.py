@@ -5,7 +5,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 
 from ..database import async_session
 from ..models.message import Message
-from ..models.user import User
+from ..models.project_member import ProjectMember
 from .manager import manager
 
 router = APIRouter()
@@ -20,14 +20,14 @@ def _get_redis():
 async def websocket_endpoint(
     websocket: WebSocket,
     chat_id: uuid.UUID,
-    user_id: uuid.UUID = Query(...),
+    member_id: uuid.UUID = Query(...),
 ):
     await manager.connect(chat_id, websocket)
 
-    # Look up display name for this user
+    # Look up display name from project_members
     async with async_session() as session:
-        user = await session.get(User, user_id)
-        display_name = user.display_name if user else "Unknown"
+        member = await session.get(ProjectMember, member_id)
+        display_name = member.display_name if member else "Unknown"
 
     try:
         while True:
@@ -39,7 +39,7 @@ async def websocket_endpoint(
             # Persist message
             message = Message(
                 chat_id=chat_id,
-                user_id=user_id,
+                member_id=member_id,
                 content=content,
             )
             async with async_session() as session:
@@ -50,7 +50,7 @@ async def websocket_endpoint(
             msg_data = {
                 "id": str(message.id),
                 "chat_id": str(chat_id),
-                "user_id": str(user_id),
+                "member_id": str(member_id),
                 "display_name": display_name,
                 "content": message.content,
                 "created_at": message.created_at.isoformat(),
