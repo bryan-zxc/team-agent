@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from .base import BaseLLMProvider, RequestType
 from .config import MAX_LLM_RETRIES, PROVIDER_PRICING
 from .models import TextResponse
+from ..cost import get_cost_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +113,7 @@ class OpenAIProvider(BaseLLMProvider):
 
             # Track usage
             if hasattr(response, "usage"):
-                self.track_cost(model, response.usage, RequestType.TEXT)
+                await self.track_cost(model, response.usage, RequestType.TEXT)
 
             # Build message list
             message_list = []
@@ -167,7 +168,7 @@ class OpenAIProvider(BaseLLMProvider):
 
                 # Track usage
                 if hasattr(response, "usage"):
-                    self.track_cost(model, response.usage, RequestType.STRUCTURED)
+                    await self.track_cost(model, response.usage, RequestType.STRUCTURED)
 
                 return response.output_parsed
 
@@ -185,7 +186,7 @@ class OpenAIProvider(BaseLLMProvider):
 
                     # Track usage immediately after API call
                     if hasattr(response, "usage"):
-                        self.track_cost(
+                        await self.track_cost(
                             model, response.usage, RequestType.STRUCTURED
                         )
 
@@ -231,7 +232,7 @@ class OpenAIProvider(BaseLLMProvider):
             logger.error(f"OpenAI structured response error: {e}")
             return None
 
-    def track_cost(
+    async def track_cost(
         self, model: str, usage_metadata: Any, request_type: RequestType
     ) -> None:
         """Calculate cost and log usage for OpenAI."""
@@ -253,9 +254,18 @@ class OpenAIProvider(BaseLLMProvider):
         else:
             logger.warning(f"No pricing info for model {model}")
 
-        # Log-only tracking (DB integration in ticket #13)
         logger.info(
             f"LLM Usage: {model}, Input: {input_tokens}, "
             f"Output: {output_tokens}, Cost: ${cost:.6f}, "
             f"Type: {request_type.value}"
+        )
+
+        await get_cost_tracker().track_llm_cost(
+            model=model,
+            provider=self.provider_name,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost=cost,
+            request_type=request_type.value,
+            caller="zimomo",
         )

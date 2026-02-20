@@ -1,6 +1,6 @@
 ---
 name: adr-recorder
-description: Record architecture decision records (ADRs) after completing tasks. Use this skill proactively at the end of any task that involved an architectural or design decision — technology choices, patterns, trade-offs, structural changes, or infrastructure decisions. Do NOT trigger for routine code changes, bug fixes, or minor refactors that don't involve a design choice.
+description: Record architecture decision records (ADRs). Activate this skill in two situations: (1) Before every git commit — always assess whether the changes being committed involve a design decision worth recording. (2) At the end of any task that involved an architectural or design decision — technology choices, patterns, trade-offs, structural changes, or infrastructure decisions.
 ---
 
 # ADR Recorder
@@ -11,7 +11,7 @@ Record architecture decisions in `docs/adr/`.
 
 ### 1. Assess
 
-After completing a task, assess whether any design decisions were made that are worth recording. A decision is worth recording if it:
+Assess whether any design decisions were made that are worth recording. Do not record routine code changes, bug fixes, or minor refactors that don't involve a design choice. A decision is worth recording if it:
 
 - Chose between multiple viable approaches
 - Established a pattern others should follow

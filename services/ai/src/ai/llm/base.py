@@ -104,7 +104,7 @@ class BaseLLMProvider(ABC):
         pass
 
     @abstractmethod
-    def track_cost(
+    async def track_cost(
         self, model: str, usage_metadata: Any, request_type: RequestType
     ) -> None:
         """Calculate cost and track usage.
