@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useTheme } from "@/hooks/useTheme";
+import clsx from "clsx";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { MemberList } from "@/components/members/MemberList";
+import { Sidebar } from "@/components/sidebar/Sidebar";
 import { AddMemberModal } from "@/components/members/AddMemberModal";
 import type { Member, Message, Room, User } from "@/types";
 import styles from "./page.module.css";
@@ -14,7 +14,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 export default function ChatPage() {
   const params = useParams<{ roomId: string }>();
   const router = useRouter();
-  const { theme, toggle } = useTheme();
 
   const [room, setRoom] = useState<Room | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -87,46 +86,17 @@ export default function ChatPage() {
 
   return (
     <div className={styles.layout}>
-      {/* Sidebar */}
-      <aside className={styles.sidebar}>
-        <div className={styles.sidebarHeader}>
-          <div className={styles.logo}>
-            <div className={styles.logoMark}>ta</div>
-            <h1 className={styles.logoText}>Team Agent</h1>
-          </div>
-          <button className={styles.themeToggle} onClick={toggle} title="Toggle theme">
-            {theme === "light" ? "\u263D" : "\u2600"}
-          </button>
-        </div>
-
-        <div className={styles.sectionLabel}>Rooms</div>
-
-        <div className={styles.roomList}>
-          {rooms.map((r) => (
-            <button
-              key={r.id}
-              className={`${styles.roomItem} ${r.id === params.roomId ? styles.roomItemActive : ""}`}
-              onClick={() => router.push(`/chat/${r.id}`)}
-            >
-              <div className={`${styles.roomIcon} ${r.id === params.roomId ? styles.roomIconActive : ""}`}>
-                #
-              </div>
-              <div className={styles.roomInfo}>
-                <div className={styles.roomName}>{r.name}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <MemberList
-          members={members}
-          onAddClick={() => setShowAddModal(true)}
-        />
-
-        <div className={styles.sidebarFooter}>
-          {currentUser && (
+      <Sidebar
+        rooms={rooms}
+        members={members}
+        activeRoomId={params.roomId}
+        onRoomClick={(roomId) => router.push(`/chat/${roomId}`)}
+        onAddMember={() => setShowAddModal(true)}
+      >
+        {currentUser && (
+          <div className={styles.sidebarFooter}>
             <div className={styles.userDisplay}>
-              <div className={`${styles.avatar} ${styles.avatarHuman}`}>
+              <div className={clsx(styles.avatar, styles.avatarHuman)}>
                 {currentUser.display_name[0]}
               </div>
               <div className={styles.userInfo}>
@@ -134,15 +104,14 @@ export default function ChatPage() {
                 <div className={styles.userRole}>{currentUser.type}</div>
               </div>
             </div>
-          )}
-        </div>
-      </aside>
+          </div>
+        )}
+      </Sidebar>
 
-      {/* Chat */}
       <main className={styles.main}>
-        <div className={styles.chatHeader}>
+        <header className={styles.chatHeader}>
           <h2 className={styles.chatTitle}>{room?.name ?? "Loading..."}</h2>
-        </div>
+        </header>
 
         <div className={styles.messages}>
           {messages.map((msg) => {
@@ -153,10 +122,10 @@ export default function ChatPage() {
             return (
               <div
                 key={msg.id}
-                className={`${styles.messageGroup} ${isSelf ? styles.self : ""} ${isAi ? styles.ai : ""}`}
+                className={clsx(styles.messageGroup, isSelf && styles.self, isAi && styles.ai)}
               >
                 <div
-                  className={`${styles.msgAvatar} ${isAi ? styles.avatarAi : styles.avatarHuman}`}
+                  className={clsx(styles.msgAvatar, isAi ? styles.avatarAi : styles.avatarHuman)}
                 >
                   {msg.display_name[0]}
                 </div>
@@ -184,7 +153,7 @@ export default function ChatPage() {
               onKeyDown={handleKeyDown}
               rows={1}
             />
-            <button className={styles.sendBtn} onClick={handleSend}>
+            <button className={styles.sendBtn} onClick={handleSend} aria-label="Send message">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13" />
                 <polygon points="22 2 15 22 11 13 2 9 22 2" />

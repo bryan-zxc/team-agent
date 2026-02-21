@@ -68,14 +68,15 @@
   border: 1px solid var(--border);
   background: var(--bg-subtle);
   color: var(--text-primary);
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.6;
   resize: vertical;
-  outline: none;
   transition: border-color 0.2s ease;
 }
 
-.editor:focus {
+.editor:focus-visible {
+  outline: none;
   border-color: var(--accent);
 }
+

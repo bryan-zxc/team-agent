@@ -25,7 +25,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" data-theme="light" className={`${heading.variable} ${body.variable}`}>
-      <body style={{ fontFamily: "var(--font-body)" }}>
+      <body>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

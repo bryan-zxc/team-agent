@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import clsx from "clsx";
 import type { AvailableUser, Member } from "@/types";
 import styles from "./AddMemberModal.module.css";
 
@@ -92,18 +93,18 @@ export function AddMemberModal({ open, onClose, onMemberAdded }: AddMemberModalP
         >
           <div className={styles.header}>
             <h3 className={styles.title}>Add Member</h3>
-            <button className={styles.closeBtn} onClick={onClose}>&times;</button>
+            <button className={styles.closeBtn} onClick={onClose} aria-label="Close">&times;</button>
           </div>
 
           <div className={styles.tabs}>
             <button
-              className={`${styles.tab} ${tab === "human" ? styles.tabActive : ""}`}
+              className={clsx(styles.tab, tab === "human" && styles.tabActive)}
               onClick={() => setTab("human")}
             >
               Human
             </button>
             <button
-              className={`${styles.tab} ${tab === "ai" ? styles.tabActive : ""}`}
+              className={clsx(styles.tab, tab === "ai" && styles.tabActive)}
               onClick={() => setTab("ai")}
             >
               AI Agent

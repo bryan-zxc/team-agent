@@ -12,7 +12,7 @@ Each service has its own Dockerfile, dependencies, and tests. They communicate v
 ## Dependencies
 Always use `uv add <package>` to add Python dependencies. Never edit `pyproject.toml` directly — `uv add` resolves the latest version and updates the lock file automatically.
 
-When working on the frontend, read `services/frontend/FRONTEND.md` first and follow its design system, styling, and component guidelines.
+When working on the frontend, the `fe-dev` skill provides the design system, styling rules, and component guidelines.
 
 ## Ticket Workflow
 - When picking up a ticket: transition status to **In progress** on the project board

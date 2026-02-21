@@ -12,14 +12,19 @@ team-agent/
 ├── services/
 │   ├── frontend/                       # Next.js (React / TypeScript)
 │   │   ├── Dockerfile
+│   │   ├── frontend-design.md          # UX/navigation design reference
 │   │   ├── public/
 │   │   └── src/
 │   │       ├── app/                    # Next.js app router (pages)
-│   │       │   └── chat/
-│   │       │       └── [roomId]/       # Dynamic route per room
+│   │       │   ├── chat/
+│   │       │   │   └── [roomId]/       # Dynamic route per room
+│   │       │   └── members/
+│   │       │       └── [memberId]/     # Member profile route
 │   │       ├── components/
 │   │       │   ├── chat/               # Chat UI components (message list, input, threads)
-│   │       │   └── agent/              # Agent chat window components
+│   │       │   ├── agent/              # Agent chat window components
+│   │       │   ├── members/            # Member list, profile, add modal
+│   │       │   └── sidebar/            # Shared sidebar component
 │   │       ├── hooks/                  # React hooks (e.g. WebSocket connection)
 │   │       ├── lib/                    # Utility functions, API client
 │   │       └── types/                  # TypeScript type definitions
@@ -98,3 +103,7 @@ team-agent/
 | Docker orchestration | `docker-compose.yml` |
 | Chat UI components | `services/frontend/src/components/chat/` |
 | Agent chat window UI | `services/frontend/src/components/agent/` |
+| Member management UI | `services/frontend/src/components/members/` |
+| Shared sidebar component | `services/frontend/src/components/sidebar/` |
+| Frontend design guidelines | `.claude/skills/fe-dev/SKILL.md` |
+| UX/navigation design | `services/frontend/frontend-design.md` |

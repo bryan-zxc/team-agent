@@ -36,6 +36,10 @@
   background: var(--surface-hover);
 }
 
+.memberItemClickable {
+  cursor: pointer;
+}
+
 .avatar {
   width: 28px;
   height: 28px;

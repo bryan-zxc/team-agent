@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useTheme } from "@/hooks/useTheme";
-import { MemberList } from "@/components/members/MemberList";
+import { Sidebar } from "@/components/sidebar/Sidebar";
 import { AddMemberModal } from "@/components/members/AddMemberModal";
 import { MemberProfile } from "@/components/members/MemberProfile";
 import { MemberProfileEditor } from "@/components/members/MemberProfileEditor";
@@ -15,7 +14,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 export default function MemberProfilePage() {
   const params = useParams<{ memberId: string }>();
   const router = useRouter();
-  const { theme, toggle } = useTheme();
 
   const [rooms, setRooms] = useState<Room[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -54,38 +52,12 @@ export default function MemberProfilePage() {
 
   return (
     <div className={styles.layout}>
-      <aside className={styles.sidebar}>
-        <div className={styles.sidebarHeader}>
-          <div className={styles.logo}>
-            <div className={styles.logoMark}>ta</div>
-            <h1 className={styles.logoText}>Team Agent</h1>
-          </div>
-          <button className={styles.themeToggle} onClick={toggle} title="Toggle theme">
-            {theme === "light" ? "\u263D" : "\u2600"}
-          </button>
-        </div>
-
-        <div className={styles.sectionLabel}>Rooms</div>
-        <div className={styles.roomList}>
-          {rooms.map((r) => (
-            <button
-              key={r.id}
-              className={styles.roomItem}
-              onClick={() => router.push(`/chat/${r.id}`)}
-            >
-              <div className={styles.roomIcon}>#</div>
-              <div className={styles.roomInfo}>
-                <div className={styles.roomName}>{r.name}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <MemberList
-          members={members}
-          onAddClick={() => setShowAddModal(true)}
-        />
-      </aside>
+      <Sidebar
+        rooms={rooms}
+        members={members}
+        onRoomClick={(roomId) => router.push(`/chat/${roomId}`)}
+        onAddMember={() => setShowAddModal(true)}
+      />
 
       <main className={styles.main}>
         {profileContent !== null && member ? (

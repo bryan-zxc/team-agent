@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useTheme } from "@/hooks/useTheme";
-import { MemberList } from "@/components/members/MemberList";
+import clsx from "clsx";
+import { Sidebar } from "@/components/sidebar/Sidebar";
 import { AddMemberModal } from "@/components/members/AddMemberModal";
 import type { Member, Room, User } from "@/types";
 import styles from "./page.module.css";
@@ -12,7 +12,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function Home() {
   const router = useRouter();
-  const { theme, toggle } = useTheme();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -62,50 +61,24 @@ export default function Home() {
 
   return (
     <div className={styles.layout}>
-      <aside className={styles.sidebar}>
-        <div className={styles.sidebarHeader}>
-          <div className={styles.logo}>
-            <div className={styles.logoMark}>ta</div>
-            <h1 className={styles.logoText}>Team Agent</h1>
+      <Sidebar
+        rooms={rooms}
+        members={members}
+        onRoomClick={openRoom}
+        onAddMember={() => setShowAddModal(true)}
+        roomActions={
+          <div className={styles.newRoom}>
+            <input
+              className={styles.newRoomInput}
+              placeholder="New room name..."
+              value={newRoomName}
+              onChange={(e) => setNewRoomName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && createRoom()}
+            />
+            <button className={styles.newRoomBtn} onClick={createRoom} aria-label="Create room">+</button>
           </div>
-          <button className={styles.themeToggle} onClick={toggle} title="Toggle theme">
-            {theme === "light" ? "\u263D" : "\u2600"}
-          </button>
-        </div>
-
-        <div className={styles.sectionLabel}>Rooms</div>
-
-        <div className={styles.roomList}>
-          {rooms.map((room) => (
-            <button
-              key={room.id}
-              className={styles.roomItem}
-              onClick={() => openRoom(room.id)}
-            >
-              <div className={styles.roomIcon}>#</div>
-              <div className={styles.roomInfo}>
-                <div className={styles.roomName}>{room.name}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <div className={styles.newRoom}>
-          <input
-            className={styles.newRoomInput}
-            placeholder="New room name..."
-            value={newRoomName}
-            onChange={(e) => setNewRoomName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && createRoom()}
-          />
-          <button className={styles.newRoomBtn} onClick={createRoom}>+</button>
-        </div>
-
-        <MemberList
-          members={members}
-          onAddClick={() => setShowAddModal(true)}
-        />
-
+        }
+      >
         <div className={styles.sidebarFooter}>
           <button
             className={styles.userSelector}
@@ -113,7 +86,7 @@ export default function Home() {
           >
             {currentUser ? (
               <>
-                <div className={`${styles.avatar} ${currentUser.type === "ai" ? styles.avatarAi : styles.avatarHuman}`}>
+                <div className={clsx(styles.avatar, currentUser.type === "ai" ? styles.avatarAi : styles.avatarHuman)}>
                   {currentUser.display_name[0]}
                 </div>
                 <div className={styles.userInfo}>
@@ -137,7 +110,7 @@ export default function Home() {
                   className={styles.userOption}
                   onClick={() => selectUser(user.id)}
                 >
-                  <div className={`${styles.avatar} ${styles.avatarHuman}`}>
+                  <div className={clsx(styles.avatar, styles.avatarHuman)}>
                     {user.display_name[0]}
                   </div>
                   <span>{user.display_name}</span>
@@ -146,7 +119,7 @@ export default function Home() {
             </div>
           )}
         </div>
-      </aside>
+      </Sidebar>
 
       <main className={styles.main}>
         <div className={styles.welcome}>

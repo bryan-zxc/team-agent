@@ -29,6 +29,10 @@
   --bubble-ai: #F5EDE4;
   --scrollbar-thumb: #D4CFC7;
   --overlay: rgba(44, 42, 39, 0.3);
+  --error: #c44;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --spinner-track: rgba(255, 255, 255, 0.3);
+  --spinner-head: #fff;
 }
 
 :root[data-theme="dark"] {
@@ -56,6 +60,10 @@
   --bubble-ai: rgba(212, 165, 116, 0.1);
   --scrollbar-thumb: #3A3937;
   --overlay: rgba(0, 0, 0, 0.5);
+  --error: #d66;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --spinner-track: rgba(255, 255, 255, 0.3);
+  --spinner-head: #fff;
 }
 
 html {
@@ -63,6 +71,7 @@ html {
 }
 
 body {
+  font-family: var(--font-body);
   background: var(--bg);
   color: var(--text-primary);
   height: 100vh;
@@ -73,5 +82,10 @@ body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
 
 a { color: inherit; text-decoration: none; }

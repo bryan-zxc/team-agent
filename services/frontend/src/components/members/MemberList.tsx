@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import clsx from "clsx";
 import type { Member } from "@/types";
 import styles from "./MemberList.module.css";
 
@@ -19,17 +20,16 @@ export function MemberList({ members, onAddClick }: MemberListProps) {
         {members.map((member) => (
           <button
             key={member.id}
-            className={styles.memberItem}
+            className={clsx(styles.memberItem, member.type === "ai" && styles.memberItemClickable)}
             onClick={() => member.type === "ai" && router.push(`/members/${member.id}`)}
-            style={{ cursor: member.type === "ai" ? "pointer" : "default" }}
           >
-            <div className={`${styles.avatar} ${member.type === "ai" ? styles.avatarAi : styles.avatarHuman}`}>
+            <div className={clsx(styles.avatar, member.type === "ai" ? styles.avatarAi : styles.avatarHuman)}>
               {member.display_name[0]}
             </div>
             <div className={styles.memberInfo}>
               <span className={styles.memberName}>{member.display_name}</span>
             </div>
-            <span className={`${styles.typeBadge} ${member.type === "ai" ? styles.typeBadgeAi : ""}`}>
+            <span className={clsx(styles.typeBadge, member.type === "ai" && styles.typeBadgeAi)}>
               {member.type === "ai" ? "AI" : "Human"}
             </span>
           </button>
