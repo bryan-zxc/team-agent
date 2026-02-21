@@ -210,6 +210,9 @@ __marimo__/
 node_modules/
 .next/
 
+# Allow frontend src/lib (overrides Python lib/ pattern above)
+!services/frontend/src/lib/
+
 # Playwright CLI
 .playwright-cli/
 

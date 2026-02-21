@@ -3,8 +3,8 @@
 Drops/recreates all tables. Inserts users, a fully-formed project with:
 - Real git clone of https://github.com/bryan-zxc/popmart.git
 - Zimomo AI agent (uses pre-written profile at agents/popmart/zimomo.md)
-- General room with primary chat
 - Alice and Bob as human members
+- No rooms — rooms are created through the UI
 
 No LLM calls — the agent profile already exists on disk.
 
@@ -101,20 +101,6 @@ async def seed():
             zimomo_member_id, project_id, "Zimomo", "ai", now,
         )
         print("Inserted 3 members (Alice, Bob, Zimomo)")
-
-        # --- General room + primary chat ---
-        room_id = uuid.uuid4()
-        await conn.execute(
-            "INSERT INTO rooms (id, project_id, name, created_at) VALUES ($1, $2, $3, $4)",
-            room_id, project_id, "General", now,
-        )
-
-        chat_id = uuid.uuid4()
-        await conn.execute(
-            "INSERT INTO chats (id, room_id, type, created_at) VALUES ($1, $2, $3, $4)",
-            chat_id, room_id, "primary", now,
-        )
-        print("Created General room with primary chat")
 
         print("Seed complete — popmart project ready")
     finally:

@@ -127,6 +127,25 @@ export default function ChatPage() {
         members={members}
         activeRoomId={params.roomId}
         onRoomClick={(roomId) => router.push(`/project/${params.projectId}/chat/${roomId}`)}
+        onCreateRoom={async (name) => {
+          const res = await fetch(`${API_URL}/projects/${params.projectId}/rooms`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name }),
+          });
+          const newRoom: Room = await res.json();
+          setRooms((prev) => [...prev, newRoom]);
+        }}
+        onRenameRoom={async (roomId, newName) => {
+          const res = await fetch(`${API_URL}/projects/${params.projectId}/rooms/${roomId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: newName }),
+          });
+          const updated: Room = await res.json();
+          setRooms((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+          if (updated.id === params.roomId) setRoom(updated);
+        }}
         onAddMember={() => setShowAddModal(true)}
         onMemberClick={(id) => router.push(`/project/${params.projectId}/members/${id}`)}
       >

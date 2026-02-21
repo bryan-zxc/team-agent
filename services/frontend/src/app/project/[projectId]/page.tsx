@@ -16,7 +16,6 @@ export default function ProjectDashboard() {
 
   const [rooms, setRooms] = useState<Room[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
-  const [newRoomName, setNewRoomName] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
 
   const userId = typeof window !== "undefined" ? localStorage.getItem("user_id") : null;
@@ -28,17 +27,25 @@ export default function ProjectDashboard() {
     fetch(`${API_URL}/projects/${params.projectId}/members`).then((r) => r.json()).then(setMembers);
   }, [params.projectId]);
 
-  const createRoom = useCallback(async () => {
-    if (!newRoomName.trim()) return;
+  const handleCreateRoom = useCallback(async (name: string) => {
     const res = await fetch(`${API_URL}/projects/${params.projectId}/rooms`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newRoomName.trim() }),
+      body: JSON.stringify({ name }),
     });
     const room: Room = await res.json();
     setRooms((prev) => [...prev, room]);
-    setNewRoomName("");
-  }, [newRoomName, params.projectId]);
+  }, [params.projectId]);
+
+  const handleRenameRoom = useCallback(async (roomId: string, newName: string) => {
+    const res = await fetch(`${API_URL}/projects/${params.projectId}/rooms/${roomId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName }),
+    });
+    const updated: Room = await res.json();
+    setRooms((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+  }, [params.projectId]);
 
   const openRoom = useCallback(
     (roomId: string) => {
@@ -53,20 +60,10 @@ export default function ProjectDashboard() {
         rooms={rooms}
         members={members}
         onRoomClick={openRoom}
+        onCreateRoom={handleCreateRoom}
+        onRenameRoom={handleRenameRoom}
         onAddMember={() => setShowAddModal(true)}
         onMemberClick={(id) => router.push(`/project/${params.projectId}/members/${id}`)}
-        roomActions={
-          <div className={styles.newRoom}>
-            <input
-              className={styles.newRoomInput}
-              placeholder="New room name..."
-              value={newRoomName}
-              onChange={(e) => setNewRoomName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && createRoom()}
-            />
-            <button className={styles.newRoomBtn} onClick={createRoom} aria-label="Create room">+</button>
-          </div>
-        }
       >
         {currentMember && (
           <div className={styles.sidebarFooter}>
@@ -85,8 +82,14 @@ export default function ProjectDashboard() {
 
       <main className={styles.main}>
         <div className={styles.welcome}>
-          <h2 className={styles.welcomeTitle}>Welcome</h2>
-          <p className={styles.welcomeText}>Select a room to start chatting.</p>
+          <h2 className={styles.welcomeTitle}>
+            {rooms.length === 0 ? "No rooms yet" : "Welcome"}
+          </h2>
+          <p className={styles.welcomeText}>
+            {rooms.length === 0
+              ? "Create a room to get started."
+              : "Select a room to start chatting."}
+          </p>
         </div>
       </main>
 

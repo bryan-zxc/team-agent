@@ -60,13 +60,42 @@
   color: var(--text-primary);
 }
 
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 20px 8px;
+}
+
 .sectionLabel {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
-  padding: 24px 20px 8px;
+}
+
+.addRoomBtn {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.addRoomBtn:hover,
+.addRoomBtnActive {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
 }
 
 /* ── Room List ── */
@@ -139,4 +168,56 @@
 
 .roomItemActive .roomName {
   color: var(--accent);
+}
+
+/* ── Inline Create ── */
+
+.roomCreateInline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin-bottom: 2px;
+  background: var(--accent-light);
+}
+
+.createInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.createInput::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* ── Inline Rename ── */
+
+.renameInput {
+  width: 100%;
+  border: none;
+  border-bottom: 2px solid var(--accent);
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  outline: none;
+  padding: 2px 0;
+}
+
+/* ── Hint ── */
+
+.hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 22px 0;
 }

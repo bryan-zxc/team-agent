@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -14,6 +14,10 @@ router = APIRouter()
 
 
 class CreateRoomRequest(BaseModel):
+    name: str
+
+
+class RenameRoomRequest(BaseModel):
     name: str
 
 
@@ -63,6 +67,36 @@ async def create_room(project_id: uuid.UUID, req: CreateRoomRequest):
             "id": str(room.id),
             "name": room.name,
             "primary_chat_id": str(chat.id),
+            "created_at": room.created_at.isoformat(),
+        }
+
+
+@router.patch("/projects/{project_id}/rooms/{room_id}")
+async def rename_room(project_id: uuid.UUID, room_id: uuid.UUID, req: RenameRoomRequest):
+    async with async_session() as session:
+        room = (
+            await session.execute(
+                select(Room).where(Room.id == room_id, Room.project_id == project_id)
+            )
+        ).scalar_one_or_none()
+
+        if not room:
+            raise HTTPException(status_code=404, detail="Room not found")
+
+        room.name = req.name.strip()
+        await session.commit()
+        await session.refresh(room)
+
+        primary_chat = (
+            await session.execute(
+                select(Chat).where(Chat.room_id == room.id, Chat.type == "primary")
+            )
+        ).scalar_one_or_none()
+
+        return {
+            "id": str(room.id),
+            "name": room.name,
+            "primary_chat_id": str(primary_chat.id) if primary_chat else None,
             "created_at": room.created_at.isoformat(),
         }
 

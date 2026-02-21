@@ -10,7 +10,6 @@ from sqlalchemy import select
 
 from ..config import settings
 from ..database import async_session
-from ..models.chat import Chat
 from ..models.project import Project
 from ..models.project_member import ProjectMember
 from ..models.room import Room
@@ -132,14 +131,6 @@ async def create_project(req: CreateProjectRequest):
             type="human",
         )
         session.add(creator_member)
-
-        # Create General room + primary chat
-        room = Room(name="General", project_id=project.id)
-        session.add(room)
-        await session.flush()
-
-        chat = Chat(room_id=room.id, type="primary")
-        session.add(chat)
 
         await session.commit()
         await session.refresh(project)

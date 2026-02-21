@@ -4,58 +4,6 @@
   height: 100vh;
 }
 
-/* ── New Room ── */
-
-.newRoom {
-  display: flex;
-  gap: 6px;
-  padding: 8px 10px 16px;
-}
-
-.newRoomInput {
-  flex: 1;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px dashed var(--border);
-  background: transparent;
-  font-family: var(--font-body);
-  font-size: 13px;
-  color: var(--text-primary);
-  transition: border-color 0.2s ease;
-}
-
-.newRoomInput::placeholder {
-  color: var(--text-muted);
-}
-
-.newRoomInput:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-  border-style: solid;
-}
-
-.newRoomBtn {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  border: 1px dashed var(--border);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.newRoomBtn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-light);
-  border-style: solid;
-}
-
 /* ── User Display ── */
 
 .sidebarFooter {
