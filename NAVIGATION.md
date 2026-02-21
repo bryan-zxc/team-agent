@@ -71,7 +71,11 @@ team-agent/
 │       └── adr.md                      # Index of all active decisions
 │
 ├── db/
-│   ├── seed.py                         # Dev seed script (global users only)
+│   ├── seed.py                         # Convenience wrapper → seeds/clean.py
+│   ├── seeds/
+│   │   ├── base.py                     # Shared schema + connection helper
+│   │   ├── clean.py                    # Users only (project creation testing)
+│   │   └── with_project.py             # Full project with git clone + Zimomo
 │   └── migrations/                     # Database migrations (shared schema for api + ai)
 │
 ├── scripts/
@@ -105,6 +109,7 @@ team-agent/
 | Transcript persistence | `services/ai/src/ai/transcript.py` |
 | Persona definitions and loading | `services/ai/src/ai/personas/` |
 | Agent memory skills | `services/ai/src/ai/skills/` |
+| Database seed scenarios | `db/seeds/` |
 | Database migrations | `db/migrations/` |
 | Docker orchestration | `docker-compose.yml` |
 | Landing page (projects + user picker) | `services/frontend/src/app/page.tsx` |
@@ -115,4 +120,5 @@ team-agent/
 | Member management UI | `services/frontend/src/components/members/` |
 | Shared sidebar component | `services/frontend/src/components/sidebar/` |
 | Frontend design guidelines | `.claude/skills/fe-dev/SKILL.md` |
+| Frontend testing workflow | `.claude/skills/fe-testing/SKILL.md` |
 | UX/navigation design | `services/frontend/frontend-design.md` |
