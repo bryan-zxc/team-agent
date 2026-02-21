@@ -17,8 +17,10 @@ services:
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FORMAT=${LOG_FORMAT:-text}
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-http://ai-service:8001}
     volumes:
       - ./db:/app/db
+      - ./agents:/app/agents
     depends_on:
       postgres:
         condition: service_healthy

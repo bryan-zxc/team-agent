@@ -19,3 +19,18 @@ export type User = {
   display_name: string;
   type: string;
 };
+
+export type Member = {
+  id: string;
+  display_name: string;
+  type: "human" | "ai";
+};
+
+export type AvailableUser = {
+  id: string;
+  display_name: string;
+};
+
+export type MemberProfile = {
+  content: string;
+};

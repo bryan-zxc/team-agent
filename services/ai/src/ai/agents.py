@@ -38,8 +38,8 @@ async def _get_existing_agent_names(project_name: str) -> list[str]:
         await conn.close()
 
 
-async def _insert_project_member(project_name: str, agent_name: str) -> None:
-    """Insert a new AI project member into the database."""
+async def _insert_project_member(project_name: str, agent_name: str) -> uuid.UUID:
+    """Insert a new AI project member into the database. Returns the member id."""
     conn = await asyncpg.connect(_dsn)
     try:
         project_id = await conn.fetchval(
@@ -48,13 +48,15 @@ async def _insert_project_member(project_name: str, agent_name: str) -> None:
         if not project_id:
             raise RuntimeError(f"Project '{project_name}' not found in database")
 
+        member_id = uuid.uuid4()
         await conn.execute(
             "INSERT INTO project_members (id, project_id, user_id, display_name, type, created_at) "
             "VALUES ($1, $2, NULL, $3, 'ai', NOW())",
-            uuid.uuid4(),
+            member_id,
             project_id,
             agent_name,
         )
+        return member_id
     finally:
         await conn.close()
 
@@ -62,12 +64,14 @@ async def _insert_project_member(project_name: str, agent_name: str) -> None:
 async def generate_agent_profile(
     project_name: str,
     name: str | None = None,
-) -> str:
+) -> dict:
     """Generate an agent profile markdown file using the LLM.
 
     If name is not provided, the LLM picks a Pop Mart character name.
     Creates a project_member record and writes the profile to
-    agents/{project_name}/{name}.md. Returns the file path.
+    agents/{project_name}/{name}.md.
+
+    Returns {"id": str, "display_name": str, "file_path": str}.
     """
     existing_names = await _get_existing_agent_names(project_name)
 
@@ -86,7 +90,7 @@ async def generate_agent_profile(
         raise RuntimeError(f"Expected AgentProfile, got {type(result)}")
 
     # Insert into database as AI project member
-    await _insert_project_member(project_name, result.name)
+    member_id = await _insert_project_member(project_name, result.name)
 
     # Write markdown file
     profile_dir = _agents_dir(project_name)
@@ -110,4 +114,8 @@ async def generate_agent_profile(
     file_path.write_text(md_content)
 
     logger.info("Generated agent profile: %s", file_path)
-    return str(file_path)
+    return {
+        "id": str(member_id),
+        "display_name": result.name,
+        "file_path": str(file_path),
+    }

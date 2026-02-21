@@ -12,6 +12,7 @@ from sqlalchemy import text
 from .config import settings, setup_logging
 from .database import async_session, engine
 from .models.message import Message
+from .routes.members import router as members_router
 from .routes.rooms import router as rooms_router
 from .routes.users import router as users_router
 from .websocket.handler import router as ws_router
@@ -75,6 +76,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(members_router)
 app.include_router(rooms_router)
 app.include_router(users_router)
 app.include_router(ws_router)

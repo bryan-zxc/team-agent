@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTheme } from "@/hooks/useTheme";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import type { Message, Room, User } from "@/types";
+import { MemberList } from "@/components/members/MemberList";
+import { AddMemberModal } from "@/components/members/AddMemberModal";
+import type { Member, Message, Room, User } from "@/types";
 import styles from "./page.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -17,8 +19,10 @@ export default function ChatPage() {
   const [room, setRoom] = useState<Room | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const chatId = room?.primary_chat_id ?? null;
@@ -42,6 +46,7 @@ export default function ChatPage() {
       if (current) setRoom(current);
     });
     fetch(`${API_URL}/users`).then((r) => r.json()).then(setUsers);
+    fetch(`${API_URL}/members`).then((r) => r.json()).then(setMembers);
   }, [params.roomId]);
 
   useEffect(() => {
@@ -113,6 +118,11 @@ export default function ChatPage() {
           ))}
         </div>
 
+        <MemberList
+          members={members}
+          onAddClick={() => setShowAddModal(true)}
+        />
+
         <div className={styles.sidebarFooter}>
           {currentUser && (
             <div className={styles.userDisplay}>
@@ -183,6 +193,12 @@ export default function ChatPage() {
           </div>
         </div>
       </main>
+
+      <AddMemberModal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onMemberAdded={(member) => setMembers((prev) => [...prev, member])}
+      />
     </div>
   );
 }

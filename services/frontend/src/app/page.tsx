@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/hooks/useTheme";
-import type { Room, User } from "@/types";
+import { MemberList } from "@/components/members/MemberList";
+import { AddMemberModal } from "@/components/members/AddMemberModal";
+import type { Member, Room, User } from "@/types";
 import styles from "./page.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -13,13 +15,16 @@ export default function Home() {
   const { theme, toggle } = useTheme();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [newRoomName, setNewRoomName] = useState("");
   const [showUserPicker, setShowUserPicker] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     fetch(`${API_URL}/rooms`).then((r) => r.json()).then(setRooms);
     fetch(`${API_URL}/users`).then((r) => r.json()).then(setUsers);
+    fetch(`${API_URL}/members`).then((r) => r.json()).then(setMembers);
     const stored = localStorage.getItem("member_id");
     if (stored) setSelectedUser(stored);
   }, []);
@@ -96,6 +101,11 @@ export default function Home() {
           <button className={styles.newRoomBtn} onClick={createRoom}>+</button>
         </div>
 
+        <MemberList
+          members={members}
+          onAddClick={() => setShowAddModal(true)}
+        />
+
         <div className={styles.sidebarFooter}>
           <button
             className={styles.userSelector}
@@ -144,6 +154,12 @@ export default function Home() {
           <p className={styles.welcomeText}>Select a room to start chatting.</p>
         </div>
       </main>
+
+      <AddMemberModal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onMemberAdded={(member) => setMembers((prev) => [...prev, member])}
+      />
     </div>
   );
 }

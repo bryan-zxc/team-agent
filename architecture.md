@@ -26,7 +26,8 @@ A multi-user group chat system where multiple people on different machines conve
 | Persona memory | Custom skills backed by PostgreSQL |
 | Transcript persistence | Saved to PostgreSQL on every message received |
 | Database | PostgreSQL |
-| Message broker | Redis (Pub/Sub) |
+| Message broker | Redis (Pub/Sub) for events |
+| Inter-service commands | HTTP (FastAPI) |
 | Containerisation | Docker Compose |
 | Network access (dev) | Tailscale |
 
@@ -74,17 +75,15 @@ A multi-user group chat system where multiple people on different machines conve
      │ PostgreSQL │         │ Redis       │
      │            │         │ (Pub/Sub)   │
      │ - Users    │         │             │
-     │ - Rooms    │         │ - Message   │
-     │ - Threads  │         │   routing   │
-     │ - Messages │         │ - Cross-    │
-     │ - Personas │         │   service   │
-     └───────────┘         │   comms     │
-                           └──────┬──────┘
-                                  │ subscribes
+     │ - Rooms    │         │ - Chat      │
+     │ - Threads  │         │   events    │
+     │ - Messages │         │             │
+     │ - Personas │         └──────┬──────┘
+     └───────────┘                │ subscribes
                            ┌──────▼──────┐
-                           │ AI Service   │
-                           │ (Python)     │
-                           │              │
+                    HTTP    │ AI Service   │
+              ◄───────────►│ (Python)     │
+              (commands)   │              │
                            │ - Subscribes │
                            │   to messages│
                            │ - Manages    │
@@ -100,6 +99,9 @@ A multi-user group chat system where multiple people on different machines conve
                            │   responses  │
                            │   back via   │
                            │   Redis      │
+                           │ - HTTP API   │
+                           │   for agent  │
+                           │   management │
                            └─────────────┘
 ```
 
@@ -111,7 +113,7 @@ A multi-user group chat system where multiple people on different machines conve
 |---|---|---|---|
 | `frontend` | Next.js | 3000 | Serves the chat UI |
 | `api` | FastAPI (Python) | 8000 | REST API + WebSocket server |
-| `ai-service` | Python | — | AI persona management and response generation |
+| `ai-service` | Python | 8001 | AI persona management and response generation |
 | `postgres` | PostgreSQL | 5432 | Persistent data storage |
 | `redis` | Redis | 6379 | Message broker (Pub/Sub) |
 
@@ -275,7 +277,7 @@ The session ID from each `ResultMessage` is stored alongside the transcript, ena
 
 2. **AI personas are not special** — From the frontend's perspective, an AI persona is just another user who sends messages.
 
-3. **Broker-mediated communication** — All cross-service messaging goes through Redis, enabling future scaling without architectural changes.
+3. **Events through Redis, commands through HTTP** — Asynchronous events (chat messages) flow through Redis pub/sub. Synchronous commands (agent creation, management) use HTTP between services.
 
 4. **Frontend is a thin client** — Next.js serves the UI and manages the WebSocket connection. All business logic lives server-side.
 
