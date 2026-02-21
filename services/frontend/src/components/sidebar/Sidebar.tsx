@@ -12,6 +12,7 @@ type SidebarProps = {
   activeRoomId?: string;
   onRoomClick: (roomId: string) => void;
   onAddMember: () => void;
+  onMemberClick?: (memberId: string) => void;
   roomActions?: React.ReactNode;
   children?: React.ReactNode;
 };
@@ -22,6 +23,7 @@ export function Sidebar({
   activeRoomId,
   onRoomClick,
   onAddMember,
+  onMemberClick,
   roomActions,
   children,
 }: SidebarProps) {
@@ -63,6 +65,7 @@ export function Sidebar({
       <MemberList
         members={members}
         onAddClick={onAddMember}
+        onMemberClick={onMemberClick}
       />
 
       {children}

@@ -21,6 +21,7 @@ services:
     volumes:
       - ./db:/app/db
       - ./agents:/app/agents
+      - project_data:/data/projects
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,6 +43,7 @@ services:
     volumes:
       - claude_auth:/root/.claude
       - ./agents:/app/agents
+      - project_data:/data/projects
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,3 +79,4 @@ services:
 volumes:
   postgres_data:
   claude_auth:
+  project_data:

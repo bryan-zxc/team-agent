@@ -13,7 +13,7 @@ from ..models.project import Project
 from ..models.project_member import ProjectMember
 from ..models.user import User
 
-router = APIRouter(prefix="/members")
+router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
@@ -29,17 +29,22 @@ class UpdateProfileRequest(BaseModel):
     content: str
 
 
-def _profile_path(member_name: str) -> Path:
-    return Path(settings.agents_dir) / settings.project_name / f"{member_name.lower()}.md"
+async def _resolve_profile_path(member: ProjectMember) -> Path:
+    """Resolve the markdown profile path for an AI member via its project."""
+    from ..database import async_session as _session
+    async with _session() as session:
+        project = await session.get(Project, member.project_id)
+    return Path(settings.agents_dir) / project.name / f"{member.display_name.lower()}.md"
 
 
-@router.get("")
-async def list_members():
-    """All project members."""
+@router.get("/projects/{project_id}/members")
+async def list_members(project_id: uuid.UUID):
     async with async_session() as session:
         members = (
             await session.execute(
-                select(ProjectMember).order_by(ProjectMember.created_at)
+                select(ProjectMember)
+                .where(ProjectMember.project_id == project_id)
+                .order_by(ProjectMember.created_at)
             )
         ).scalars().all()
         return [
@@ -47,18 +52,22 @@ async def list_members():
                 "id": str(m.id),
                 "display_name": m.display_name,
                 "type": m.type,
+                "user_id": str(m.user_id) if m.user_id else None,
             }
             for m in members
         ]
 
 
-@router.get("/available-users")
-async def available_users():
-    """Users not yet added as project members."""
+@router.get("/projects/{project_id}/available-users")
+async def available_users(project_id: uuid.UUID):
+    """Users not yet added as members of this project."""
     async with async_session() as session:
         existing_user_ids = (
             await session.execute(
-                select(ProjectMember.user_id).where(ProjectMember.user_id.isnot(None))
+                select(ProjectMember.user_id).where(
+                    ProjectMember.project_id == project_id,
+                    ProjectMember.user_id.isnot(None),
+                )
             )
         ).scalars().all()
 
@@ -73,18 +82,15 @@ async def available_users():
         ]
 
 
-@router.post("/human")
-async def add_human_member(req: AddHumanRequest):
-    """Add a human user as a project member."""
+@router.post("/projects/{project_id}/members/human")
+async def add_human_member(project_id: uuid.UUID, req: AddHumanRequest):
     async with async_session() as session:
         user = await session.get(User, uuid.UUID(req.user_id))
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        project = (await session.execute(select(Project).limit(1))).scalar_one()
-
         member = ProjectMember(
-            project_id=project.id,
+            project_id=project_id,
             user_id=user.id,
             display_name=user.display_name,
             type="human",
@@ -100,15 +106,21 @@ async def add_human_member(req: AddHumanRequest):
         }
 
 
-@router.post("/ai")
-async def generate_ai_member(req: GenerateAgentRequest):
+@router.post("/projects/{project_id}/members/ai")
+async def generate_ai_member(project_id: uuid.UUID, req: GenerateAgentRequest):
     """Request AI agent generation via the AI service."""
+    async with async_session() as session:
+        project = await session.get(Project, project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project_name = project.name
+
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             resp = await client.post(
                 f"{settings.ai_service_url}/generate-agent",
                 json={
-                    "project_name": settings.project_name,
+                    "project_name": project_name,
                     "name": req.name,
                 },
             )
@@ -123,7 +135,7 @@ async def generate_ai_member(req: GenerateAgentRequest):
     return resp.json()
 
 
-@router.get("/{member_id}/profile")
+@router.get("/members/{member_id}/profile")
 async def get_profile(member_id: uuid.UUID):
     """Read the raw markdown profile for an AI member."""
     async with async_session() as session:
@@ -133,14 +145,14 @@ async def get_profile(member_id: uuid.UUID):
         if member.type != "ai":
             raise HTTPException(status_code=400, detail="Only AI members have profiles")
 
-    path = _profile_path(member.display_name)
+    path = await _resolve_profile_path(member)
     if not path.exists():
         raise HTTPException(status_code=404, detail="Profile file not found")
 
     return {"content": path.read_text()}
 
 
-@router.put("/{member_id}/profile")
+@router.put("/members/{member_id}/profile")
 async def update_profile(member_id: uuid.UUID, req: UpdateProfileRequest):
     """Write raw markdown back to the profile file."""
     async with async_session() as session:
@@ -150,7 +162,7 @@ async def update_profile(member_id: uuid.UUID, req: UpdateProfileRequest):
         if member.type != "ai":
             raise HTTPException(status_code=400, detail="Only AI members have profiles")
 
-    path = _profile_path(member.display_name)
+    path = await _resolve_profile_path(member)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(req.content)
 

@@ -11,7 +11,6 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3-pro-preview"
     openai_api_key: str = ""
     openai_model: str = "gpt-5.2"
-    project_name: str = "popmart"
     agents_dir: str = "agents"
     log_level: str = "INFO"
     log_format: str = "text"

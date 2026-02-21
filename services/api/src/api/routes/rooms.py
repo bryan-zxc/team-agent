@@ -17,10 +17,16 @@ class CreateRoomRequest(BaseModel):
     name: str
 
 
-@router.get("/rooms")
-async def list_rooms():
+@router.get("/projects/{project_id}/rooms")
+async def list_rooms(project_id: uuid.UUID):
     async with async_session() as session:
-        rooms = (await session.execute(select(Room).order_by(Room.created_at))).scalars().all()
+        rooms = (
+            await session.execute(
+                select(Room)
+                .where(Room.project_id == project_id)
+                .order_by(Room.created_at)
+            )
+        ).scalars().all()
 
         result = []
         for room in rooms:
@@ -40,14 +46,10 @@ async def list_rooms():
         return result
 
 
-@router.post("/rooms")
-async def create_room(req: CreateRoomRequest):
+@router.post("/projects/{project_id}/rooms")
+async def create_room(project_id: uuid.UUID, req: CreateRoomRequest):
     async with async_session() as session:
-        # Use the first project for now
-        from ..models.project import Project
-        project = (await session.execute(select(Project).limit(1))).scalar_one()
-
-        room = Room(name=req.name, project_id=project.id)
+        room = Room(name=req.name, project_id=project_id)
         session.add(room)
         await session.flush()
 

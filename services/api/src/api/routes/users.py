@@ -2,23 +2,22 @@ from fastapi import APIRouter
 from sqlalchemy import select
 
 from ..database import async_session
-from ..models.project_member import ProjectMember
+from ..models.user import User
 
 router = APIRouter()
 
 
 @router.get("/users")
-async def list_members():
-    """List all project members (humans and AI agents) for the user picker."""
+async def list_users():
+    """List all global users (for the landing page user picker)."""
     async with async_session() as session:
-        members = (
-            await session.execute(select(ProjectMember).order_by(ProjectMember.created_at))
+        users = (
+            await session.execute(select(User).order_by(User.display_name))
         ).scalars().all()
         return [
             {
-                "id": str(m.id),
-                "display_name": m.display_name,
-                "type": m.type,
+                "id": str(u.id),
+                "display_name": u.display_name,
             }
-            for m in members
+            for u in users
         ]

@@ -20,7 +20,7 @@ def _load_all_agent_profiles(project_name: str) -> str:
     return "\n---\n".join(profiles)
 
 
-async def run_agent(conversation: list[dict]) -> AgentResponse:
+async def run_agent(conversation: list[dict], project_name: str) -> AgentResponse:
     """Run Zimomo agent with the full conversation as context.
 
     Each entry in *conversation* should have 'display_name' and 'content' keys.
@@ -32,7 +32,7 @@ async def run_agent(conversation: list[dict]) -> AgentResponse:
     )
 
     # Load all agent profiles for context
-    all_profiles = _load_all_agent_profiles(settings.project_name)
+    all_profiles = _load_all_agent_profiles(project_name)
 
     system_instruction = (
         "You are responding to the latest message that mentioned you (@zimomo) "

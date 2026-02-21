@@ -1,8 +1,7 @@
 """Seed the database with dev data.
 
-Drops and recreates all tables, then inserts sample data for the
-"popmart" project with human users, an AI agent, a room, and messages.
-This is a dev-only script — not for production use.
+Drops and recreates all tables, then inserts global users (Alice, Bob).
+Projects are created through the UI. Dev-only script — not for production use.
 """
 
 import asyncio
@@ -42,6 +41,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS projects (
     id UUID PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
+    git_repo_url TEXT,
+    clone_path TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -110,7 +111,7 @@ async def seed():
 
         now = datetime.now(timezone.utc)
 
-        # Users (humans only)
+        # Global users — projects are created through the UI
         alice_id = uuid.uuid4()
         bob_id = uuid.uuid4()
 
@@ -123,58 +124,6 @@ async def seed():
             bob_id, "Bob", now,
         )
         print("Inserted 2 users (Alice, Bob)")
-
-        # Project
-        project_id = uuid.uuid4()
-        await conn.execute(
-            "INSERT INTO projects (id, name, created_at) VALUES ($1, $2, $3)",
-            project_id, "popmart", now,
-        )
-        print("Inserted project: popmart")
-
-        # Project members (humans only — AI agents are created via generate_agent_profile)
-        alice_member_id = uuid.uuid4()
-        bob_member_id = uuid.uuid4()
-
-        await conn.execute(
-            "INSERT INTO project_members (id, project_id, user_id, display_name, type, created_at) "
-            "VALUES ($1, $2, $3, $4, $5, $6)",
-            alice_member_id, project_id, alice_id, "Alice", "human", now,
-        )
-        await conn.execute(
-            "INSERT INTO project_members (id, project_id, user_id, display_name, type, created_at) "
-            "VALUES ($1, $2, $3, $4, $5, $6)",
-            bob_member_id, project_id, bob_id, "Bob", "human", now,
-        )
-        print("Inserted 2 project members (Alice, Bob)")
-
-        # Room (project-scoped)
-        room_id = uuid.uuid4()
-        await conn.execute(
-            "INSERT INTO rooms (id, project_id, name, created_at) VALUES ($1, $2, $3, $4)",
-            room_id, project_id, "General", now,
-        )
-        print("Inserted room: General")
-
-        # Primary chat
-        chat_id = uuid.uuid4()
-        await conn.execute(
-            "INSERT INTO chats (id, room_id, type, created_at) VALUES ($1, $2, $3, $4)",
-            chat_id, room_id, "primary", now,
-        )
-        print("Inserted primary chat")
-
-        # Messages (using member_id)
-        messages = [
-            (uuid.uuid4(), chat_id, alice_member_id, "Hey team, how's it going?", now),
-            (uuid.uuid4(), chat_id, bob_member_id, "All good! Just setting things up.", now),
-        ]
-        await conn.executemany(
-            "INSERT INTO messages (id, chat_id, member_id, content, created_at) "
-            "VALUES ($1, $2, $3, $4, $5)",
-            messages,
-        )
-        print("Inserted 2 messages")
 
         print("Seed complete!")
     finally:

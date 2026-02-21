@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import type { Member } from "@/types";
 import styles from "./MemberList.module.css";
@@ -8,11 +7,10 @@ import styles from "./MemberList.module.css";
 type MemberListProps = {
   members: Member[];
   onAddClick: () => void;
+  onMemberClick?: (memberId: string) => void;
 };
 
-export function MemberList({ members, onAddClick }: MemberListProps) {
-  const router = useRouter();
-
+export function MemberList({ members, onAddClick, onMemberClick }: MemberListProps) {
   return (
     <div className={styles.container}>
       <div className={styles.sectionLabel}>Members</div>
@@ -21,7 +19,7 @@ export function MemberList({ members, onAddClick }: MemberListProps) {
           <button
             key={member.id}
             className={clsx(styles.memberItem, member.type === "ai" && styles.memberItemClickable)}
-            onClick={() => member.type === "ai" && router.push(`/members/${member.id}`)}
+            onClick={() => member.type === "ai" && onMemberClick?.(member.id)}
           >
             <div className={clsx(styles.avatar, member.type === "ai" ? styles.avatarAi : styles.avatarHuman)}>
               {member.display_name[0]}

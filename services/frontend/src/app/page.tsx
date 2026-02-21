@@ -3,135 +3,155 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
-import { Sidebar } from "@/components/sidebar/Sidebar";
-import { AddMemberModal } from "@/components/members/AddMemberModal";
-import type { Member, Room, User } from "@/types";
+import { useTheme } from "@/hooks/useTheme";
+import { CreateProjectModal } from "@/components/project/CreateProjectModal";
+import type { Project, User } from "@/types";
 import styles from "./page.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export default function Home() {
+export default function LandingPage() {
   const router = useRouter();
-  const [rooms, setRooms] = useState<Room[]>([]);
+  const { theme, toggle } = useTheme();
+  const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [newRoomName, setNewRoomName] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [showUserPicker, setShowUserPicker] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/rooms`).then((r) => r.json()).then(setRooms);
+    fetch(`${API_URL}/projects`).then((r) => r.json()).then(setProjects);
     fetch(`${API_URL}/users`).then((r) => r.json()).then(setUsers);
-    fetch(`${API_URL}/members`).then((r) => r.json()).then(setMembers);
-    const stored = localStorage.getItem("member_id");
-    if (stored) setSelectedUser(stored);
+    const stored = localStorage.getItem("user_id");
+    if (stored) setSelectedUserId(stored);
   }, []);
 
-  const currentUser = users.find((u) => u.id === selectedUser);
+  const currentUser = users.find((u) => u.id === selectedUserId);
 
   const selectUser = useCallback((id: string) => {
-    setSelectedUser(id);
-    localStorage.setItem("member_id", id);
+    setSelectedUserId(id);
+    localStorage.setItem("user_id", id);
     setShowUserPicker(false);
   }, []);
 
-  const createRoom = useCallback(async () => {
-    if (!newRoomName.trim()) return;
-    const res = await fetch(`${API_URL}/rooms`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newRoomName.trim() }),
-    });
-    const room: Room = await res.json();
-    setRooms((prev) => [...prev, room]);
-    setNewRoomName("");
-  }, [newRoomName]);
-
-  const openRoom = useCallback(
-    (roomId: string) => {
-      if (!selectedUser) {
+  const openProject = useCallback(
+    (projectId: string) => {
+      if (!selectedUserId) {
         setShowUserPicker(true);
         return;
       }
-      router.push(`/chat/${roomId}`);
+      router.push(`/project/${projectId}`);
     },
-    [selectedUser, router],
+    [selectedUserId, router],
+  );
+
+  const handleProjectCreated = useCallback(
+    (project: { id: string }) => {
+      router.push(`/project/${project.id}`);
+    },
+    [router],
   );
 
   return (
-    <div className={styles.layout}>
-      <Sidebar
-        rooms={rooms}
-        members={members}
-        onRoomClick={openRoom}
-        onAddMember={() => setShowAddModal(true)}
-        roomActions={
-          <div className={styles.newRoom}>
-            <input
-              className={styles.newRoomInput}
-              placeholder="New room name..."
-              value={newRoomName}
-              onChange={(e) => setNewRoomName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && createRoom()}
-            />
-            <button className={styles.newRoomBtn} onClick={createRoom} aria-label="Create room">+</button>
-          </div>
-        }
-      >
-        <div className={styles.sidebarFooter}>
-          <button
-            className={styles.userSelector}
-            onClick={() => setShowUserPicker(!showUserPicker)}
-          >
-            {currentUser ? (
-              <>
-                <div className={clsx(styles.avatar, currentUser.type === "ai" ? styles.avatarAi : styles.avatarHuman)}>
-                  {currentUser.display_name[0]}
-                </div>
-                <div className={styles.userInfo}>
-                  <div className={styles.userName}>{currentUser.display_name}</div>
-                  <div className={styles.userRole}>{currentUser.type}</div>
-                </div>
-              </>
-            ) : (
-              <div className={styles.userInfo}>
-                <div className={styles.userName}>Select a user</div>
-              </div>
-            )}
-            <span className={styles.chevron}>{showUserPicker ? "\u25B2" : "\u25BC"}</span>
+    <div className={styles.page}>
+      <header className={styles.topBar}>
+        <div className={styles.logo}>
+          <div className={styles.logoMark}>ta</div>
+          <h1 className={styles.logoText}>Team Agent</h1>
+        </div>
+
+        <div className={styles.topBarActions}>
+          <button className={styles.themeToggle} onClick={toggle} aria-label="Toggle theme">
+            {theme === "light" ? "\u263D" : "\u2600"}
           </button>
 
-          {showUserPicker && (
-            <div className={styles.userDropdown}>
-              {users.filter((u) => u.type === "human").map((user) => (
-                <button
-                  key={user.id}
-                  className={styles.userOption}
-                  onClick={() => selectUser(user.id)}
-                >
-                  <div className={clsx(styles.avatar, styles.avatarHuman)}>
-                    {user.display_name[0]}
-                  </div>
-                  <span>{user.display_name}</span>
-                </button>
-              ))}
+          <div className={styles.userPickerWrapper}>
+            <button
+              className={styles.userSelector}
+              onClick={() => setShowUserPicker(!showUserPicker)}
+            >
+              {currentUser ? (
+                <>
+                  <div className={styles.avatar}>{currentUser.display_name[0]}</div>
+                  <span className={styles.userName}>{currentUser.display_name}</span>
+                </>
+              ) : (
+                <span className={styles.userName}>Select user</span>
+              )}
+              <span className={styles.chevron}>{showUserPicker ? "\u25B2" : "\u25BC"}</span>
+            </button>
+
+            {showUserPicker && (
+              <div className={styles.userDropdown}>
+                {users.map((user) => (
+                  <button
+                    key={user.id}
+                    className={clsx(styles.userOption, user.id === selectedUserId && styles.userOptionActive)}
+                    onClick={() => selectUser(user.id)}
+                  >
+                    <div className={styles.avatar}>{user.display_name[0]}</div>
+                    <span>{user.display_name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className={styles.main}>
+        <div className={styles.projectsHeader}>
+          <h2 className={styles.sectionTitle}>Projects</h2>
+          <button
+            className={styles.createBtn}
+            onClick={() => {
+              if (!selectedUserId) {
+                setShowUserPicker(true);
+                return;
+              }
+              setShowCreateModal(true);
+            }}
+          >
+            + New Project
+          </button>
+        </div>
+
+        <div className={styles.projectGrid}>
+          {projects.map((project) => (
+            <button
+              key={project.id}
+              className={styles.projectCard}
+              onClick={() => openProject(project.id)}
+            >
+              <div className={styles.projectIcon}>
+                {project.name[0].toUpperCase()}
+              </div>
+              <div className={styles.projectInfo}>
+                <div className={styles.projectName}>{project.name}</div>
+                {project.git_repo_url && (
+                  <div className={styles.projectRepo}>{project.git_repo_url}</div>
+                )}
+                <div className={styles.projectMeta}>
+                  {project.member_count} member{project.member_count !== 1 ? "s" : ""}
+                  {" \u00B7 "}
+                  {project.room_count} room{project.room_count !== 1 ? "s" : ""}
+                </div>
+              </div>
+            </button>
+          ))}
+
+          {projects.length === 0 && (
+            <div className={styles.emptyState}>
+              <p>No projects yet. Create one to get started.</p>
             </div>
           )}
         </div>
-      </Sidebar>
-
-      <main className={styles.main}>
-        <div className={styles.welcome}>
-          <h2 className={styles.welcomeTitle}>Welcome to Team Agent</h2>
-          <p className={styles.welcomeText}>Select a room to start chatting.</p>
-        </div>
       </main>
 
-      <AddMemberModal
-        open={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onMemberAdded={(member) => setMembers((prev) => [...prev, member])}
+      <CreateProjectModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={handleProjectCreated}
       />
     </div>
   );

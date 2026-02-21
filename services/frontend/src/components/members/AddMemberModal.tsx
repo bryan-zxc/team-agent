@@ -10,13 +10,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type AddMemberModalProps = {
   open: boolean;
+  projectId: string;
   onClose: () => void;
   onMemberAdded: (member: Member) => void;
 };
 
 type Tab = "human" | "ai";
 
-export function AddMemberModal({ open, onClose, onMemberAdded }: AddMemberModalProps) {
+export function AddMemberModal({ open, projectId, onClose, onMemberAdded }: AddMemberModalProps) {
   const [tab, setTab] = useState<Tab>("human");
   const [availableUsers, setAvailableUsers] = useState<AvailableUser[]>([]);
   const [agentName, setAgentName] = useState("");
@@ -25,15 +26,15 @@ export function AddMemberModal({ open, onClose, onMemberAdded }: AddMemberModalP
 
   useEffect(() => {
     if (open && tab === "human") {
-      fetch(`${API_URL}/members/available-users`)
+      fetch(`${API_URL}/projects/${projectId}/available-users`)
         .then((r) => r.json())
         .then(setAvailableUsers);
     }
-  }, [open, tab]);
+  }, [open, tab, projectId]);
 
   const addHuman = useCallback(async (userId: string) => {
     setError(null);
-    const res = await fetch(`${API_URL}/members/human`, {
+    const res = await fetch(`${API_URL}/projects/${projectId}/members/human`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: userId }),
@@ -45,13 +46,13 @@ export function AddMemberModal({ open, onClose, onMemberAdded }: AddMemberModalP
     const member: Member = await res.json();
     onMemberAdded(member);
     onClose();
-  }, [onMemberAdded, onClose]);
+  }, [projectId, onMemberAdded, onClose]);
 
   const generateAgent = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/members/ai`, {
+      const res = await fetch(`${API_URL}/projects/${projectId}/members/ai`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: agentName.trim() || null }),
@@ -70,7 +71,7 @@ export function AddMemberModal({ open, onClose, onMemberAdded }: AddMemberModalP
     } finally {
       setLoading(false);
     }
-  }, [agentName, onMemberAdded, onClose]);
+  }, [agentName, projectId, onMemberAdded, onClose]);
 
   if (!open) return null;
 

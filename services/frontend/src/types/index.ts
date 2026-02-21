@@ -1,3 +1,12 @@
+export type Project = {
+  id: string;
+  name: string;
+  git_repo_url: string | null;
+  member_count: number;
+  room_count: number;
+  created_at: string;
+};
+
 export type Room = {
   id: string;
   name: string;
@@ -10,6 +19,7 @@ export type Message = {
   chat_id: string;
   member_id: string;
   display_name: string;
+  type: "human" | "ai";
   content: string;
   created_at: string;
 };
@@ -17,13 +27,13 @@ export type Message = {
 export type User = {
   id: string;
   display_name: string;
-  type: string;
 };
 
 export type Member = {
   id: string;
   display_name: string;
   type: "human" | "ai";
+  user_id: string | null;
 };
 
 export type AvailableUser = {

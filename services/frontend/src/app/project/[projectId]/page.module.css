@@ -1,0 +1,127 @@
+.layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: 100vh;
+}
+
+/* ── New Room ── */
+
+.newRoom {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px 16px;
+}
+
+.newRoomInput {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: border-color 0.2s ease;
+}
+
+.newRoomInput::placeholder {
+  color: var(--text-muted);
+}
+
+.newRoomInput:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  border-style: solid;
+}
+
+.newRoomBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.newRoomBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-light);
+  border-style: solid;
+}
+
+/* ── User Display ── */
+
+.sidebarFooter {
+  padding: 12px 10px;
+  border-top: 1px solid var(--border);
+  transition: border-color 0.4s ease;
+}
+
+.userDisplay {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.avatarHuman {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.userInfo {
+  flex: 1;
+}
+
+.userName {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.userRole {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Main Area ── */
+
+.main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.welcome {
+  text-align: center;
+}
+
+.welcomeTitle {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.welcomeText {
+  color: var(--text-secondary);
+  font-size: 15px;
+}

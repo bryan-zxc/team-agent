@@ -6,6 +6,8 @@ import type { Message } from "@/types";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const WS_URL = API_URL.replace(/^http/, "ws");
 
+type ContentBlock = { type: "text"; value: string };
+
 export function useWebSocket(chatId: string | null, memberId: string | null) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -39,11 +41,14 @@ export function useWebSocket(chatId: string | null, memberId: string | null) {
     };
   }, [connect]);
 
-  const sendMessage = useCallback((content: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ content }));
-    }
-  }, []);
+  const sendMessage = useCallback(
+    (blocks: ContentBlock[], mentions: string[]) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ blocks, mentions }));
+      }
+    },
+    [],
+  );
 
   return { messages, sendMessage, isConnected, setMessages };
 }

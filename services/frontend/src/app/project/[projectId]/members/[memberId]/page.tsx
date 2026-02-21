@@ -12,7 +12,7 @@ import styles from "./page.module.css";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function MemberProfilePage() {
-  const params = useParams<{ memberId: string }>();
+  const params = useParams<{ projectId: string; memberId: string }>();
   const router = useRouter();
 
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -24,9 +24,10 @@ export default function MemberProfilePage() {
   const member = members.find((m) => m.id === params.memberId);
 
   useEffect(() => {
-    fetch(`${API_URL}/rooms`).then((r) => r.json()).then(setRooms);
-    fetch(`${API_URL}/members`).then((r) => r.json()).then(setMembers);
-  }, []);
+    if (!params.projectId) return;
+    fetch(`${API_URL}/projects/${params.projectId}/rooms`).then((r) => r.json()).then(setRooms);
+    fetch(`${API_URL}/projects/${params.projectId}/members`).then((r) => r.json()).then(setMembers);
+  }, [params.projectId]);
 
   useEffect(() => {
     if (!params.memberId) return;
@@ -55,8 +56,9 @@ export default function MemberProfilePage() {
       <Sidebar
         rooms={rooms}
         members={members}
-        onRoomClick={(roomId) => router.push(`/chat/${roomId}`)}
+        onRoomClick={(roomId) => router.push(`/project/${params.projectId}/chat/${roomId}`)}
         onAddMember={() => setShowAddModal(true)}
+        onMemberClick={(id) => router.push(`/project/${params.projectId}/members/${id}`)}
       />
 
       <main className={styles.main}>
@@ -81,6 +83,7 @@ export default function MemberProfilePage() {
 
       <AddMemberModal
         open={showAddModal}
+        projectId={params.projectId}
         onClose={() => setShowAddModal(false)}
         onMemberAdded={handleMemberAdded}
       />

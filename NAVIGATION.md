@@ -16,14 +16,19 @@ team-agent/
 │   │   ├── public/
 │   │   └── src/
 │   │       ├── app/                    # Next.js app router (pages)
-│   │       │   ├── chat/
-│   │       │   │   └── [roomId]/       # Dynamic route per room
-│   │       │   └── members/
-│   │       │       └── [memberId]/     # Member profile route
+│   │       │   ├── page.tsx            # Landing page (project list + user picker)
+│   │       │   └── project/
+│   │       │       └── [projectId]/
+│   │       │           ├── page.tsx            # Project dashboard (rooms, members)
+│   │       │           ├── chat/
+│   │       │           │   └── [roomId]/       # Chat page (structured messages)
+│   │       │           └── members/
+│   │       │               └── [memberId]/     # Member profile page
 │   │       ├── components/
 │   │       │   ├── chat/               # Chat UI components (message list, input, threads)
 │   │       │   ├── agent/              # Agent chat window components
 │   │       │   ├── members/            # Member list, profile, add modal
+│   │       │   ├── project/            # Project creation modal
 │   │       │   └── sidebar/            # Shared sidebar component
 │   │       ├── hooks/                  # React hooks (e.g. WebSocket connection)
 │   │       ├── lib/                    # Utility functions, API client
@@ -66,6 +71,7 @@ team-agent/
 │       └── adr.md                      # Index of all active decisions
 │
 ├── db/
+│   ├── seed.py                         # Dev seed script (global users only)
 │   └── migrations/                     # Database migrations (shared schema for api + ai)
 │
 ├── scripts/
@@ -101,7 +107,10 @@ team-agent/
 | Agent memory skills | `services/ai/src/ai/skills/` |
 | Database migrations | `db/migrations/` |
 | Docker orchestration | `docker-compose.yml` |
+| Landing page (projects + user picker) | `services/frontend/src/app/page.tsx` |
+| Project dashboard | `services/frontend/src/app/project/[projectId]/page.tsx` |
 | Chat UI components | `services/frontend/src/components/chat/` |
+| Project creation modal | `services/frontend/src/components/project/` |
 | Agent chat window UI | `services/frontend/src/components/agent/` |
 | Member management UI | `services/frontend/src/components/members/` |
 | Shared sidebar component | `services/frontend/src/components/sidebar/` |
