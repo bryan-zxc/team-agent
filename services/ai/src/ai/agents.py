@@ -81,9 +81,19 @@ async def generate_agent_profile(
 
     messages = [{"role": "user", "content": prompt}]
 
+    lore_path = Path(__file__).parent / "references" / "pop-mart-characters.md"
+    lore = lore_path.read_text()
+    system_instruction = (
+        "The following Pop Mart character descriptions are provided as inspiration. "
+        "Use them as a loose guide for the agent's name and personality flavour — "
+        "you do not need to follow them exactly.\n\n"
+        f"{lore}"
+    )
+
     result = await llm.a_get_response(
         messages=messages,
         response_format=AgentProfile,
+        system_instruction=system_instruction,
     )
 
     if not isinstance(result, AgentProfile):
