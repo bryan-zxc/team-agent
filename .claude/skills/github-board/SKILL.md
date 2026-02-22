@@ -100,9 +100,17 @@ Use the status option IDs from the table above.
 gh issue close <issue-number> --repo bryan-zxc/team-agent
 ```
 
+## Ticket Workflow
+
+- When picking up a ticket: transition status to **In progress**
+- When done with a ticket: transition status to **Done** and close the issue
+- If a ticket needs to change, edit the description to the correct version — describe clearly what is eventually done, not what changed from before. Never add comments to tickets.
+
 ## Rules
 
 - Always assign `@me` — this dynamically resolves to whoever is running the command
 - Always add issues to project board 3 after creation
 - Always use the `epic` or `story` label as appropriate
 - When creating stories that belong to an epic, always link them as sub-issues
+- **Naming**: Name tickets from the user's perspective (developers are users too). Describe the benefit, not the technical implementation. E.g. "Reproducible database setup across environments" not "Set up Alembic".
+- **Context-rich descriptions**: Every ticket must contain enough context for a brand new Claude Code session to pick it up and deliver — current state, what to build, file paths, data model references, and verification steps. A reader should never need to chase down external context to understand or implement the ticket.

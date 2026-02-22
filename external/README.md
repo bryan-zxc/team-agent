@@ -17,14 +17,20 @@ The following repositories should be cloned into this directory:
 - **Purpose**: Official Python SDK for building agentic applications with Claude
 - **Directory**: `external/claude-agent-sdk-python/`
 
-### Add your repositories here
-<!--
-Example template:
-### Repository Name
-- **URL**: https://github.com/org/repo
-- **Purpose**: Brief description
-- **Directory**: `external/repo-name/`
--->
+### Monaco Editor
+- **URL**: https://github.com/microsoft/monaco-editor
+- **Purpose**: VS Code's standalone editor component — syntax highlighting, line numbers, editing
+- **Directory**: `external/monaco-editor/`
+
+### React Arborist
+- **URL**: https://github.com/brimdata/react-arborist
+- **Purpose**: Full-featured tree component with drag-and-drop, rename, create/delete
+- **Directory**: `external/react-arborist/`
+
+### Dockview
+- **URL**: https://github.com/mathuo/dockview
+- **Purpose**: VS Code-style layout manager — tabbed panels, split views, drag-and-drop
+- **Directory**: `external/dockview/`
 
 ## Quick Start
 

@@ -14,12 +14,5 @@ Always use `uv add <package>` to add Python dependencies. Never edit `pyproject.
 
 When working on the frontend, the `fe-dev` skill provides the design system, styling rules, and component guidelines.
 
-## Ticket Workflow
-- When picking up a ticket: transition status to **In progress** on the project board
-- When done with a ticket: transition status to **Done** on the project board and close the issue
-- If a ticket needs to change or needs to be updated, just edit the description to the correct version — describe clearly what is eventually done, not what changed from before. Never add comments to tickets.
-
-## Creating Tickets
-- **Epic vs Story**: An epic is a large user-facing goal or milestone — done when its stories are all complete. A story is a deliverable slice of work that provides value on its own, belonging to an epic.
-- **Naming**: Name tickets from the user's perspective (developers are users too). Describe the benefit, not the technical implementation. E.g. "Reproducible database setup across environments" not "Set up Alembic".
-- **Context-rich descriptions**: Every ticket description must contain enough context for a brand new Claude Code session to pick it up and know exactly what to do — current state, what to build, file paths, data model references, and verification steps.
+## Tickets
+Always use the `github-board` skill (`/github-board`) for any ticket operations — creating, updating, transitioning status, or closing. If a ticket needs to change, edit the description to the correct version — describe clearly what is eventually done, not what changed from before. Never add comments to tickets.

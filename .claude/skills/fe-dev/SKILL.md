@@ -75,6 +75,7 @@ Use **CSS Modules** — one `.module.css` file colocated with each component.
 - Extract shared components (in `src/components/`) when styles duplicate across pages
 - Use `clsx` for conditional class names with ternaries
 - Put all visual values in CSS using design token variables — keep inline styles out of JSX
+- Third-party library stylesheets (dockview, Monaco) are imported globally. Theme overrides for these libraries live in dedicated CSS files that map design tokens to the library's theming API. All custom component styles remain CSS Modules.
 
 ```tsx
 import clsx from "clsx";
@@ -136,9 +137,12 @@ transition: background 0.4s ease;    /* theme toggle */
 | `motion` | Animation |
 | `clsx` | Conditional class names |
 | `react-markdown` + `remark-gfm` | Markdown rendering |
+| `dockview` | Workbench layout — tabbed, splittable editor area |
+| `react-arborist` | File tree with expand/collapse, DnD, rename, CRUD |
+| `@monaco-editor/react` | Code editor/viewer with syntax highlighting |
 
-All components are custom-built. No component libraries (Material UI, Chakra, shadcn).
+No UI component libraries (Material UI, Chakra, shadcn). Specialised infrastructure libraries (layout, tree, code editor) are used where building from scratch is impractical — wrap them in custom components.
 
 ## Theme Switching
 
-Theme stored in localStorage under key `theme`. Applied as `data-theme` on `<html>`. Defaults to system preference via `prefers-color-scheme`. Toggle logic in `useTheme` hook.
+Theme stored in localStorage under key `theme`. Applied as `data-theme` on `<html>`. Defaults to system preference via `prefers-color-scheme`. Toggle logic in `useTheme` hook. Monaco editor theme must be synced separately via `monaco.editor.setTheme()` when the app theme changes — custom Monaco themes (`team-agent-light`, `team-agent-dark`) mirror our design tokens.
