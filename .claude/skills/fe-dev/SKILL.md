@@ -98,6 +98,10 @@ src/components/chat/
 - Shared types in `src/types/`, custom hooks in `src/hooks/`
 - Local state with `useState` / `useReducer`. No global state library.
 
+## Icons
+
+Never use emoji characters or text symbols as icons. All icons must be inline SVGs using `stroke="currentColor"` so they inherit colour from the parent and respond to theme changes. Use Feather-style icons (24×24 viewBox, `strokeWidth="1.8"`, `strokeLinecap="round"`, `strokeLinejoin="round"`). Size icons via `width`/`height` props (common sizes: 14px for tab icons, 18–20px for activity bar, 16px for inline actions). When a new icon is needed that doesn't match an existing one, discuss the design before implementing.
+
 ## Accessibility
 
 Global `:focus-visible` ring is defined in `globals.css` (3px accent outline). For inputs with custom border-based focus:

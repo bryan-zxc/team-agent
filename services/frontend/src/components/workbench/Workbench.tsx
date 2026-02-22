@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DockviewReact, type DockviewApi, type DockviewReadyEvent, type IDockviewPanelProps, type IWatermarkPanelProps } from "dockview";
+import { TabIcon } from "./TabIcon";
 import "dockview/dist/styles/dockview.css";
 import "./dockview-theme.css";
 import { ActivityBar } from "./ActivityBar";
@@ -77,7 +78,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
       api.addPanel({
         id: panelId,
         component: "chatTab",
-        title: `💬 ${room.name}`,
+        title: room.name,
         params: { roomId, room, memberId, members },
       });
       setActiveRoomId(roomId);
@@ -137,7 +138,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
         const panel = api.panels.find((p) => p.id === `room-${roomId}`);
         if (panel) {
           panel.api.updateParameters({ room: updated });
-          panel.setTitle(`💬 ${updated.name}`);
+          panel.setTitle(updated.name);
         }
       }
     },
@@ -184,6 +185,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
         <DockviewReact
           className="ta-dockview"
           components={components}
+          defaultTabComponent={TabIcon}
           watermarkComponent={Watermark}
           onReady={handleReady}
         />

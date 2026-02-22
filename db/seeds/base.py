@@ -61,6 +61,8 @@ CREATE TABLE IF NOT EXISTS chats (
     id UUID PRIMARY KEY,
     room_id UUID NOT NULL REFERENCES rooms(id),
     type TEXT NOT NULL,
+    title TEXT,
+    owner_id UUID REFERENCES project_members(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

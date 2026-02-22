@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type { IDockviewPanelProps } from "dockview";
-import type { Member, Message, Room } from "@/types";
+import type { Member, Message, Room, WorkloadChat } from "@/types";
 import styles from "./ChatTab.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -31,22 +31,27 @@ function getMessageText(content: string): string {
   return content;
 }
 
-type InternalTab = "chat" | "workloads";
+/* ── ChatView: reusable messages + input for any chat ── */
 
-export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
-  const { roomId, room, memberId, members } = params;
-  const [activeTab, setActiveTab] = useState<InternalTab>("chat");
+type ChatViewProps = {
+  chatId: string | null;
+  memberId: string | null;
+  members: Member[];
+  placeholder: string;
+};
+
+function ChatView({ chatId, memberId, members, placeholder }: ChatViewProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const chatId = room.primary_chat_id;
   const { messages, sendMessage, setMessages } = useWebSocket(chatId, memberId);
 
   useEffect(() => {
-    fetch(`${API_URL}/rooms/${roomId}/messages`)
+    if (!chatId) return;
+    fetch(`${API_URL}/chats/${chatId}/messages`)
       .then((r) => r.json())
       .then((history: Message[]) => setMessages(history));
-  }, [roomId, setMessages]);
+  }, [chatId, setMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -84,78 +89,102 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.tabs}>
-        <button
-          className={clsx(styles.tab, activeTab === "chat" && styles.tabActive)}
-          onClick={() => setActiveTab("chat")}
-        >
-          Chat
-        </button>
-        <button
-          className={clsx(styles.tab, activeTab === "workloads" && styles.tabActive)}
-          onClick={() => setActiveTab("workloads")}
-        >
-          Workloads
-        </button>
+    <div className={styles.chatView}>
+      <div className={styles.messages}>
+        {messages.map((msg) => {
+          const author = memberMap.get(msg.member_id);
+          const isSelf = msg.member_id === memberId;
+          const isAi = msg.type === "ai" || author?.type === "ai";
+
+          return (
+            <div
+              key={msg.id}
+              className={clsx(styles.messageGroup, isSelf && styles.self, isAi && styles.ai)}
+            >
+              <div className={clsx(styles.msgAvatar, isAi ? styles.avatarAi : styles.avatarHuman)}>
+                {msg.display_name[0]}
+              </div>
+              <div className={styles.msgBody}>
+                <div className={styles.msgHeader}>
+                  <span className={styles.msgAuthor}>{msg.display_name}</span>
+                  {isAi && <span className={styles.aiBadge}>AI</span>}
+                  <span className={styles.msgTime}>{formatTime(msg.created_at)}</span>
+                </div>
+                <div className={styles.msgBubble}>{getMessageText(msg.content)}</div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={messagesEndRef} />
       </div>
 
-      {activeTab === "chat" ? (
-        <div className={styles.chatView}>
-          <div className={styles.messages}>
-            {messages.map((msg) => {
-              const author = memberMap.get(msg.member_id);
-              const isSelf = msg.member_id === memberId;
-              const isAi = msg.type === "ai" || author?.type === "ai";
-
-              return (
-                <div
-                  key={msg.id}
-                  className={clsx(styles.messageGroup, isSelf && styles.self, isAi && styles.ai)}
-                >
-                  <div className={clsx(styles.msgAvatar, isAi ? styles.avatarAi : styles.avatarHuman)}>
-                    {msg.display_name[0]}
-                  </div>
-                  <div className={styles.msgBody}>
-                    <div className={styles.msgHeader}>
-                      <span className={styles.msgAuthor}>{msg.display_name}</span>
-                      {isAi && <span className={styles.aiBadge}>AI</span>}
-                      <span className={styles.msgTime}>{formatTime(msg.created_at)}</span>
-                    </div>
-                    <div className={styles.msgBubble}>{getMessageText(msg.content)}</div>
-                  </div>
-                </div>
-              );
-            })}
-            <div ref={messagesEndRef} />
-          </div>
-
-          <div className={styles.inputArea}>
-            <div className={styles.inputWrapper}>
-              <textarea
-                className={styles.inputField}
-                placeholder={`Message ${room.name}...`}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                rows={1}
-              />
-              <button className={styles.sendBtn} onClick={handleSend} aria-label="Send message">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="22" y1="2" x2="11" y2="13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-              </button>
-            </div>
-          </div>
+      <div className={styles.inputArea}>
+        <div className={styles.inputWrapper}>
+          <textarea
+            className={styles.inputField}
+            placeholder={placeholder}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            rows={1}
+          />
+          <button className={styles.sendBtn} onClick={handleSend} aria-label="Send message">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+          </button>
         </div>
-      ) : (
-        <div className={styles.workloadsView}>
-          <div className={styles.workloadsPlaceholder}>
-            <p className={styles.placeholderText}>Workloads will appear here</p>
-          </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── ChatTab: dockview panel with dynamic internal tabs ── */
+
+export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
+  const { roomId, room, memberId, members } = params;
+  const [workloads, setWorkloads] = useState<WorkloadChat[]>([]);
+  const [activeChatId, setActiveChatId] = useState<string>(room.primary_chat_id);
+
+  useEffect(() => {
+    fetch(`${API_URL}/rooms/${roomId}/workloads`)
+      .then((r) => r.json())
+      .then((data: WorkloadChat[]) => setWorkloads(data))
+      .catch(() => {});
+  }, [roomId]);
+
+  const hasWorkloads = workloads.length > 0;
+
+  return (
+    <div className={styles.container}>
+      {hasWorkloads && (
+        <div className={styles.tabs}>
+          <button
+            className={clsx(styles.tab, activeChatId === room.primary_chat_id && styles.tabActive)}
+            onClick={() => setActiveChatId(room.primary_chat_id)}
+          >
+            Main
+          </button>
+          {workloads.map((w) => (
+            <button
+              key={w.id}
+              className={clsx(styles.tab, activeChatId === w.id && styles.tabActive)}
+              onClick={() => setActiveChatId(w.id)}
+            >
+              {w.owner_name}: {w.title}
+            </button>
+          ))}
         </div>
       )}
+
+      <ChatView
+        key={activeChatId}
+        chatId={activeChatId}
+        memberId={memberId}
+        members={members}
+        placeholder={`Message ${room.name}...`}
+      />
     </div>
   );
 }

@@ -113,24 +113,58 @@ async def get_room_messages(room_id: uuid.UUID):
         if not primary_chat:
             return []
 
+        return await _messages_for_chat(session, primary_chat.id)
+
+
+@router.get("/rooms/{room_id}/workloads")
+async def list_workloads(room_id: uuid.UUID):
+    async with async_session() as session:
         rows = (
             await session.execute(
-                select(Message, ProjectMember.display_name, ProjectMember.type)
-                .join(ProjectMember, Message.member_id == ProjectMember.id)
-                .where(Message.chat_id == primary_chat.id)
-                .order_by(Message.created_at)
+                select(Chat, ProjectMember.display_name)
+                .outerjoin(ProjectMember, Chat.owner_id == ProjectMember.id)
+                .where(Chat.room_id == room_id, Chat.type == "workload")
+                .order_by(Chat.created_at)
             )
         ).all()
 
         return [
             {
-                "id": str(msg.id),
-                "chat_id": str(msg.chat_id),
-                "member_id": str(msg.member_id),
-                "display_name": display_name,
-                "type": member_type,
-                "content": msg.content,
-                "created_at": msg.created_at.isoformat(),
+                "id": str(chat.id),
+                "title": chat.title,
+                "owner_name": display_name,
+                "owner_id": str(chat.owner_id) if chat.owner_id else None,
+                "created_at": chat.created_at.isoformat(),
             }
-            for msg, display_name, member_type in rows
+            for chat, display_name in rows
         ]
+
+
+@router.get("/chats/{chat_id}/messages")
+async def get_chat_messages(chat_id: uuid.UUID):
+    async with async_session() as session:
+        return await _messages_for_chat(session, chat_id)
+
+
+async def _messages_for_chat(session, chat_id: uuid.UUID):
+    rows = (
+        await session.execute(
+            select(Message, ProjectMember.display_name, ProjectMember.type)
+            .join(ProjectMember, Message.member_id == ProjectMember.id)
+            .where(Message.chat_id == chat_id)
+            .order_by(Message.created_at)
+        )
+    ).all()
+
+    return [
+        {
+            "id": str(msg.id),
+            "chat_id": str(msg.chat_id),
+            "member_id": str(msg.member_id),
+            "display_name": display_name,
+            "type": member_type,
+            "content": msg.content,
+            "created_at": msg.created_at.isoformat(),
+        }
+        for msg, display_name, member_type in rows
+    ]

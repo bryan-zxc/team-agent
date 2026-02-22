@@ -17,7 +17,8 @@
     "react-arborist": "^3.4.3",
     "react-dom": "^19",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "seti-icons": "^0.0.4"
   },
   "devDependencies": {
     "@types/node": "^25",

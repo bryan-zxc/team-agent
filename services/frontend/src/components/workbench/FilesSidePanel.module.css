@@ -69,15 +69,6 @@
   align-items: center;
 }
 
-.fileIcon {
-  flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  width: 18px;
-  text-align: center;
-  letter-spacing: -0.02em;
-}
 
 .nodeName {
   overflow: hidden;

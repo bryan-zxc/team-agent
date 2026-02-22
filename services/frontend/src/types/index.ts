@@ -44,3 +44,11 @@ export type AvailableUser = {
 export type MemberProfile = {
   content: string;
 };
+
+export type WorkloadChat = {
+  id: string;
+  title: string;
+  owner_name: string | null;
+  owner_id: string | null;
+  created_at: string;
+};

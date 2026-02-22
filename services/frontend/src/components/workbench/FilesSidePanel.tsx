@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Tree, type NodeRendererProps } from "react-arborist";
 import clsx from "clsx";
 import { getFileIcon } from "@/lib/fileIcons";
+import { SetiIcon } from "./SetiIcon";
 import { FileContextMenu } from "./FileContextMenu";
 import styles from "./FilesSidePanel.module.css";
 
@@ -36,8 +37,6 @@ async function fetchDirectory(projectId: string, path: string): Promise<FileNode
 }
 
 function FileNodeRenderer({ node, style, dragHandle }: NodeRendererProps<FileNode>) {
-  const icon = getFileIcon(node.data.name, node.data.isDirectory);
-
   return (
     <div
       ref={dragHandle}
@@ -62,9 +61,7 @@ function FileNodeRenderer({ node, style, dragHandle }: NodeRendererProps<FileNod
           </svg>
         </span>
       ) : (
-        <span className={styles.fileIcon} style={{ color: icon.colour }}>
-          {icon.label}
-        </span>
+        <SetiIcon svg={getFileIcon(node.data.name)} size={16} />
       )}
       <span className={styles.nodeName}>{node.data.name}</span>
     </div>
