@@ -11,7 +11,8 @@ from .agents import generate_agent_profile
 from .config import settings, setup_logging
 from .cost.models import Base
 from .database import engine
-from .listener import listen
+from .listener import listen, listen_workload_messages
+from .workload import shutdown_all_sessions
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -40,10 +41,13 @@ async def lifespan(app: FastAPI):
         raise
 
     listener_task = asyncio.create_task(listen(client))
+    workload_listener_task = asyncio.create_task(listen_workload_messages(client))
 
     yield
 
+    await shutdown_all_sessions()
     listener_task.cancel()
+    workload_listener_task.cancel()
     await client.aclose()
     await engine.dispose()
     logger.info("AI service shut down")

@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 
 from ..database import async_session
+from ..models.chat import Chat
 from ..models.message import Message
 from ..models.project_member import ProjectMember
 from .manager import manager
@@ -49,6 +50,10 @@ async def websocket_endpoint(
         display_name = member.display_name if member else "Unknown"
         member_type = member.type if member else "human"
 
+        chat = await session.get(Chat, chat_id)
+        chat_type = chat.type if chat else "primary"
+        workload_id = str(chat.workload_id) if chat and chat.workload_id else None
+
     try:
         while True:
             data = await websocket.receive_json()
@@ -87,8 +92,17 @@ async def websocket_endpoint(
             # Broadcast to all connections in this chat
             await manager.broadcast(chat_id, msg_data)
 
-            # Check if any mentioned members are AI — publish one ai:respond
-            if mentions:
+            # Route message: workload chats → workload:messages, primary chats → ai:respond
+            if chat_type == "workload" and workload_id:
+                plain_text = " ".join(
+                    b["value"] for b in blocks if b.get("type") == "text"
+                )
+                await _get_redis().publish(
+                    "workload:messages",
+                    json.dumps({"workload_id": workload_id, "content": plain_text}),
+                )
+                logger.info("Published workload message for %s", workload_id[:8])
+            elif mentions:
                 await _notify_ai_if_mentioned(mentions, str(chat_id))
 
     except WebSocketDisconnect:

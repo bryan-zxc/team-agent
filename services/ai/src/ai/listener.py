@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import uuid
@@ -9,6 +10,7 @@ import redis.asyncio as aioredis
 from .agents import generate_agent_profile
 from .config import settings
 from .runner import run_agent
+from .workload import route_message, start_workload_session
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +152,20 @@ async def _resolve_member(
     return row["id"]
 
 
+async def _get_clone_path(project_name: str) -> str:
+    """Resolve the clone_path for a project by name."""
+    conn = await asyncpg.connect(_dsn)
+    try:
+        row = await conn.fetchval(
+            "SELECT clone_path FROM projects WHERE name = $1", project_name,
+        )
+        if not row:
+            raise ValueError(f"No project found with name '{project_name}'")
+        return row
+    finally:
+        await conn.close()
+
+
 async def _persist_workloads(
     workloads: list,
     main_chat_id: str,
@@ -157,7 +173,7 @@ async def _persist_workloads(
 ) -> list[dict]:
     """Persist workloads and their associated chats to the database.
 
-    Returns a list of dicts with {owner_name, title} for response enrichment.
+    Returns a list of dicts with full workload data for session startup.
     """
     conn = await asyncpg.connect(_dsn)
     try:
@@ -189,7 +205,20 @@ async def _persist_workloads(
                 chat_id, room_id, w.title, member_id, workload_id, now,
             )
 
-            results.append({"owner_name": w.owner, "title": w.title})
+            results.append({
+                "id": str(workload_id),
+                "main_chat_id": main_chat_id,
+                "chat_id": str(chat_id),
+                "member_id": str(member_id),
+                "display_name": w.owner,
+                "title": w.title,
+                "description": w.description,
+                "background_context": w.background_context,
+                "problem": w.problem,
+                "status": "assigned",
+                "worktree_branch": None,
+                "session_id": None,
+            })
 
         return results
     finally:
@@ -247,12 +276,20 @@ async def listen(redis_client: aioredis.Redis):
             logger.info(
                 "Persisted %d workloads: %s",
                 len(persisted),
-                ", ".join(f"{w['owner_name']}: {w['title']}" for w in persisted),
+                ", ".join(f"{w['display_name']}: {w['title']}" for w in persisted),
             )
             assignment_lines = [
-                f"- {w['owner_name']}: {w['title']}" for w in persisted
+                f"- {w['display_name']}: {w['title']}" for w in persisted
             ]
             content += "\n\nWorkloads assigned:\n" + "\n".join(assignment_lines)
+
+            # Start workload sessions (non-blocking)
+            clone_path = await _get_clone_path(project_name)
+            for wd in persisted:
+                asyncio.create_task(
+                    start_workload_session(wd, clone_path, redis_client),
+                    name=f"workload-start-{wd['id'][:8]}",
+                )
 
         # Wrap response in structured format for consistency
         structured_content = json.dumps({
@@ -272,3 +309,24 @@ async def listen(redis_client: aioredis.Redis):
 
         await redis_client.publish("chat:responses", json.dumps(response))
         logger.info("Published response to chat:responses")
+
+
+async def listen_workload_messages(redis_client: aioredis.Redis):
+    """Subscribe to workload:messages and route follow-ups to active sessions."""
+    pubsub = redis_client.pubsub()
+    await pubsub.subscribe("workload:messages")
+    logger.info("Subscribed to workload:messages")
+
+    async for raw in pubsub.listen():
+        if raw["type"] != "message":
+            continue
+
+        msg = json.loads(raw["data"])
+        workload_id = msg["workload_id"]
+        content = msg["content"]
+
+        delivered = await route_message(workload_id, content)
+        if delivered:
+            logger.info("Routed follow-up to workload %s", workload_id[:8])
+        else:
+            logger.warning("No active session for workload %s, message dropped", workload_id[:8])

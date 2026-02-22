@@ -40,7 +40,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FORMAT=${LOG_FORMAT:-text}
     volumes:
-      - claude_auth:/root/.claude
+      - claude_auth:/home/agent/.claude
       - project_data:/data/projects
     depends_on:
       postgres:
