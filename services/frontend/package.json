@@ -8,10 +8,13 @@
     "start": "next start"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "clsx": "^2.1.1",
+    "dockview": "^5.0.0",
     "motion": "^12.34.0",
     "next": "^16",
     "react": "^19",
+    "react-arborist": "^3.4.3",
     "react-dom": "^19",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1"

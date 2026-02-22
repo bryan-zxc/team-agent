@@ -24,7 +24,10 @@ export function useWebSocket(chatId: string | null, memberId: string | null) {
 
     ws.onmessage = (event) => {
       const msg: Message = JSON.parse(event.data);
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
     };
 
     ws.onclose = () => {

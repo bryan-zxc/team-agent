@@ -1,0 +1,93 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+.filePath {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toolbarActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.toolbarBtn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toolbarBtn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.toolbarBtnPrimary {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toolbarBtnPrimary:hover {
+  background: var(--accent-hover);
+}
+
+.toolbarBtnPrimary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.editorWrapper {
+  flex: 1;
+  min-height: 0;
+}
+
+.loadingState,
+.errorState {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loadingText {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.errorText {
+  color: var(--error);
+  font-size: 14px;
+}

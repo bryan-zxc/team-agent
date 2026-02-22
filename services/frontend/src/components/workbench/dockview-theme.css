@@ -1,0 +1,39 @@
+.ta-dockview {
+  --dv-group-view-background-color: var(--bg);
+  --dv-tabs-and-actions-container-background-color: var(--bg-subtle);
+  --dv-activegroup-visiblepanel-tab-background-color: var(--surface);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--bg-subtle);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--surface);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--bg-subtle);
+  --dv-activegroup-visiblepanel-tab-color: var(--text-primary);
+  --dv-activegroup-hiddenpanel-tab-color: var(--text-secondary);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--text-primary);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--text-secondary);
+  --dv-tab-divider-color: var(--border-light);
+  --dv-separator-border: var(--border);
+  --dv-drag-over-background-color: var(--accent-light);
+  --dv-drag-over-border: 2px solid var(--accent);
+  --dv-paneview-header-border-color: var(--border);
+  --dv-tabs-and-actions-container-height: 36px;
+  --dv-tabs-and-actions-container-font-size: 13px;
+  --dv-border-radius: 0px;
+  --dv-tab-margin: 0px;
+  --dv-sash-color: transparent;
+  --dv-active-sash-color: var(--accent);
+
+  font-family: var(--font-body);
+}
+
+.ta-dockview .dv-tabs-container .dv-tab {
+  padding: 0 16px;
+  border-radius: 0;
+}
+
+.ta-dockview .dv-tabs-container .dv-tab .dv-default-tab-action {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.ta-dockview .dv-tabs-container .dv-tab:hover .dv-default-tab-action {
+  opacity: 1;
+}

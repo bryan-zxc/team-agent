@@ -51,7 +51,8 @@
       "WebFetch(domain:toylandhk.com)",
       "WebFetch(domain:arttoyfamilia.com)",
       "Bash(du:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(grep:*)"
     ]
   }
 }

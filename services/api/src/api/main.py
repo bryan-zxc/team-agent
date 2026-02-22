@@ -12,6 +12,7 @@ from sqlalchemy import text
 from .config import settings, setup_logging
 from .database import async_session, engine
 from .models.message import Message
+from .routes.files import router as files_router
 from .routes.members import router as members_router
 from .routes.projects import router as projects_router
 from .routes.rooms import router as rooms_router
@@ -81,6 +82,7 @@ app.include_router(projects_router)
 app.include_router(members_router)
 app.include_router(rooms_router)
 app.include_router(users_router)
+app.include_router(files_router)
 app.include_router(ws_router)
 
 

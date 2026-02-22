@@ -1,0 +1,64 @@
+.bar {
+  width: 48px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+.topIcons,
+.bottomIcons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.icon {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.icon:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.iconActive {
+  color: var(--text-primary);
+}
+
+.iconActive::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+
+.iconDisabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.iconDisabled:hover {
+  color: var(--text-muted);
+  background: transparent;
+}

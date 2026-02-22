@@ -1,0 +1,32 @@
+.workbench {
+  display: grid;
+  grid-template-columns: 48px 260px 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidePanel {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+.editorArea {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.watermark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: var(--bg);
+}
+
+.watermarkText {
+  color: var(--text-muted);
+  font-size: 15px;
+}
