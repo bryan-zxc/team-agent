@@ -14,5 +14,8 @@ Always use `uv add <package>` to add Python dependencies. Never edit `pyproject.
 
 When working on the frontend, the `fe-dev` skill provides the design system, styling rules, and component guidelines.
 
+## Git
+Always include `.claude/settings.local.json` when committing — do not exclude it from staged changes.
+
 ## Tickets
 Always use the `github-board` skill (`/github-board`) for any ticket operations — creating, updating, transitioning status, or closing. If a ticket needs to change, edit the description to the correct version — describe clearly what is eventually done, not what changed from before. Never add comments to tickets.
