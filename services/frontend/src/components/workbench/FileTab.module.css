@@ -47,6 +47,12 @@
   color: var(--text-primary);
 }
 
+.toolbarBtnActive {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
 .toolbarBtnPrimary {
   padding: 4px 12px;
   border-radius: 6px;

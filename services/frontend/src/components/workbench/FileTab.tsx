@@ -58,8 +58,12 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   const [error, setError] = useState<string | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
 
-  const language = getLanguage(filePath.split("/").pop() ?? "");
+  const fileName = filePath.split("/").pop() ?? "";
+  const language = getLanguage(fileName);
   const monacoTheme = theme === "dark" ? "team-agent-dark" : "team-agent-light";
+  const [wordWrap, setWordWrap] = useState<"on" | "off">(
+    fileName.toLowerCase().endsWith(".md") ? "on" : "off",
+  );
 
   useEffect(() => {
     fetch(`${API_URL}/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`)
@@ -131,6 +135,13 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
       <div className={styles.toolbar}>
         <span className={styles.filePath}>{filePath}</span>
         <div className={styles.toolbarActions}>
+          <button
+            className={`${styles.toolbarBtn} ${wordWrap === "on" ? styles.toolbarBtnActive : ""}`}
+            onClick={() => setWordWrap((w) => (w === "on" ? "off" : "on"))}
+            title={wordWrap === "on" ? "Disable word wrap" : "Enable word wrap"}
+          >
+            Wrap
+          </button>
           {editing ? (
             <>
               <button
@@ -172,6 +183,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
             lineNumbers: "on",
             scrollBeyondLastLine: false,
             renderLineHighlight: "line",
+            wordWrap,
             padding: { top: 12 },
             scrollbar: {
               verticalScrollbarSize: 6,
