@@ -1,6 +1,6 @@
 ---
 name: github-board
-description: Manage GitHub project board tickets for the teamagent project. Use whenever creating issues, epics, or stories, transitioning ticket status, closing tickets, or any project board management. Triggers on requests to create tickets, track work, manage the backlog, or update issue status.
+description: Manage GitHub project board tickets for the teamagent project. Use whenever creating issues — epics, stories, or bugs — transitioning ticket status, closing tickets, or any project board management. Triggers on requests to create tickets, track work, manage the backlog, or update issue status.
 ---
 
 # GitHub Board Management
@@ -22,14 +22,13 @@ description: Manage GitHub project board tickets for the teamagent project. Use 
 | In review | df73e18b |
 | Done | 98236657 |
 
-## Issue Hierarchy
-
-Use two levels:
+## Issue Types
 
 - **Epic** — high-level feature grouping (label: `epic`)
 - **Story** — deliverable slice of functionality within an epic (label: `story`)
+- **Bug** — something that used to work but is now broken (label: `bug`)
 
-Stories are linked to epics as sub-issues via the GitHub GraphQL API.
+Stories are linked to epics as sub-issues via the GitHub GraphQL API. Bugs are standalone — they don't belong to an epic.
 
 ## Creating an Epic
 
@@ -38,6 +37,22 @@ gh issue create --repo bryan-zxc/team-agent \
   --title "Epic title" \
   --body "Description" \
   --label "epic" \
+  --assignee "@me"
+```
+
+Then add to the project board:
+
+```bash
+gh project item-add 3 --owner @me --url <issue-url> --format json
+```
+
+## Creating a Bug
+
+```bash
+gh issue create --repo bryan-zxc/team-agent \
+  --title "Bug title" \
+  --body "Description" \
+  --label "bug" \
   --assignee "@me"
 ```
 
@@ -110,7 +125,7 @@ gh issue close <issue-number> --repo bryan-zxc/team-agent
 
 - Always assign `@me` — this dynamically resolves to whoever is running the command
 - Always add issues to project board 3 after creation
-- Always use the `epic` or `story` label as appropriate
+- Always use the `epic`, `story`, or `bug` label as appropriate
 - When creating stories that belong to an epic, always link them as sub-issues
 - **Naming**: Name tickets from the user's perspective (developers are users too). Describe the benefit, not the technical implementation. E.g. "Reproducible database setup across environments" not "Set up Alembic".
 - **Context-rich descriptions**: Every ticket must contain enough context for a brand new Claude Code session to pick it up and deliver — current state, what to build, file paths, data model references, and verification steps. A reader should never need to chase down external context to understand or implement the ticket.

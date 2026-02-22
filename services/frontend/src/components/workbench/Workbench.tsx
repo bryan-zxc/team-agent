@@ -10,6 +10,7 @@ import { ChatSidePanel } from "./ChatSidePanel";
 import { FilesSidePanel } from "./FilesSidePanel";
 import { ChatTab } from "./ChatTab";
 import { FileTab } from "./FileTab";
+import { MemberProfileTab } from "./MemberProfileTab";
 import { AddMemberModal } from "@/components/members/AddMemberModal";
 import type { Member, Room } from "@/types";
 import styles from "./Workbench.module.css";
@@ -33,6 +34,7 @@ function Watermark({ containerApi }: IWatermarkPanelProps) {
 const components: Record<string, React.FunctionComponent<IDockviewPanelProps<any>>> = {
   chatTab: ChatTab,
   fileTab: FileTab,
+  memberTab: MemberProfileTab,
 };
 
 export function Workbench({ projectId }: WorkbenchProps) {
@@ -172,7 +174,25 @@ export function Workbench({ projectId }: WorkbenchProps) {
             onRenameRoom={handleRenameRoom}
             onAddMember={() => setShowAddModal(true)}
             onMemberClick={(id) => {
-              /* future: open member profile tab */
+              const api = apiRef.current;
+              if (!api) return;
+
+              const panelId = `member-${id}`;
+              const existing = api.panels.find((p) => p.id === panelId);
+              if (existing) {
+                existing.api.setActive();
+                return;
+              }
+
+              const member = members.find((m) => m.id === id);
+              if (!member) return;
+
+              api.addPanel({
+                id: panelId,
+                component: "memberTab",
+                title: member.display_name,
+                params: { memberId: id, memberName: member.display_name },
+              });
             }}
             currentMember={currentMember}
           />

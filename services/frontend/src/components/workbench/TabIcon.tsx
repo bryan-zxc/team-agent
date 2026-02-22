@@ -25,6 +25,13 @@ const ChatIcon = () => (
   </svg>
 );
 
+const PersonIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+);
+
 const CloseIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="18" y1="6" x2="6" y2="18" />
@@ -37,6 +44,7 @@ export const TabIcon: React.FunctionComponent<IDockviewPanelHeaderProps> = ({ ap
   const isMiddleMouseButton = useRef(false);
 
   const isRoom = api.id.startsWith("room-");
+  const isMember = api.id.startsWith("member-");
 
   const onClose = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
@@ -70,7 +78,7 @@ export const TabIcon: React.FunctionComponent<IDockviewPanelHeaderProps> = ({ ap
       onPointerLeave={onPointerLeave}
     >
       <span className="dv-default-tab-content" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-        {isRoom ? <ChatIcon /> : <SetiIcon svg={getFileIcon(title ?? "")} size={14} />}
+        {isRoom ? <ChatIcon /> : isMember ? <PersonIcon /> : <SetiIcon svg={getFileIcon(title ?? "")} size={14} />}
         {title}
       </span>
       <div className="dv-default-tab-action" onPointerDown={onBtnPointerDown} onClick={onClose}>
