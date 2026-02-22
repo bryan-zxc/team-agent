@@ -13,7 +13,6 @@ type MemberListProps = {
 export function MemberList({ members, onAddClick, onMemberClick }: MemberListProps) {
   return (
     <div className={styles.container}>
-      <div className={styles.sectionLabel}>Members</div>
       <div className={styles.list}>
         {members.map((member) => (
           <button

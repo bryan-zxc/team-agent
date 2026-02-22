@@ -2,32 +2,25 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { MemberList } from "@/components/members/MemberList";
 import { generateRoomName } from "@/lib/roomNames";
 import type { Member, Room } from "@/types";
 import styles from "./ChatSidePanel.module.css";
 
 type ChatSidePanelProps = {
   rooms: Room[];
-  members: Member[];
   activeRoomId?: string;
   onRoomClick: (roomId: string) => void;
   onCreateRoom?: (name: string) => void;
   onRenameRoom?: (roomId: string, newName: string) => void;
-  onAddMember: () => void;
-  onMemberClick?: (memberId: string) => void;
   currentMember?: Member | null;
 };
 
 export function ChatSidePanel({
   rooms,
-  members,
   activeRoomId,
   onRoomClick,
   onCreateRoom,
   onRenameRoom,
-  onAddMember,
-  onMemberClick,
   currentMember,
 }: ChatSidePanelProps) {
   const [creating, setCreating] = useState(false);
@@ -178,12 +171,6 @@ export function ChatSidePanel({
 
       {creating && <div className={styles.hint}>Enter to create · Esc to cancel</div>}
       {renamingId && <div className={styles.hint}>Enter to save · Esc to cancel</div>}
-
-      <MemberList
-        members={members}
-        onAddClick={onAddMember}
-        onMemberClick={onMemberClick}
-      />
 
       {currentMember && (
         <div className={styles.footer}>

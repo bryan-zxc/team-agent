@@ -8,6 +8,7 @@ import "./dockview-theme.css";
 import { ActivityBar } from "./ActivityBar";
 import { ChatSidePanel } from "./ChatSidePanel";
 import { FilesSidePanel } from "./FilesSidePanel";
+import { MembersSidePanel } from "./MembersSidePanel";
 import { ChatTab } from "./ChatTab";
 import { FileTab } from "./FileTab";
 import { MemberProfileTab } from "./MemberProfileTab";
@@ -17,7 +18,7 @@ import styles from "./Workbench.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-type Panel = "chat" | "files";
+type Panel = "chat" | "files" | "members";
 
 type WorkbenchProps = {
   projectId: string;
@@ -167,11 +168,15 @@ export function Workbench({ projectId }: WorkbenchProps) {
         {activePanel === "chat" ? (
           <ChatSidePanel
             rooms={rooms}
-            members={members}
             activeRoomId={activeRoomId}
             onRoomClick={openRoom}
             onCreateRoom={handleCreateRoom}
             onRenameRoom={handleRenameRoom}
+            currentMember={currentMember}
+          />
+        ) : activePanel === "members" ? (
+          <MembersSidePanel
+            members={members}
             onAddMember={() => setShowAddModal(true)}
             onMemberClick={(id) => {
               const api = apiRef.current;
@@ -194,7 +199,6 @@ export function Workbench({ projectId }: WorkbenchProps) {
                 params: { memberId: id, memberName: member.display_name },
               });
             }}
-            currentMember={currentMember}
           />
         ) : (
           <FilesSidePanel projectId={projectId} onFileClick={openFile} />
