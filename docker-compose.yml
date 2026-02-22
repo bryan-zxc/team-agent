@@ -20,7 +20,6 @@ services:
       - AI_SERVICE_URL=${AI_SERVICE_URL:-http://ai-service:8001}
     volumes:
       - ./db:/app/db
-      - ./agents:/app/agents
       - project_data:/data/projects
     depends_on:
       postgres:
@@ -42,7 +41,6 @@ services:
       - LOG_FORMAT=${LOG_FORMAT:-text}
     volumes:
       - claude_auth:/root/.claude
-      - ./agents:/app/agents
       - project_data:/data/projects
     depends_on:
       postgres:

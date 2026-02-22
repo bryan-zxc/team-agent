@@ -30,11 +30,13 @@ class UpdateProfileRequest(BaseModel):
 
 
 async def _resolve_profile_path(member: ProjectMember) -> Path:
-    """Resolve the markdown profile path for an AI member via its project."""
+    """Resolve the markdown profile path for an AI member via its project's clone_path."""
     from ..database import async_session as _session
     async with _session() as session:
         project = await session.get(Project, member.project_id)
-    return Path(settings.agents_dir) / project.name / f"{member.display_name.lower()}.md"
+    if not project or not project.clone_path:
+        raise HTTPException(status_code=404, detail="Project not found or has no clone_path")
+    return Path(project.clone_path) / ".agent" / f"{member.display_name.lower()}.md"
 
 
 @router.get("/projects/{project_id}/members")

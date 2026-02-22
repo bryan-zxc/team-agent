@@ -15,12 +15,26 @@ logger = logging.getLogger(__name__)
 _dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
 
 
-def _agents_dir(project_name: str) -> Path:
-    return Path(settings.agents_dir) / project_name
+async def _get_clone_path(project_name: str) -> Path:
+    """Resolve the clone_path for a project from the database."""
+    conn = await asyncpg.connect(_dsn)
+    try:
+        row = await conn.fetchval(
+            "SELECT clone_path FROM projects WHERE name = $1", project_name
+        )
+        if not row:
+            raise RuntimeError(f"Project '{project_name}' not found or has no clone_path")
+        return Path(row)
+    finally:
+        await conn.close()
 
 
-def _profile_path(project_name: str, agent_name: str) -> Path:
-    return _agents_dir(project_name) / f"{agent_name.lower()}.md"
+def _agent_dir(clone_path: Path) -> Path:
+    return clone_path / ".agent"
+
+
+def _profile_path(clone_path: Path, agent_name: str) -> Path:
+    return _agent_dir(clone_path) / f"{agent_name.lower()}.md"
 
 
 async def _get_existing_agent_names(project_name: str) -> list[str]:
@@ -73,7 +87,7 @@ async def generate_agent_profile(
 
     If name is not provided, the LLM picks a Pop Mart character name.
     Creates a project_member record and writes the profile to
-    agents/{project_name}/{name}.md.
+    {clone_path}/.agent/{name}.md.
 
     Returns {"id": str, "display_name": str, "file_path": str}.
     """
@@ -106,8 +120,9 @@ async def generate_agent_profile(
     # Insert into database as project member
     member_id = await _insert_project_member(project_name, result.name, member_type)
 
-    # Write markdown file
-    profile_dir = _agents_dir(project_name)
+    # Write markdown file into the project's cloned repo
+    clone_path = await _get_clone_path(project_name)
+    profile_dir = _agent_dir(clone_path)
     profile_dir.mkdir(parents=True, exist_ok=True)
 
     md_content = f"""# {result.name}
@@ -124,7 +139,7 @@ async def generate_agent_profile(
 ## Work Done
 """
 
-    file_path = _profile_path(project_name, result.name)
+    file_path = _profile_path(clone_path, result.name)
     file_path.write_text(md_content)
 
     logger.info("Generated agent profile: %s", file_path)

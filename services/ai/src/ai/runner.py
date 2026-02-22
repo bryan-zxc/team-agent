@@ -1,23 +1,23 @@
 import logging
 from typing import Literal
 
-from pathlib import Path
 from pydantic import BaseModel
 
-from .config import settings
+from .agents import _get_clone_path
 from .llm import llm
 
 logger = logging.getLogger(__name__)
 
 
-def _load_all_agent_profiles(project_name: str) -> str:
-    """Load all agent markdown files and concatenate them."""
-    agents_dir = Path(settings.agents_dir) / project_name
-    if not agents_dir.exists():
+async def _load_all_agent_profiles(project_name: str) -> str:
+    """Load all agent markdown files from the project's .agent/ directory."""
+    clone_path = await _get_clone_path(project_name)
+    agent_dir = clone_path / ".agent"
+    if not agent_dir.exists():
         return ""
 
     profiles = []
-    for md_file in sorted(agents_dir.glob("*.md")):
+    for md_file in sorted(agent_dir.glob("*.md")):
         profiles.append(md_file.read_text())
 
     return "\n---\n".join(profiles)
@@ -60,7 +60,7 @@ async def run_agent(
     )
 
     # Load all agent profiles for context
-    all_profiles = _load_all_agent_profiles(project_name)
+    all_profiles = await _load_all_agent_profiles(project_name)
 
     system_instruction = (
         f"You are {coordinator_name}, responding to the latest message that mentioned "

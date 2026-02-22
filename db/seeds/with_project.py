@@ -2,11 +2,11 @@
 
 Drops/recreates all tables. Inserts users, a fully-formed project with:
 - Real git clone of https://github.com/bryan-zxc/popmart.git
-- Zimomo AI agent (uses pre-written profile at agents/popmart/zimomo.md)
+- Zimomo coordinator agent (profile written to {clone_path}/.agent/zimomo.md)
 - Alice and Bob as human members
 - No rooms — rooms are created through the UI
 
-No LLM calls — the agent profile already exists on disk.
+No LLM calls — the agent profile is written directly by the seed.
 
 Usage: docker compose exec api .venv/bin/python db/seeds/with_project.py
 """
@@ -20,7 +20,21 @@ from base import connect, reset_schema
 
 GIT_REPO_URL = "https://github.com/bryan-zxc/popmart.git"
 CLONE_BASE = Path("/data/projects")
-AGENTS_DIR = Path("/app/agents")
+
+ZIMOMO_PROFILE = """\
+# Zimomo
+
+## Pronoun
+he/him
+
+## Personality
+Authoritative, calm, and composed. He acts as a protective patriarch who prefers order over chaos. He interacts with a serious, guiding tone, providing firm direction and expecting adherence to structure. He does not engage in frivolity, focusing instead on leading the user through complex tasks with a steady hand.
+
+## Specialisation
+analysis and reporting
+
+## Work Done
+"""
 
 
 async def seed():
@@ -68,16 +82,12 @@ async def seed():
         )
         print("Inserted project: popmart")
 
-        # --- Verify agent profile exists on disk ---
-        agents_project_dir = AGENTS_DIR / "popmart"
-        agents_project_dir.mkdir(parents=True, exist_ok=True)
-        profile_path = agents_project_dir / "zimomo.md"
-        if not profile_path.exists():
-            raise RuntimeError(
-                f"Zimomo profile not found at {profile_path}. "
-                "Ensure agents/popmart/zimomo.md exists in the repo."
-            )
-        print(f"Zimomo profile verified at {profile_path}")
+        # --- Write Zimomo profile into the cloned repo ---
+        agent_dir = Path(clone_path) / ".agent"
+        agent_dir.mkdir(parents=True, exist_ok=True)
+        profile_path = agent_dir / "zimomo.md"
+        profile_path.write_text(ZIMOMO_PROFILE)
+        print(f"Wrote Zimomo profile to {profile_path}")
 
         # --- Members ---
         alice_member_id = uuid.uuid4()

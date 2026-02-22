@@ -119,9 +119,8 @@ async def create_project(req: CreateProjectRequest):
         project.clone_path = clone_path
         logger.info("Cloned %s to %s", req.git_repo_url, clone_path)
 
-        # Create agents directory
-        agents_dir = Path(settings.agents_dir) / req.name
-        agents_dir.mkdir(parents=True, exist_ok=True)
+        # Create .agent/ directory inside the cloned repo for agent profiles
+        (Path(clone_path) / ".agent").mkdir(parents=True, exist_ok=True)
 
         # Add creator as human member
         creator_member = ProjectMember(

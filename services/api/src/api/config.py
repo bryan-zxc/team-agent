@@ -6,7 +6,6 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://teamagent:teamagent_dev@postgres:5432/teamagent"
     redis_url: str = "redis://redis:6379"
-    agents_dir: str = "agents"
     ai_service_url: str = "http://ai-service:8001"
     log_level: str = "INFO"
     log_format: str = "text"
