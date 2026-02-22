@@ -19,7 +19,7 @@ export type Message = {
   chat_id: string;
   member_id: string;
   display_name: string;
-  type: "human" | "ai";
+  type: "human" | "ai" | "coordinator";
   content: string;
   created_at: string;
 };
@@ -32,7 +32,7 @@ export type User = {
 export type Member = {
   id: string;
   display_name: string;
-  type: "human" | "ai";
+  type: "human" | "ai" | "coordinator";
   user_id: string | null;
 };
 
@@ -47,7 +47,10 @@ export type MemberProfile = {
 
 export type WorkloadChat = {
   id: string;
+  workload_id: string;
   title: string;
+  description: string;
+  status: string;
   owner_name: string | null;
   owner_id: string | null;
   created_at: string;

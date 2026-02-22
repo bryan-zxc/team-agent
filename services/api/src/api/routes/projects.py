@@ -142,7 +142,7 @@ async def create_project(req: CreateProjectRequest):
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
                 f"{settings.ai_service_url}/generate-agent",
-                json={"project_name": req.name, "name": "Zimomo"},
+                json={"project_name": req.name, "name": "Zimomo", "member_type": "coordinator"},
             )
         if resp.status_code == 200:
             zimomo_member = resp.json()

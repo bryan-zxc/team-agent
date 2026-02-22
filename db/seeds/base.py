@@ -18,6 +18,7 @@ DSN = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
 DROP_TABLES = """
 DROP TABLE IF EXISTS llm_usage CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
+DROP TABLE IF EXISTS workloads CASCADE;
 DROP TABLE IF EXISTS chats CASCADE;
 DROP TABLE IF EXISTS rooms CASCADE;
 DROP TABLE IF EXISTS project_members CASCADE;
@@ -63,8 +64,25 @@ CREATE TABLE IF NOT EXISTS chats (
     type TEXT NOT NULL,
     title TEXT,
     owner_id UUID REFERENCES project_members(id),
+    workload_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS workloads (
+    id UUID PRIMARY KEY,
+    main_chat_id UUID NOT NULL REFERENCES chats(id),
+    member_id UUID NOT NULL REFERENCES project_members(id),
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'assigned',
+    worktree_branch TEXT,
+    session_id TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE chats ADD CONSTRAINT fk_chats_workload_id
+    FOREIGN KEY (workload_id) REFERENCES workloads(id);
 
 CREATE TABLE IF NOT EXISTS messages (
     id UUID PRIMARY KEY,

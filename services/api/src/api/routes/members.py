@@ -142,7 +142,7 @@ async def get_profile(member_id: uuid.UUID):
         member = await session.get(ProjectMember, member_id)
         if not member:
             raise HTTPException(status_code=404, detail="Member not found")
-        if member.type != "ai":
+        if member.type == "human":
             raise HTTPException(status_code=400, detail="Only AI members have profiles")
 
     path = await _resolve_profile_path(member)
@@ -159,7 +159,7 @@ async def update_profile(member_id: uuid.UUID, req: UpdateProfileRequest):
         member = await session.get(ProjectMember, member_id)
         if not member:
             raise HTTPException(status_code=404, detail="Member not found")
-        if member.type != "ai":
+        if member.type == "human":
             raise HTTPException(status_code=400, detail="Only AI members have profiles")
 
     path = await _resolve_profile_path(member)

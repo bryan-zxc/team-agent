@@ -19,3 +19,6 @@ class Chat(UUIDPrimaryKey, TimestampMixin, Base):
     owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("project_members.id"), nullable=True
     )
+    workload_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workloads.id"), nullable=True
+    )

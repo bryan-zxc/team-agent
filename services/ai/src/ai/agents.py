@@ -38,8 +38,10 @@ async def _get_existing_agent_names(project_name: str) -> list[str]:
         await conn.close()
 
 
-async def _insert_project_member(project_name: str, agent_name: str) -> uuid.UUID:
-    """Insert a new AI project member into the database. Returns the member id."""
+async def _insert_project_member(
+    project_name: str, agent_name: str, member_type: str = "ai",
+) -> uuid.UUID:
+    """Insert a new project member into the database. Returns the member id."""
     conn = await asyncpg.connect(_dsn)
     try:
         project_id = await conn.fetchval(
@@ -51,10 +53,11 @@ async def _insert_project_member(project_name: str, agent_name: str) -> uuid.UUI
         member_id = uuid.uuid4()
         await conn.execute(
             "INSERT INTO project_members (id, project_id, user_id, display_name, type, created_at) "
-            "VALUES ($1, $2, NULL, $3, 'ai', NOW())",
+            "VALUES ($1, $2, NULL, $3, $4, NOW())",
             member_id,
             project_id,
             agent_name,
+            member_type,
         )
         return member_id
     finally:
@@ -64,6 +67,7 @@ async def _insert_project_member(project_name: str, agent_name: str) -> uuid.UUI
 async def generate_agent_profile(
     project_name: str,
     name: str | None = None,
+    member_type: str = "ai",
 ) -> dict:
     """Generate an agent profile markdown file using the LLM.
 
@@ -99,8 +103,8 @@ async def generate_agent_profile(
     if not isinstance(result, AgentProfile):
         raise RuntimeError(f"Expected AgentProfile, got {type(result)}")
 
-    # Insert into database as AI project member
-    member_id = await _insert_project_member(project_name, result.name)
+    # Insert into database as project member
+    member_id = await _insert_project_member(project_name, result.name, member_type)
 
     # Write markdown file
     profile_dir = _agents_dir(project_name)

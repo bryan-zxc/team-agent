@@ -9,6 +9,7 @@ from ..models.room import Room
 from ..models.chat import Chat
 from ..models.message import Message
 from ..models.project_member import ProjectMember
+from ..models.workload import Workload
 
 router = APIRouter()
 
@@ -121,8 +122,9 @@ async def list_workloads(room_id: uuid.UUID):
     async with async_session() as session:
         rows = (
             await session.execute(
-                select(Chat, ProjectMember.display_name)
-                .outerjoin(ProjectMember, Chat.owner_id == ProjectMember.id)
+                select(Chat, Workload, ProjectMember.display_name)
+                .join(Workload, Chat.workload_id == Workload.id)
+                .outerjoin(ProjectMember, Workload.member_id == ProjectMember.id)
                 .where(Chat.room_id == room_id, Chat.type == "workload")
                 .order_by(Chat.created_at)
             )
@@ -131,12 +133,15 @@ async def list_workloads(room_id: uuid.UUID):
         return [
             {
                 "id": str(chat.id),
-                "title": chat.title,
+                "workload_id": str(workload.id),
+                "title": workload.title,
+                "description": workload.description,
+                "status": workload.status,
                 "owner_name": display_name,
-                "owner_id": str(chat.owner_id) if chat.owner_id else None,
+                "owner_id": str(workload.member_id),
                 "created_at": chat.created_at.isoformat(),
             }
-            for chat, display_name in rows
+            for chat, workload, display_name in rows
         ]
 
 

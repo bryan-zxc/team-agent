@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class GenerateAgentRequest(BaseModel):
     project_name: str
     name: Optional[str] = None
+    member_type: str = "ai"
 
 
 @asynccontextmanager
@@ -55,7 +56,7 @@ app = FastAPI(title="AI Service", lifespan=lifespan)
 async def generate_agent(req: GenerateAgentRequest):
     """Generate an AI agent profile via LLM."""
     try:
-        result = await generate_agent_profile(req.project_name, name=req.name)
+        result = await generate_agent_profile(req.project_name, name=req.name, member_type=req.member_type)
     except Exception as e:
         logger.error("Agent creation failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

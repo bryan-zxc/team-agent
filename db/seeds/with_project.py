@@ -98,7 +98,7 @@ async def seed():
         await conn.execute(
             "INSERT INTO project_members (id, project_id, user_id, display_name, type, created_at) "
             "VALUES ($1, $2, NULL, $3, $4, $5)",
-            zimomo_member_id, project_id, "Zimomo", "ai", now,
+            zimomo_member_id, project_id, "Zimomo", "coordinator", now,
         )
         print("Inserted 3 members (Alice, Bob, Zimomo)")
 

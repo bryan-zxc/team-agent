@@ -27,7 +27,7 @@ async def _notify_ai_if_mentioned(mentions: list[str], chat_id: str):
             except ValueError:
                 continue
 
-            if member and member.type == "ai":
+            if member and member.type in ("ai", "coordinator"):
                 await _get_redis().publish(
                     "ai:respond", json.dumps({"chat_id": chat_id})
                 )

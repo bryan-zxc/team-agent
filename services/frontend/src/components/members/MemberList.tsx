@@ -17,17 +17,17 @@ export function MemberList({ members, onAddClick, onMemberClick }: MemberListPro
         {members.map((member) => (
           <button
             key={member.id}
-            className={clsx(styles.memberItem, member.type === "ai" && styles.memberItemClickable)}
-            onClick={() => member.type === "ai" && onMemberClick?.(member.id)}
+            className={clsx(styles.memberItem, member.type !== "human" && styles.memberItemClickable)}
+            onClick={() => member.type !== "human" && onMemberClick?.(member.id)}
           >
-            <div className={clsx(styles.avatar, member.type === "ai" ? styles.avatarAi : styles.avatarHuman)}>
+            <div className={clsx(styles.avatar, member.type !== "human" ? styles.avatarAi : styles.avatarHuman)}>
               {member.display_name[0]}
             </div>
             <div className={styles.memberInfo}>
               <span className={styles.memberName}>{member.display_name}</span>
             </div>
-            <span className={clsx(styles.typeBadge, member.type === "ai" && styles.typeBadgeAi)}>
-              {member.type === "ai" ? "AI" : "Human"}
+            <span className={clsx(styles.typeBadge, member.type !== "human" && styles.typeBadgeAi)}>
+              {member.type === "coordinator" ? "Coordinator" : member.type === "ai" ? "AI" : "Human"}
             </span>
           </button>
         ))}

@@ -5,5 +5,6 @@ from .project_member import ProjectMember
 from .room import Room
 from .chat import Chat
 from .message import Message
+from .workload import Workload
 
-__all__ = ["Base", "User", "Project", "ProjectMember", "Room", "Chat", "Message"]
+__all__ = ["Base", "User", "Project", "ProjectMember", "Room", "Chat", "Message", "Workload"]

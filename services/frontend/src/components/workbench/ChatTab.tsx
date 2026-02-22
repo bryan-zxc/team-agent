@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type { IDockviewPanelProps } from "dockview";
@@ -38,11 +38,13 @@ type ChatViewProps = {
   memberId: string | null;
   members: Member[];
   placeholder: string;
+  onAiMessage?: () => void;
 };
 
-function ChatView({ chatId, memberId, members, placeholder }: ChatViewProps) {
+function ChatView({ chatId, memberId, members, placeholder, onAiMessage }: ChatViewProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const prevCountRef = useRef(0);
 
   const { messages, sendMessage, setMessages } = useWebSocket(chatId, memberId);
 
@@ -57,7 +59,17 @@ function ChatView({ chatId, memberId, members, placeholder }: ChatViewProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const memberMap = new Map(members.map((m) => [m.id, m]));
+  useEffect(() => {
+    if (messages.length > prevCountRef.current && onAiMessage) {
+      const latest = messages[messages.length - 1];
+      if (latest.type !== "human") {
+        onAiMessage();
+      }
+    }
+    prevCountRef.current = messages.length;
+  }, [messages, onAiMessage]);
+
+  const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
 
   const handleSend = useCallback(() => {
     if (!input.trim()) return;
@@ -94,7 +106,7 @@ function ChatView({ chatId, memberId, members, placeholder }: ChatViewProps) {
         {messages.map((msg) => {
           const author = memberMap.get(msg.member_id);
           const isSelf = msg.member_id === memberId;
-          const isAi = msg.type === "ai" || author?.type === "ai";
+          const isAi = msg.type !== "human";
 
           return (
             <div
@@ -147,12 +159,16 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
   const [workloads, setWorkloads] = useState<WorkloadChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>(room.primary_chat_id);
 
-  useEffect(() => {
+  const refreshWorkloads = useCallback(() => {
     fetch(`${API_URL}/rooms/${roomId}/workloads`)
       .then((r) => r.json())
       .then((data: WorkloadChat[]) => setWorkloads(data))
       .catch(() => {});
   }, [roomId]);
+
+  useEffect(() => {
+    refreshWorkloads();
+  }, [refreshWorkloads]);
 
   const hasWorkloads = workloads.length > 0;
 
@@ -184,6 +200,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
         memberId={memberId}
         members={members}
         placeholder={`Message ${room.name}...`}
+        onAiMessage={activeChatId === room.primary_chat_id ? refreshWorkloads : undefined}
       />
     </div>
   );
