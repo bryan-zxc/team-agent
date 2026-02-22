@@ -4,6 +4,8 @@ Active design decisions for the team-agent project. Newest first. When a decisio
 
 | # | Date | Title | Description | Link |
 |---|------|-------|-------------|------|
+| 0007 | 2026-02-22 | Tool approval persistence via project settings | Persist tool approvals to .claude/settings.local.json in the cloned project repo, shared between web app and CLI users | [ADR-0007](0007-tool-approval-persistence-via-project-settings.md) |
+| 0006 | 2026-02-22 | Workload session lifecycle with worktree auto-merge | SDK Stop hook triggers deterministic merge with conflict resolution; packaged session function detects/creates worktrees independently of conversation context | [ADR-0006](0006-workload-session-lifecycle-with-worktree-auto-merge.md) |
 | 0005 | 2026-02-22 | Workbench infrastructure libraries | dockview, react-arborist, and Monaco for VS Code-style workbench instead of extracting from VS Code source or building from scratch | [ADR-0005](0005-workbench-infrastructure-libraries.md) |
 | 0004 | 2026-02-21 | Hybrid inter-service communication | Redis pub/sub for asynchronous events, HTTP for synchronous commands between services | [ADR-0004](0004-hybrid-inter-service-communication.md) |
 | 0003 | 2026-02-20 | Shared database access between services | Both services connect directly to PostgreSQL as peers with database constraints enforcing integrity | [ADR-0003](0003-shared-database-access-between-services.md) |
