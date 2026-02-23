@@ -13,6 +13,7 @@ type Decision = "approve" | "approve_session" | "approve_project" | "deny";
 
 type Props = {
   block: ToolApprovalBlock;
+  disabled?: boolean;
 };
 
 function defineThemes(monaco: Monaco) {
@@ -92,7 +93,7 @@ function toolVerb(toolName: string): string {
   }
 }
 
-export function ToolApprovalCard({ block }: Props) {
+export function ToolApprovalCard({ block, disabled }: Props) {
   const { theme } = useTheme();
   const monacoRef = useRef<Monaco | null>(null);
   const [status, setStatus] = useState<"pending" | "deny_input" | Decision>("pending");
@@ -201,7 +202,7 @@ export function ToolApprovalCard({ block }: Props) {
 
   // Pending state — full approval card
   return (
-    <div className={styles.card}>
+    <div className={disabled ? `${styles.card} ${styles.cardDisabled}` : styles.card}>
       <div className={styles.header}>
         <span className={styles.toolBadge}>{block.tool_name}</span>
         <span className={styles.headerLabel}>
@@ -245,36 +246,40 @@ export function ToolApprovalCard({ block }: Props) {
         </div>
       )}
 
-      <div className={styles.actions}>
-        <button
-          className={styles.btnApprove}
-          onClick={() => submitDecision("approve")}
-          disabled={submitting}
-        >
-          Approve
-        </button>
-        <button
-          className={styles.btnSession}
-          onClick={() => submitDecision("approve_session")}
-          disabled={submitting}
-        >
-          For Session
-        </button>
-        <button
-          className={styles.btnProject}
-          onClick={() => submitDecision("approve_project")}
-          disabled={submitting}
-        >
-          For Project
-        </button>
-        <button
-          className={styles.btnDenyOutline}
-          onClick={() => setStatus("deny_input")}
-          disabled={submitting}
-        >
-          Deny
-        </button>
-      </div>
+      {disabled ? (
+        <div className={styles.disabledLabel}>Interrupted</div>
+      ) : (
+        <div className={styles.actions}>
+          <button
+            className={styles.btnApprove}
+            onClick={() => submitDecision("approve")}
+            disabled={submitting}
+          >
+            Approve
+          </button>
+          <button
+            className={styles.btnSession}
+            onClick={() => submitDecision("approve_session")}
+            disabled={submitting}
+          >
+            For Session
+          </button>
+          <button
+            className={styles.btnProject}
+            onClick={() => submitDecision("approve_project")}
+            disabled={submitting}
+          >
+            For Project
+          </button>
+          <button
+            className={styles.btnDenyOutline}
+            onClick={() => setStatus("deny_input")}
+            disabled={submitting}
+          >
+            Deny
+          </button>
+        </div>
+      )}
     </div>
   );
 }

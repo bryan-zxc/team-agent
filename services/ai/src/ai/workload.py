@@ -35,6 +35,24 @@ _dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
 _sessions: dict[str, dict] = {}
 
 
+async def _publish_status(
+    redis_client: aioredis.Redis,
+    workload_id: str,
+    status: str,
+    room_id: str,
+) -> None:
+    """Broadcast a workload status change to the workload:status Redis channel."""
+    await redis_client.publish(
+        "workload:status",
+        json.dumps({
+            "workload_id": workload_id,
+            "status": status,
+            "room_id": room_id,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }),
+    )
+
+
 def _slugify(title: str, workload_id: str) -> str:
     """Convert a workload title to a branch-safe slug with UUID suffix for uniqueness."""
     slug = title.lower().strip()
@@ -332,6 +350,11 @@ async def _relay_messages(
                 finally:
                     await conn.close()
 
+                await _publish_status(
+                    redis_client, workload_id, "needs_attention",
+                    workload_data.get("room_id", ""),
+                )
+
                 # Publish merge-aware summary to main chat
                 session = _sessions.get(workload_id, {})
                 merge_succeeded = session.get("merge_state", {}).get("succeeded")
@@ -412,13 +435,17 @@ async def _relay_messages(
             conn = await asyncpg.connect(_dsn)
             try:
                 await conn.execute(
-                    "UPDATE workloads SET status = 'error', updated_at = $1 WHERE id = $2",
+                    "UPDATE workloads SET status = 'needs_attention', updated_at = $1 WHERE id = $2",
                     datetime.now(timezone.utc), uuid.UUID(workload_id),
                 )
             finally:
                 await conn.close()
+            await _publish_status(
+                redis_client, workload_id, "needs_attention",
+                workload_data.get("room_id", ""),
+            )
         except Exception:
-            logger.exception("Failed to update workload status to error")
+            logger.exception("Failed to update workload status to needs_attention")
         _sessions.pop(workload_id, None)
 
 
@@ -448,11 +475,15 @@ async def start_workload_session(
         conn = await asyncpg.connect(_dsn)
         try:
             await conn.execute(
-                "UPDATE workloads SET status = 'error', updated_at = $1 WHERE id = $2",
+                "UPDATE workloads SET status = 'needs_attention', updated_at = $1 WHERE id = $2",
                 datetime.now(timezone.utc), uuid.UUID(workload_id),
             )
         finally:
             await conn.close()
+        await _publish_status(
+            redis_client, workload_id, "needs_attention",
+            workload_data.get("room_id", ""),
+        )
         return
 
     # 2. Update worktree_branch and status in DB
@@ -466,6 +497,8 @@ async def start_workload_session(
         )
     finally:
         await conn.close()
+
+    await _publish_status(redis_client, workload_id, "running", workload_data.get("room_id", ""))
 
     # 3. Load agent profile for system prompt
     profile_path = Path(clone_path) / ".team-agent" / "agents" / f"{workload_data['display_name'].lower()}.md"
@@ -524,11 +557,15 @@ async def start_workload_session(
         conn = await asyncpg.connect(_dsn)
         try:
             await conn.execute(
-                "UPDATE workloads SET status = 'error', updated_at = $1 WHERE id = $2",
+                "UPDATE workloads SET status = 'needs_attention', updated_at = $1 WHERE id = $2",
                 datetime.now(timezone.utc), uuid.UUID(workload_id),
             )
         finally:
             await conn.close()
+        await _publish_status(
+            redis_client, workload_id, "needs_attention",
+            workload_data.get("room_id", ""),
+        )
         return
 
     # 7. Finish registration and start relay
@@ -565,6 +602,61 @@ async def route_message(workload_id: str, prompt: str) -> bool:
     client = session["client"]
     await client.query(prompt)
     logger.info("Routed follow-up message to workload %s", workload_id[:8])
+    return True
+
+
+async def stop_workload_session(
+    workload_id: str,
+    target_status: str,
+    redis_client: aioredis.Redis,
+) -> bool:
+    """Stop a workload session and transition to the given status.
+
+    Aborts the SDK session if running, updates the DB, and publishes the
+    status change. Returns True if the workload was found and updated.
+    """
+    session = _sessions.pop(workload_id, None)
+    room_id = ""
+
+    if session:
+        room_id = session.get("workload_data", {}).get("room_id", "")
+        task = session.get("task")
+        if task and not task.done():
+            task.cancel()
+        client = session.get("client")
+        if client:
+            try:
+                await client.disconnect()
+            except Exception:
+                logger.exception("Error disconnecting workload %s during stop", workload_id[:8])
+
+    # Update DB status regardless of whether a session was active
+    conn = await asyncpg.connect(_dsn)
+    try:
+        result = await conn.execute(
+            "UPDATE workloads SET status = $1, updated_at = $2 WHERE id = $3",
+            target_status, datetime.now(timezone.utc), uuid.UUID(workload_id),
+        )
+        if result == "UPDATE 0":
+            return False
+
+        # If we didn't get room_id from session, look it up from DB
+        if not room_id:
+            row = await conn.fetchrow(
+                "SELECT c.room_id FROM workloads w "
+                "JOIN chats c ON c.workload_id = w.id "
+                "WHERE w.id = $1",
+                uuid.UUID(workload_id),
+            )
+            if row:
+                room_id = str(row["room_id"])
+    finally:
+        await conn.close()
+
+    if room_id:
+        await _publish_status(redis_client, workload_id, target_status, room_id)
+
+    logger.info("Stopped workload %s → %s", workload_id[:8], target_status)
     return True
 
 

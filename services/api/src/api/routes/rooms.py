@@ -149,6 +149,7 @@ async def list_workloads(room_id: uuid.UUID):
                 "owner_name": display_name,
                 "owner_id": str(workload.member_id),
                 "created_at": chat.created_at.isoformat(),
+                "updated_at": workload.updated_at.isoformat() if workload.updated_at else chat.created_at.isoformat(),
             }
             for chat, workload, display_name in rows
         ]

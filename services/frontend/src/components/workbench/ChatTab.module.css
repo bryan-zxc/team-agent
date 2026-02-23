@@ -7,6 +7,7 @@
 
 .tabs {
   display: flex;
+  align-items: center;
   gap: 0;
   padding: 0 16px;
   border-bottom: 1px solid var(--border);
@@ -26,6 +27,7 @@
   border-bottom: 2px solid transparent;
   transition: all 0.15s ease;
   margin-bottom: -1px;
+  white-space: nowrap;
 }
 
 .tab:hover {
@@ -37,6 +39,62 @@
   border-bottom-color: var(--accent);
 }
 
+/* ── Panel toggle ── */
+
+.panelToggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.panelToggle:hover {
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+}
+
+.panelToggleActive {
+  color: var(--accent);
+}
+
+.panelToggleActive:hover {
+  color: var(--accent-hover);
+}
+
+/* ── Body ── */
+
+.body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* ── Panel ── */
+
+.panel {
+  width: 280px;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  overflow-y: auto;
+  transition: width 0.2s ease, border-left-width 0.2s ease;
+  flex-shrink: 0;
+}
+
+.panelCollapsed {
+  width: 0;
+  border-left-width: 0;
+  overflow: hidden;
+}
+
 /* ── Chat View ── */
 
 .chatView {
@@ -44,6 +102,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
 }
 
 .messages {
@@ -226,3 +285,24 @@
   transform: scale(1.05);
 }
 
+/* ── Interrupt button ── */
+
+.interruptBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--warm);
+  color: var(--warm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.interruptBtn:hover {
+  background: var(--warm-light);
+  transform: scale(1.05);
+}

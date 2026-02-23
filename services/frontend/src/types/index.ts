@@ -67,4 +67,13 @@ export type WorkloadChat = {
   owner_name: string | null;
   owner_id: string | null;
   created_at: string;
+  updated_at: string;
+};
+
+export type WorkloadStatusEvent = {
+  _event: "workload_status";
+  workload_id: string;
+  status: string;
+  room_id: string;
+  updated_at: string;
 };

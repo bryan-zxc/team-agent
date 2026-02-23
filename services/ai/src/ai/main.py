@@ -12,7 +12,7 @@ from .config import settings, setup_logging
 from .cost.models import Base
 from .database import engine
 from .listener import listen, listen_tool_approvals, listen_workload_messages
-from .workload import shutdown_all_sessions
+from .workload import shutdown_all_sessions, stop_workload_session
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -40,6 +40,8 @@ async def lifespan(app: FastAPI):
         logger.error("Failed to connect to Redis: %s", e)
         raise
 
+    app.state.redis = client
+
     listener_task = asyncio.create_task(listen(client))
     workload_listener_task = asyncio.create_task(listen_workload_messages(client))
     tool_approval_task = asyncio.create_task(listen_tool_approvals(client))
@@ -56,6 +58,24 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AI Service", lifespan=lifespan)
+
+
+@app.post("/workloads/{workload_id}/interrupt")
+async def interrupt_workload(workload_id: str):
+    """Interrupt a running workload — transitions to needs_attention."""
+    found = await stop_workload_session(workload_id, "needs_attention", app.state.redis)
+    if not found:
+        raise HTTPException(status_code=404, detail="Workload not found")
+    return {"status": "interrupted"}
+
+
+@app.post("/workloads/{workload_id}/cancel")
+async def cancel_workload(workload_id: str):
+    """Cancel a workload — transitions to cancelled."""
+    found = await stop_workload_session(workload_id, "cancelled", app.state.redis)
+    if not found:
+        raise HTTPException(status_code=404, detail="Workload not found")
+    return {"status": "cancelled"}
 
 
 @app.post("/generate-agent")

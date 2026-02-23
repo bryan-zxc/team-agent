@@ -213,6 +213,7 @@ async def _persist_workloads(
             results.append({
                 "id": str(workload_id),
                 "project_id": project_id,
+                "room_id": str(room_id),
                 "main_chat_id": main_chat_id,
                 "chat_id": str(chat_id),
                 "member_id": str(member_id),

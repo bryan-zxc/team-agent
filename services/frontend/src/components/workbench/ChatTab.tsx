@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type { IDockviewPanelProps } from "dockview";
-import type { Member, Message, Room, ToolApprovalBlock, WorkloadChat } from "@/types";
+import type { Member, Message, Room, ToolApprovalBlock, WorkloadChat, WorkloadStatusEvent } from "@/types";
 import { ToolApprovalCard } from "./ToolApprovalCard";
+import { WorkloadPanel } from "./WorkloadPanel";
 import styles from "./ChatTab.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -52,14 +53,26 @@ type ChatViewProps = {
   members: Member[];
   placeholder: string;
   onAiMessage?: () => void;
+  onRoomEvent?: (event: Record<string, unknown>) => void;
+  workloadStatus?: string;
+  onInterrupt?: () => void;
 };
 
-function ChatView({ chatId, memberId, members, placeholder, onAiMessage }: ChatViewProps) {
+function ChatView({
+  chatId,
+  memberId,
+  members,
+  placeholder,
+  onAiMessage,
+  onRoomEvent,
+  workloadStatus,
+  onInterrupt,
+}: ChatViewProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(0);
 
-  const { messages, sendMessage, setMessages } = useWebSocket(chatId, memberId);
+  const { messages, sendMessage, setMessages } = useWebSocket(chatId, memberId, onRoomEvent);
 
   useEffect(() => {
     if (!chatId) return;
@@ -98,14 +111,24 @@ function ChatView({ chatId, memberId, members, placeholder, onAiMessage }: ChatV
     setInput("");
   }, [input, members, sendMessage]);
 
+  const isRunning = workloadStatus === "running" || workloadStatus === "assigned";
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         handleSend();
       }
+      if (e.key === "Escape" && isRunning && onInterrupt) {
+        e.preventDefault();
+        if (input.trim()) {
+          setInput("");
+        } else {
+          onInterrupt();
+        }
+      }
     },
-    [handleSend],
+    [handleSend, isRunning, onInterrupt, input],
   );
 
   const formatTime = (iso: string) => {
@@ -122,7 +145,7 @@ function ChatView({ chatId, memberId, members, placeholder, onAiMessage }: ChatV
           if (approvalBlock) {
             return (
               <div key={msg.id} className={styles.approvalRow}>
-                <ToolApprovalCard block={approvalBlock} />
+                <ToolApprovalCard block={approvalBlock} disabled={!!workloadStatus && !isRunning} />
               </div>
             );
           }
@@ -162,6 +185,18 @@ function ChatView({ chatId, memberId, members, placeholder, onAiMessage }: ChatV
             onKeyDown={handleKeyDown}
             rows={1}
           />
+          {isRunning && onInterrupt && (
+            <button
+              className={styles.interruptBtn}
+              onClick={onInterrupt}
+              aria-label="Interrupt workload"
+              title="Interrupt (Esc)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            </button>
+          )}
           <button className={styles.sendBtn} onClick={handleSend} aria-label="Send message">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13" />
@@ -180,6 +215,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
   const { roomId, room, memberId, members } = params;
   const [workloads, setWorkloads] = useState<WorkloadChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>(room.primary_chat_id);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const refreshWorkloads = useCallback(() => {
     fetch(`${API_URL}/rooms/${roomId}/workloads`)
@@ -192,38 +228,157 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
     refreshWorkloads();
   }, [refreshWorkloads]);
 
+  const handleRoomEvent = useCallback(
+    (event: Record<string, unknown>) => {
+      if (event._event === "workload_status") {
+        const e = event as unknown as WorkloadStatusEvent;
+        setWorkloads((prev) => {
+          const idx = prev.findIndex((w) => w.workload_id === e.workload_id);
+          if (idx === -1) {
+            // New workload — re-fetch to get full data
+            refreshWorkloads();
+            return prev;
+          }
+          const updated = [...prev];
+          updated[idx] = { ...updated[idx], status: e.status, updated_at: e.updated_at };
+          return updated;
+        });
+      }
+    },
+    [refreshWorkloads],
+  );
+
+  const handleCancel = useCallback(
+    async (workloadId: string) => {
+      // Optimistic update
+      setWorkloads((prev) =>
+        prev.map((w) =>
+          w.workload_id === workloadId
+            ? { ...w, status: "cancelled", updated_at: new Date().toISOString() }
+            : w,
+        ),
+      );
+      try {
+        const resp = await fetch(`${API_URL}/workloads/${workloadId}/cancel`, {
+          method: "POST",
+        });
+        if (!resp.ok) refreshWorkloads();
+      } catch {
+        refreshWorkloads();
+      }
+    },
+    [refreshWorkloads],
+  );
+
+  const handleComplete = useCallback(
+    async (workloadId: string) => {
+      // Optimistic update
+      setWorkloads((prev) =>
+        prev.map((w) =>
+          w.workload_id === workloadId
+            ? { ...w, status: "completed", updated_at: new Date().toISOString() }
+            : w,
+        ),
+      );
+      try {
+        const resp = await fetch(`${API_URL}/workloads/${workloadId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "completed" }),
+        });
+        if (!resp.ok) refreshWorkloads();
+      } catch {
+        refreshWorkloads();
+      }
+    },
+    [refreshWorkloads],
+  );
+
+  const handleInterrupt = useCallback(
+    async (workloadId: string) => {
+      setWorkloads((prev) =>
+        prev.map((w) =>
+          w.workload_id === workloadId
+            ? { ...w, status: "needs_attention", updated_at: new Date().toISOString() }
+            : w,
+        ),
+      );
+      try {
+        const resp = await fetch(`${API_URL}/workloads/${workloadId}/interrupt`, {
+          method: "POST",
+        });
+        if (!resp.ok) refreshWorkloads();
+      } catch {
+        refreshWorkloads();
+      }
+    },
+    [refreshWorkloads],
+  );
+
+  // Find workload for the active chat (if viewing a workload chat)
+  const activeWorkload = workloads.find((w) => w.id === activeChatId);
+
   const hasWorkloads = workloads.length > 0;
 
   return (
     <div className={styles.container}>
-      {hasWorkloads && (
-        <div className={styles.tabs}>
+      <div className={styles.tabs}>
+        <button
+          className={clsx(styles.tab, activeChatId === room.primary_chat_id && styles.tabActive)}
+          onClick={() => setActiveChatId(room.primary_chat_id)}
+        >
+          Main
+        </button>
+        {workloads.map((w) => (
           <button
-            className={clsx(styles.tab, activeChatId === room.primary_chat_id && styles.tabActive)}
-            onClick={() => setActiveChatId(room.primary_chat_id)}
+            key={w.id}
+            className={clsx(styles.tab, activeChatId === w.id && styles.tabActive)}
+            onClick={() => setActiveChatId(w.id)}
           >
-            Main
+            {w.owner_name}: {w.title}
           </button>
-          {workloads.map((w) => (
-            <button
-              key={w.id}
-              className={clsx(styles.tab, activeChatId === w.id && styles.tabActive)}
-              onClick={() => setActiveChatId(w.id)}
-            >
-              {w.owner_name}: {w.title}
-            </button>
-          ))}
-        </div>
-      )}
+        ))}
+        <button
+          className={clsx(styles.panelToggle, panelOpen && styles.panelToggleActive)}
+          onClick={() => setPanelOpen((p) => !p)}
+          aria-label="Toggle workload panel"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <line x1="15" y1="3" x2="15" y2="21" />
+          </svg>
+        </button>
+      </div>
 
-      <ChatView
-        key={activeChatId}
-        chatId={activeChatId}
-        memberId={memberId}
-        members={members}
-        placeholder={`Message ${room.name}...`}
-        onAiMessage={activeChatId === room.primary_chat_id ? refreshWorkloads : undefined}
-      />
+      <div className={styles.body}>
+        <ChatView
+          key={activeChatId}
+          chatId={activeChatId}
+          memberId={memberId}
+          members={members}
+          placeholder={`Message ${room.name}...`}
+          onAiMessage={activeChatId === room.primary_chat_id ? refreshWorkloads : undefined}
+          onRoomEvent={handleRoomEvent}
+          workloadStatus={activeWorkload?.status}
+          onInterrupt={
+            activeWorkload
+              ? () => handleInterrupt(activeWorkload.workload_id)
+              : undefined
+          }
+        />
+        <div className={clsx(styles.panel, !panelOpen && styles.panelCollapsed)}>
+          {panelOpen && (
+            <WorkloadPanel
+              workloads={workloads}
+              activeChatId={activeChatId}
+              onSelectWorkload={setActiveChatId}
+              onCancel={handleCancel}
+              onComplete={handleComplete}
+              onInterrupt={handleInterrupt}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -216,6 +216,20 @@
   opacity: 0.9;
 }
 
+/* ── Disabled / interrupted state ── */
+
+.cardDisabled {
+  opacity: 0.6;
+}
+
+.disabledLabel {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
 /* ── Resolved state ── */
 
 .resolvedRow {

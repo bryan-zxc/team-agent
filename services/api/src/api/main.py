@@ -27,6 +27,32 @@ logger = logging.getLogger(__name__)
 redis_client = aioredis.from_url(settings.redis_url)
 
 
+async def _listen_for_workload_status():
+    """Subscribe to workload:status and broadcast to room WebSocket clients."""
+    sub_client = aioredis.from_url(settings.redis_url)
+    pubsub = sub_client.pubsub()
+    await pubsub.subscribe("workload:status")
+    logger.info("Subscribed to workload:status")
+
+    try:
+        async for raw in pubsub.listen():
+            if raw["type"] != "message":
+                continue
+            event = json.loads(raw["data"])
+            room_id = event.get("room_id")
+            if not room_id:
+                continue
+
+            # Wrap with _event marker so frontend can distinguish from chat messages
+            event["_event"] = "workload_status"
+            await manager.broadcast_room(uuid.UUID(room_id), event)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        await pubsub.unsubscribe("workload:status")
+        await sub_client.aclose()
+
+
 async def _listen_for_ai_responses():
     """Subscribe to chat:responses and broadcast AI messages to WebSocket clients."""
     sub_client = aioredis.from_url(settings.redis_url)
@@ -63,9 +89,11 @@ async def _listen_for_ai_responses():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(_listen_for_ai_responses())
+    ai_task = asyncio.create_task(_listen_for_ai_responses())
+    status_task = asyncio.create_task(_listen_for_workload_status())
     yield
-    task.cancel()
+    ai_task.cancel()
+    status_task.cancel()
     await engine.dispose()
     await redis_client.aclose()
 

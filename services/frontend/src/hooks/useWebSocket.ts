@@ -8,11 +8,17 @@ const WS_URL = API_URL.replace(/^http/, "ws");
 
 type ContentBlock = { type: "text"; value: string };
 
-export function useWebSocket(chatId: string | null, memberId: string | null) {
+export function useWebSocket(
+  chatId: string | null,
+  memberId: string | null,
+  onRoomEvent?: (event: Record<string, unknown>) => void,
+) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const roomEventRef = useRef(onRoomEvent);
+  roomEventRef.current = onRoomEvent;
 
   const connect = useCallback(() => {
     if (!chatId || !memberId) return;
@@ -23,7 +29,15 @@ export function useWebSocket(chatId: string | null, memberId: string | null) {
     ws.onopen = () => setIsConnected(true);
 
     ws.onmessage = (event) => {
-      const msg: Message = JSON.parse(event.data);
+      const data = JSON.parse(event.data);
+
+      // Room-level events (e.g. workload status) have an _event marker
+      if (data._event) {
+        roomEventRef.current?.(data);
+        return;
+      }
+
+      const msg: Message = data;
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, msg];

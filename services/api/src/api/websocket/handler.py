@@ -47,6 +47,7 @@ async def websocket_endpoint(
     await manager.connect(chat_id, websocket)
 
     # Look up display name, type, and owning project
+    room_id = None
     async with async_session() as session:
         member = await session.get(ProjectMember, member_id)
         display_name = member.display_name if member else "Unknown"
@@ -62,6 +63,11 @@ async def websocket_endpoint(
             room = await session.get(Room, chat.room_id)
             if room:
                 project_id = room.project_id
+                room_id = room.id
+
+    # Register room-level connection for status broadcasts
+    if room_id:
+        manager.connect_room(room_id, websocket)
 
     try:
         while True:
@@ -127,3 +133,5 @@ async def websocket_endpoint(
 
     except WebSocketDisconnect:
         manager.disconnect(chat_id, websocket)
+        if room_id:
+            manager.disconnect_room(room_id, websocket)
