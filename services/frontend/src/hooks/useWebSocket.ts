@@ -12,7 +12,7 @@ export function useWebSocket(chatId: string | null, memberId: string | null) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout>>();
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const connect = useCallback(() => {
     if (!chatId || !memberId) return;

@@ -67,6 +67,11 @@
   flex-direction: row-reverse;
 }
 
+.approvalRow {
+  width: 100%;
+  animation: msgIn 0.3s ease;
+}
+
 @keyframes msgIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }

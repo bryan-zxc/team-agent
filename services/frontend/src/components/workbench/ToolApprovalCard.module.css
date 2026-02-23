@@ -1,0 +1,252 @@
+/* ── Card ── */
+
+.card {
+  background: var(--warm-light);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  width: 100%;
+  animation: cardIn 0.3s ease;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Header ── */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.toolBadge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--warm);
+  color: var(--accent-text);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.headerLabel {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.headerSummary {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+/* ── Command box (Bash) ── */
+
+.commandBox {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  overflow-x: auto;
+}
+
+.commandBox code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ── Diff container ── */
+
+.diffContainer {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.diffFilePath {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.diffEditor {
+  height: 250px;
+}
+
+/* ── Action buttons ── */
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.actions button {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnApprove {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.btnApprove:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btnSession,
+.btnProject {
+  background: var(--surface);
+  color: var(--text-primary);
+  border-color: var(--border) !important;
+}
+
+.btnSession:hover:not(:disabled),
+.btnProject:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.btnDenyOutline {
+  background: transparent;
+  color: var(--error);
+  border-color: var(--error) !important;
+}
+
+.btnDenyOutline:hover:not(:disabled) {
+  background: var(--error);
+  color: #fff;
+}
+
+/* ── Deny input state ── */
+
+.denySection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.denyTextarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+
+.denyTextarea:focus-visible {
+  outline: none;
+  border-color: var(--error);
+}
+
+.denyTextarea::placeholder {
+  color: var(--text-muted);
+}
+
+.denyActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.denyActions button {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.denyActions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnCancel {
+  background: var(--surface);
+  color: var(--text-secondary);
+  border-color: var(--border) !important;
+}
+
+.btnCancel:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.btnDeny {
+  background: var(--error);
+  color: #fff;
+}
+
+.btnDeny:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+/* ── Resolved state ── */
+
+.resolvedRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.resolvedSummary {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resolvedApproved {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.resolvedDenied {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--error);
+  white-space: nowrap;
+}

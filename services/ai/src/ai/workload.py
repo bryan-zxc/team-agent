@@ -25,6 +25,7 @@ from claude_agent_sdk import (
 )
 
 from .config import settings
+from .tool_approval import make_can_use_tool
 
 logger = logging.getLogger(__name__)
 
@@ -481,11 +482,35 @@ async def start_workload_session(
     # 5. Build SDK options
     is_resume = bool(workload_data.get("session_id"))
 
+    # Pre-register session so tool_approval can access it via _sessions
+    _sessions[workload_id] = {
+        "client": None,
+        "task": None,
+        "workload_data": workload_data,
+        "merge_state": merge_state,
+        "branch_name": branch_name,
+        "clone_path": clone_path,
+        "session_approvals": set(),
+        "pending_approvals": {},
+    }
+
+    can_use_tool = make_can_use_tool(
+        workload_id=workload_id,
+        clone_path=clone_path,
+        worktree_path=str(worktree_path),
+        session_state=_sessions[workload_id],
+        redis_client=redis_client,
+        chat_id=workload_data["chat_id"],
+        member_id=workload_data["member_id"],
+        display_name=workload_data["display_name"],
+    )
+
     options = ClaudeAgentOptions(
         cwd=str(worktree_path),
         resume=workload_data.get("session_id") if is_resume else None,
         system_prompt=_build_system_prompt(agent_profile, workload_data),
-        permission_mode="acceptEdits",
+        permission_mode="default",
+        can_use_tool=can_use_tool,
         hooks={"Stop": [HookMatcher(hooks=[stop_hook])]},
     )
 
@@ -495,6 +520,7 @@ async def start_workload_session(
         await client.connect()
     except Exception:
         logger.exception("Failed to connect ClaudeSDKClient for workload %s", workload_id[:8])
+        _sessions.pop(workload_id, None)
         conn = await asyncpg.connect(_dsn)
         try:
             await conn.execute(
@@ -505,14 +531,8 @@ async def start_workload_session(
             await conn.close()
         return
 
-    # 7. Register and start relay
-    _sessions[workload_id] = {
-        "client": client,
-        "task": None,
-        "workload_data": workload_data,
-        "merge_state": merge_state,
-        "branch_name": branch_name,
-    }
+    # 7. Finish registration and start relay
+    _sessions[workload_id]["client"] = client
 
     relay_task = asyncio.create_task(
         _relay_messages(workload_id, client, workload_data, redis_client),

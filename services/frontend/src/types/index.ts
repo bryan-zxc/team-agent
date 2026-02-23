@@ -21,9 +21,20 @@ export type Message = {
   chat_id: string;
   member_id: string;
   display_name: string;
-  type: "human" | "ai" | "coordinator";
+  type: "human" | "ai" | "coordinator" | "tool_approval_request";
   content: string;
   created_at: string;
+};
+
+export type ToolApprovalBlock = {
+  type: "tool_approval_request";
+  approval_request_id: string;
+  workload_id: string;
+  tool_name: string;
+  tool_input: Record<string, unknown>;
+  input_summary: string;
+  permission_key: string;
+  original_content: string | null;
 };
 
 export type User = {

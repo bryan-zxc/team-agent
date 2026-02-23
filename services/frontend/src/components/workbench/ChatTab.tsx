@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type { IDockviewPanelProps } from "dockview";
-import type { Member, Message, Room, WorkloadChat } from "@/types";
+import type { Member, Message, Room, ToolApprovalBlock, WorkloadChat } from "@/types";
+import { ToolApprovalCard } from "./ToolApprovalCard";
 import styles from "./ChatTab.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -29,6 +30,18 @@ function getMessageText(content: string): string {
     /* legacy plain text */
   }
   return content;
+}
+
+function getToolApprovalBlock(content: string): ToolApprovalBlock | null {
+  try {
+    const data = JSON.parse(content);
+    if (data?.blocks?.[0]?.type === "tool_approval_request") {
+      return data.blocks[0] as ToolApprovalBlock;
+    }
+  } catch {
+    /* not a tool approval */
+  }
+  return null;
 }
 
 /* ── ChatView: reusable messages + input for any chat ── */
@@ -104,7 +117,16 @@ function ChatView({ chatId, memberId, members, placeholder, onAiMessage }: ChatV
     <div className={styles.chatView}>
       <div className={styles.messages}>
         {messages.map((msg) => {
-          const author = memberMap.get(msg.member_id);
+          // Tool approval request — detect from content (type may be "ai" when loaded from API)
+          const approvalBlock = getToolApprovalBlock(msg.content);
+          if (approvalBlock) {
+            return (
+              <div key={msg.id} className={styles.approvalRow}>
+                <ToolApprovalCard block={approvalBlock} />
+              </div>
+            );
+          }
+
           const isSelf = msg.member_id === memberId;
           const isAi = msg.type !== "human";
 

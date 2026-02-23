@@ -17,6 +17,7 @@ from .routes.members import router as members_router
 from .routes.projects import router as projects_router
 from .routes.rooms import router as rooms_router
 from .routes.users import router as users_router
+from .routes.workloads import router as workloads_router
 from .websocket.handler import router as ws_router
 from .websocket.manager import manager
 
@@ -83,6 +84,7 @@ app.include_router(members_router)
 app.include_router(rooms_router)
 app.include_router(users_router)
 app.include_router(files_router)
+app.include_router(workloads_router)
 app.include_router(ws_router)
 
 

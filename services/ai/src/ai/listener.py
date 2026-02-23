@@ -10,6 +10,7 @@ import redis.asyncio as aioredis
 from .agents import generate_agent_profile
 from .config import settings
 from .runner import run_agent
+from .tool_approval import resolve_tool_approval
 from .workload import route_message, start_workload_session
 
 logger = logging.getLogger(__name__)
@@ -335,3 +336,35 @@ async def listen_workload_messages(redis_client: aioredis.Redis):
             logger.info("Routed follow-up to workload %s", workload_id[:8])
         else:
             logger.warning("No active session for workload %s, message dropped", workload_id[:8])
+
+
+async def listen_tool_approvals(redis_client: aioredis.Redis):
+    """Subscribe to tool:approvals and resolve pending approval Futures."""
+    pubsub = redis_client.pubsub()
+    await pubsub.subscribe("tool:approvals")
+    logger.info("Subscribed to tool:approvals")
+
+    async for raw in pubsub.listen():
+        if raw["type"] != "message":
+            continue
+
+        msg = json.loads(raw["data"])
+        workload_id = msg["workload_id"]
+        approval_request_id = msg["approval_request_id"]
+        decision = {
+            "decision": msg["decision"],
+            "tool_name": msg.get("tool_name"),
+            "reason": msg.get("reason"),
+        }
+
+        resolved = resolve_tool_approval(workload_id, approval_request_id, decision)
+        if resolved:
+            logger.info(
+                "Resolved tool approval %s → %s (workload %s)",
+                approval_request_id[:8], msg["decision"], workload_id[:8],
+            )
+        else:
+            logger.warning(
+                "Failed to resolve tool approval %s (workload %s)",
+                approval_request_id[:8], workload_id[:8],
+            )

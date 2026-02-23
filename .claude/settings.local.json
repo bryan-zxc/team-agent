@@ -56,7 +56,8 @@
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(gh label:*)"
+      "Bash(gh label:*)",
+      "Bash(tail:*)"
     ]
   }
 }
