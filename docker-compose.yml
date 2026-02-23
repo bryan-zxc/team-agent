@@ -44,6 +44,7 @@ services:
       - API_SERVICE_URL=${API_SERVICE_URL:-http://api:8000}
     volumes:
       - claude_auth:/home/agent/.claude
+      - gh_auth:/home/agent/.config/gh
       - project_data:/data/projects
     depends_on:
       postgres:
@@ -80,4 +81,5 @@ services:
 volumes:
   postgres_data:
   claude_auth:
+  gh_auth:
   project_data:

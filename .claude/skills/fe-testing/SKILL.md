@@ -62,6 +62,15 @@ Always wipe and re-seed before a test run — seeds are destructive (DROP + CREA
 2. Click a member name in sidebar
 3. Verify: profile page renders with name and content
 
+## Test Scenarios
+
+Detailed, repeatable test scenarios live in the `scenarios/` folder. Each file covers setup, step-by-step instructions, verification commands, and common failure modes.
+
+| Scenario | File | Seed | What it tests |
+|---|---|---|---|
+| **Workload Creates a File** | [workload-creates-file.md](scenarios/workload-creates-file.md) | `with_project` | Full workload pipeline: @mention → agent assignment → file creation → auto-commit → merge → push to GitHub |
+| **Project Lockdown** | [project-lockdown.md](scenarios/project-lockdown.md) | `with_project` | Locked card treatment, workbench lockdown banner, disabled controls, refresh-to-unlock flow |
+
 ## Notes
 
 - `with_project` seed performs a real git clone — requires network access from Docker

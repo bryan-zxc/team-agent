@@ -20,6 +20,7 @@
 }
 
 .sidePanel {
+  grid-row: 2;
   background: var(--surface);
   border-right: 1px solid var(--border);
   overflow: hidden;
@@ -27,6 +28,7 @@
 }
 
 .editorArea {
+  grid-row: 2;
   min-width: 0;
   min-height: 0;
   overflow: hidden;

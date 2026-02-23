@@ -134,10 +134,13 @@ export default function LandingPage() {
 
         <div className={styles.projectGrid}>
           {projects.map((project) => (
-            <button
+            <div
               key={project.id}
               className={clsx(styles.projectCard, project.is_locked && styles.projectCardLocked)}
               onClick={() => openProject(project.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") openProject(project.id); }}
             >
               <div className={clsx(styles.projectIcon, project.is_locked && styles.projectIconLocked)}>
                 {project.is_locked ? (
@@ -175,7 +178,7 @@ export default function LandingPage() {
                   <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                 </svg>
               </button>
-            </button>
+            </div>
           ))}
 
           {projects.length === 0 && (

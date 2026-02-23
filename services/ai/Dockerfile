@@ -23,7 +23,9 @@ RUN npm install -g @anthropic-ai/claude-code
 
 # Non-root user (UID 1000) shared with api service for project_data volume
 RUN useradd -m -u 1000 -s /bin/bash agent && \
-    mkdir -p /home/agent/.claude && chown -R agent:agent /home/agent/.claude
+    mkdir -p /home/agent/.claude /home/agent/.config/gh && \
+    chown -R agent:agent /home/agent/.claude /home/agent/.config && \
+    git config --system credential.helper '!/usr/bin/gh auth git-credential'
 
 WORKDIR /app
 
