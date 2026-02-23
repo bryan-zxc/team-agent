@@ -16,6 +16,13 @@ const body = Plus_Jakarta_Sans({
 
 export const metadata = {
   title: "Team Agent",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({
