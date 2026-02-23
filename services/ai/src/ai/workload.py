@@ -192,6 +192,21 @@ def _make_stop_hook(
                 ),
             }
 
+        # Auto-commit any uncommitted changes in the worktree
+        # (the agent runs with acceptEdits — it can write files but not git commit)
+        await _run_git("add", "-A", cwd=str(worktree_path))
+        status_rc, status_out, _ = await _run_git("status", "--porcelain", cwd=str(worktree_path))
+        if status_rc == 0 and status_out.strip():
+            commit_rc, _, commit_err = await _run_git(
+                "-c", "user.name=team-agent", "-c", "user.email=noreply@team-agent",
+                "commit", "-m", f"Workload {workload_id[:8]}: auto-commit changes",
+                cwd=str(worktree_path),
+            )
+            if commit_rc == 0:
+                logger.info("Workload %s: auto-committed uncommitted changes", workload_id[:8])
+            else:
+                logger.warning("Workload %s: auto-commit failed: %s", workload_id[:8], commit_err)
+
         # Attempt merge into main
         rc, stdout, stderr = await _run_git(
             "merge", branch_name, "--no-edit",
