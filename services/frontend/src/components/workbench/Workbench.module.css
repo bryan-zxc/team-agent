@@ -1,8 +1,22 @@
 .workbench {
   display: grid;
   grid-template-columns: 48px 260px 1fr;
+  grid-template-rows: auto 1fr;
   height: 100vh;
   overflow: hidden;
+}
+
+.lockdownBanner {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(204, 68, 68, 0.08);
+  border-bottom: 1px solid rgba(204, 68, 68, 0.2);
+  color: var(--error);
+  font-size: 13px;
+  font-family: var(--font-body);
 }
 
 .sidePanel {

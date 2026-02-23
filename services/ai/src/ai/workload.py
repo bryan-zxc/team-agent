@@ -9,12 +9,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import asyncpg
+import httpx
 import redis.asyncio as aioredis
 
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
     ClaudeSDKClient,
+    HookContext,
+    HookInput,
+    HookJSONOutput,
+    HookMatcher,
     ResultMessage,
     TextBlock,
 )
@@ -132,6 +137,108 @@ def _build_initial_prompt(workload_data: dict) -> str:
     return "\n".join(parts)
 
 
+async def _run_git(*args: str, cwd: str) -> tuple[int, str, str]:
+    """Run a git command and return (returncode, stdout, stderr)."""
+    proc = await asyncio.create_subprocess_exec(
+        "git", *args,
+        cwd=cwd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    return proc.returncode, stdout.decode().strip(), stderr.decode().strip()
+
+
+_MAX_MERGE_RETRIES = 2
+
+
+def _make_stop_hook(
+    workload_id: str,
+    clone_path: str,
+    worktree_path: Path,
+    branch_name: str,
+) -> tuple:
+    """Create a Stop hook that merges the workload branch into main.
+
+    Returns (hook_callback, merge_state_dict).
+    The merge_state dict is shared with the relay handler to report merge outcome.
+    """
+    merge_state: dict = {"succeeded": None, "retries": 0}
+
+    async def stop_hook(
+        input_data: HookInput,
+        tool_use_id: str | None,
+        context: HookContext,
+    ) -> HookJSONOutput:
+        # If worktree is already gone, nothing to merge — let agent stop
+        if not worktree_path.exists():
+            logger.info("Workload %s: worktree already removed, skipping merge", workload_id[:8])
+            merge_state["succeeded"] = True
+            return {"continue_": False}
+
+        retries = merge_state["retries"]
+
+        if retries >= _MAX_MERGE_RETRIES:
+            logger.warning(
+                "Workload %s: merge failed after %d retries, giving up",
+                workload_id[:8], retries,
+            )
+            merge_state["succeeded"] = False
+            return {
+                "continue_": False,
+                "stopReason": (
+                    f"Merge failed after {retries} attempts. "
+                    f"Branch '{branch_name}' is preserved for manual resolution."
+                ),
+            }
+
+        # Attempt merge into main
+        rc, stdout, stderr = await _run_git(
+            "merge", branch_name, "--no-edit",
+            cwd=clone_path,
+        )
+
+        if rc == 0:
+            logger.info("Workload %s: merge succeeded on attempt %d", workload_id[:8], retries + 1)
+
+            # Clean up worktree and branch
+            await _run_git("worktree", "remove", str(worktree_path), "--force", cwd=clone_path)
+            await _run_git("branch", "-d", branch_name, cwd=clone_path)
+
+            # Push merged changes to remote
+            push_rc, _, push_err = await _run_git("push", cwd=clone_path)
+            if push_rc != 0:
+                logger.warning("Workload %s: post-merge push failed: %s", workload_id[:8], push_err)
+            else:
+                logger.info("Workload %s: pushed merged changes to remote", workload_id[:8])
+
+            merge_state["succeeded"] = True
+            return {"continue_": False}
+
+        # Merge conflict — abort and ask agent to rebase
+        logger.warning(
+            "Workload %s: merge conflict on attempt %d: %s",
+            workload_id[:8], retries + 1, stderr,
+        )
+        await _run_git("merge", "--abort", cwd=clone_path)
+        merge_state["retries"] = retries + 1
+
+        return {
+            "continue_": True,
+            "reason": (
+                f"Your branch '{branch_name}' has merge conflicts with main "
+                f"(attempt {retries + 1} of {_MAX_MERGE_RETRIES}). "
+                f"Please rebase onto main and resolve the conflicts:\n\n"
+                f"1. Run: git rebase main\n"
+                f"2. Resolve any conflicts in the affected files\n"
+                f"3. Run: git rebase --continue\n"
+                f"4. Then finish your task as normal."
+            ),
+        }
+
+    return stop_hook, merge_state
+
+
 async def _get_coordinator_for_chat(chat_id: str) -> dict:
     """Look up the coordinator member for the project owning a chat."""
     conn = await asyncpg.connect(_dsn)
@@ -209,8 +316,28 @@ async def _relay_messages(
                 finally:
                     await conn.close()
 
-                # Publish summary to main chat
-                summary = f"Workload **{workload_data['title']}** has finished and needs attention."
+                # Publish merge-aware summary to main chat
+                session = _sessions.get(workload_id, {})
+                merge_succeeded = session.get("merge_state", {}).get("succeeded")
+
+                if merge_succeeded is True:
+                    summary = (
+                        f"Workload **{workload_data['title']}** has finished "
+                        f"and its changes have been merged to main."
+                    )
+                elif merge_succeeded is False:
+                    branch = session.get("branch_name", "unknown")
+                    summary = (
+                        f"Workload **{workload_data['title']}** has finished "
+                        f"but merge conflicts could not be resolved automatically. "
+                        f"Changes remain on branch `{branch}`."
+                    )
+                else:
+                    summary = (
+                        f"Workload **{workload_data['title']}** has finished "
+                        f"and needs attention."
+                    )
+
                 if msg.result:
                     summary += f"\n\nSummary: {msg.result}"
 
@@ -230,6 +357,32 @@ async def _relay_messages(
                     "created_at": datetime.now(timezone.utc).isoformat(),
                 }
                 await redis_client.publish("chat:responses", json.dumps(main_response))
+
+                # Post-workload manifest check (no git pull — we just pushed)
+                if merge_succeeded and workload_data.get("project_id"):
+                    try:
+                        async with httpx.AsyncClient(timeout=10.0) as http:
+                            resp = await http.post(
+                                f"{settings.api_service_url}/projects/"
+                                f"{workload_data['project_id']}/check-manifest?pull=false",
+                            )
+                            if resp.status_code == 200:
+                                data = resp.json()
+                                if data.get("is_locked"):
+                                    logger.warning(
+                                        "Workload %s: manifest check triggered lockdown",
+                                        workload_id[:8],
+                                    )
+                            else:
+                                logger.warning(
+                                    "Workload %s: manifest check returned %d",
+                                    workload_id[:8], resp.status_code,
+                                )
+                    except Exception:
+                        logger.warning(
+                            "Workload %s: manifest check failed (non-blocking)",
+                            workload_id[:8], exc_info=True,
+                        )
 
                 _sessions.pop(workload_id, None)
                 return
@@ -299,10 +452,18 @@ async def start_workload_session(
         await conn.close()
 
     # 3. Load agent profile for system prompt
-    profile_path = Path(clone_path) / ".agent" / f"{workload_data['display_name'].lower()}.md"
+    profile_path = Path(clone_path) / ".team-agent" / "agents" / f"{workload_data['display_name'].lower()}.md"
     agent_profile = profile_path.read_text() if profile_path.exists() else ""
 
-    # 4. Build SDK options
+    # 4. Create Stop hook for auto-merge
+    stop_hook, merge_state = _make_stop_hook(
+        workload_id=workload_id,
+        clone_path=clone_path,
+        worktree_path=worktree_path,
+        branch_name=branch_name,
+    )
+
+    # 5. Build SDK options
     is_resume = bool(workload_data.get("session_id"))
 
     options = ClaudeAgentOptions(
@@ -310,9 +471,10 @@ async def start_workload_session(
         resume=workload_data.get("session_id") if is_resume else None,
         system_prompt=_build_system_prompt(agent_profile, workload_data),
         permission_mode="acceptEdits",
+        hooks={"Stop": [HookMatcher(hooks=[stop_hook])]},
     )
 
-    # 5. Connect
+    # 6. Connect
     try:
         client = ClaudeSDKClient(options)
         await client.connect()
@@ -328,11 +490,13 @@ async def start_workload_session(
             await conn.close()
         return
 
-    # 6. Register and start relay
+    # 7. Register and start relay
     _sessions[workload_id] = {
         "client": client,
         "task": None,
         "workload_data": workload_data,
+        "merge_state": merge_state,
+        "branch_name": branch_name,
     }
 
     relay_task = asyncio.create_task(
@@ -341,7 +505,7 @@ async def start_workload_session(
     )
     _sessions[workload_id]["task"] = relay_task
 
-    # 7. Send initial prompt (or skip if resuming)
+    # 8. Send initial prompt (or skip if resuming)
     if not is_resume:
         initial_prompt = _build_initial_prompt(workload_data)
         await client.query(initial_prompt)

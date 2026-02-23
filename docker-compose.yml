@@ -18,6 +18,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FORMAT=${LOG_FORMAT:-text}
       - AI_SERVICE_URL=${AI_SERVICE_URL:-http://ai-service:8001}
+      - TEAM_AGENT_ENV=${TEAM_AGENT_ENV:-dev}
     volumes:
       - ./db:/app/db
       - project_data:/data/projects
@@ -39,6 +40,8 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-5.2}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FORMAT=${LOG_FORMAT:-text}
+      - TEAM_AGENT_ENV=${TEAM_AGENT_ENV:-dev}
+      - API_SERVICE_URL=${API_SERVICE_URL:-http://api:8000}
     volumes:
       - claude_auth:/home/agent/.claude
       - project_data:/data/projects

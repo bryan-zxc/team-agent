@@ -7,7 +7,9 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from ..database import async_session
 from ..models.chat import Chat
 from ..models.message import Message
+from ..models.project import Project
 from ..models.project_member import ProjectMember
+from ..models.room import Room
 from .manager import manager
 
 router = APIRouter()
@@ -44,7 +46,7 @@ async def websocket_endpoint(
 ):
     await manager.connect(chat_id, websocket)
 
-    # Look up display name and type from project_members
+    # Look up display name, type, and owning project
     async with async_session() as session:
         member = await session.get(ProjectMember, member_id)
         display_name = member.display_name if member else "Unknown"
@@ -54,9 +56,27 @@ async def websocket_endpoint(
         chat_type = chat.type if chat else "primary"
         workload_id = str(chat.workload_id) if chat and chat.workload_id else None
 
+        # Resolve project_id via chat → room for lockdown checks
+        project_id = None
+        if chat:
+            room = await session.get(Room, chat.room_id)
+            if room:
+                project_id = room.project_id
+
     try:
         while True:
             data = await websocket.receive_json()
+
+            # Check project lockdown before processing each message
+            if project_id:
+                async with async_session() as session:
+                    project = await session.get(Project, project_id)
+                    if project and project.is_locked:
+                        await websocket.send_json({
+                            "error": "project_locked",
+                            "detail": f"Project is locked: {project.lock_reason}",
+                        })
+                        continue
 
             # Expect structured format: {"blocks": [...], "mentions": [...]}
             blocks = data.get("blocks", [])

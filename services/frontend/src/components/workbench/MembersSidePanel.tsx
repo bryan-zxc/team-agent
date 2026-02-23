@@ -6,7 +6,7 @@ import styles from "./MembersSidePanel.module.css";
 
 type MembersSidePanelProps = {
   members: Member[];
-  onAddMember: () => void;
+  onAddMember?: () => void;
   onMemberClick?: (memberId: string) => void;
 };
 

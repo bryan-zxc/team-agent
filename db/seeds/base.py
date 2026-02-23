@@ -36,8 +36,10 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS projects (
     id UUID PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    git_repo_url TEXT,
+    git_repo_url TEXT UNIQUE,
     clone_path TEXT,
+    is_locked BOOLEAN NOT NULL DEFAULT FALSE,
+    lock_reason TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

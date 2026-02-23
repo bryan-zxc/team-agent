@@ -6,7 +6,7 @@ import styles from "./MemberList.module.css";
 
 type MemberListProps = {
   members: Member[];
-  onAddClick: () => void;
+  onAddClick?: () => void;
   onMemberClick?: (memberId: string) => void;
 };
 
@@ -32,9 +32,11 @@ export function MemberList({ members, onAddClick, onMemberClick }: MemberListPro
           </button>
         ))}
       </div>
-      <button className={styles.addButton} onClick={onAddClick}>
-        + Add Member
-      </button>
+      {onAddClick && (
+        <button className={styles.addButton} onClick={onAddClick}>
+          + Add Member
+        </button>
+      )}
     </div>
   );
 }

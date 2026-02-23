@@ -3,12 +3,13 @@ import uuid
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from ..config import settings
 from ..database import async_session
+from ..guards import get_unlocked_project
 from ..models.project import Project
 from ..models.project_member import ProjectMember
 from ..models.user import User
@@ -29,14 +30,9 @@ class UpdateProfileRequest(BaseModel):
     content: str
 
 
-async def _resolve_profile_path(member: ProjectMember) -> Path:
-    """Resolve the markdown profile path for an AI member via its project's clone_path."""
-    from ..database import async_session as _session
-    async with _session() as session:
-        project = await session.get(Project, member.project_id)
-    if not project or not project.clone_path:
-        raise HTTPException(status_code=404, detail="Project not found or has no clone_path")
-    return Path(project.clone_path) / ".agent" / f"{member.display_name.lower()}.md"
+def _profile_path(clone_path: str, display_name: str) -> Path:
+    """Compute the markdown profile path for an AI member."""
+    return Path(clone_path) / ".team-agent" / "agents" / f"{display_name.lower()}.md"
 
 
 @router.get("/projects/{project_id}/members")
@@ -85,14 +81,17 @@ async def available_users(project_id: uuid.UUID):
 
 
 @router.post("/projects/{project_id}/members/human")
-async def add_human_member(project_id: uuid.UUID, req: AddHumanRequest):
+async def add_human_member(
+    req: AddHumanRequest,
+    project: Project = Depends(get_unlocked_project),
+):
     async with async_session() as session:
         user = await session.get(User, uuid.UUID(req.user_id))
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
         member = ProjectMember(
-            project_id=project_id,
+            project_id=project.id,
             user_id=user.id,
             display_name=user.display_name,
             type="human",
@@ -109,20 +108,17 @@ async def add_human_member(project_id: uuid.UUID, req: AddHumanRequest):
 
 
 @router.post("/projects/{project_id}/members/ai")
-async def generate_ai_member(project_id: uuid.UUID, req: GenerateAgentRequest):
+async def generate_ai_member(
+    req: GenerateAgentRequest,
+    project: Project = Depends(get_unlocked_project),
+):
     """Request AI agent generation via the AI service."""
-    async with async_session() as session:
-        project = await session.get(Project, project_id)
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-        project_name = project.name
-
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             resp = await client.post(
                 f"{settings.ai_service_url}/generate-agent",
                 json={
-                    "project_name": project_name,
+                    "project_name": project.name,
                     "name": req.name,
                 },
             )
@@ -137,34 +133,45 @@ async def generate_ai_member(project_id: uuid.UUID, req: GenerateAgentRequest):
     return resp.json()
 
 
-@router.get("/members/{member_id}/profile")
-async def get_profile(member_id: uuid.UUID):
+@router.get("/projects/{project_id}/members/{member_id}/profile")
+async def get_profile(project_id: uuid.UUID, member_id: uuid.UUID):
     """Read the raw markdown profile for an AI member."""
     async with async_session() as session:
         member = await session.get(ProjectMember, member_id)
-        if not member:
+        if not member or member.project_id != project_id:
             raise HTTPException(status_code=404, detail="Member not found")
         if member.type == "human":
             raise HTTPException(status_code=400, detail="Only AI members have profiles")
 
-    path = await _resolve_profile_path(member)
+        project = await session.get(Project, project_id)
+        if not project or not project.clone_path:
+            raise HTTPException(status_code=404, detail="Project has no cloned repo")
+
+    path = _profile_path(project.clone_path, member.display_name)
     if not path.exists():
         raise HTTPException(status_code=404, detail="Profile file not found")
 
     return {"content": path.read_text()}
 
 
-@router.put("/members/{member_id}/profile")
-async def update_profile(member_id: uuid.UUID, req: UpdateProfileRequest):
+@router.put("/projects/{project_id}/members/{member_id}/profile")
+async def update_profile(
+    member_id: uuid.UUID,
+    req: UpdateProfileRequest,
+    project: Project = Depends(get_unlocked_project),
+):
     """Write raw markdown back to the profile file."""
+    if not project.clone_path:
+        raise HTTPException(status_code=404, detail="Project has no cloned repo")
+
     async with async_session() as session:
         member = await session.get(ProjectMember, member_id)
-        if not member:
+        if not member or member.project_id != project.id:
             raise HTTPException(status_code=404, detail="Member not found")
         if member.type == "human":
             raise HTTPException(status_code=400, detail="Only AI members have profiles")
 
-    path = await _resolve_profile_path(member)
+    path = _profile_path(project.clone_path, member.display_name)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(req.content)
 

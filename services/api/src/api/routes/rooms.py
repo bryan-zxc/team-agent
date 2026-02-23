@@ -1,13 +1,15 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from ..database import async_session
+from ..guards import get_unlocked_project
 from ..models.room import Room
 from ..models.chat import Chat
 from ..models.message import Message
+from ..models.project import Project
 from ..models.project_member import ProjectMember
 from ..models.workload import Workload
 
@@ -52,9 +54,12 @@ async def list_rooms(project_id: uuid.UUID):
 
 
 @router.post("/projects/{project_id}/rooms")
-async def create_room(project_id: uuid.UUID, req: CreateRoomRequest):
+async def create_room(
+    req: CreateRoomRequest,
+    project: Project = Depends(get_unlocked_project),
+):
     async with async_session() as session:
-        room = Room(name=req.name, project_id=project_id)
+        room = Room(name=req.name, project_id=project.id)
         session.add(room)
         await session.flush()
 
@@ -73,11 +78,15 @@ async def create_room(project_id: uuid.UUID, req: CreateRoomRequest):
 
 
 @router.patch("/projects/{project_id}/rooms/{room_id}")
-async def rename_room(project_id: uuid.UUID, room_id: uuid.UUID, req: RenameRoomRequest):
+async def rename_room(
+    room_id: uuid.UUID,
+    req: RenameRoomRequest,
+    project: Project = Depends(get_unlocked_project),
+):
     async with async_session() as session:
         room = (
             await session.execute(
-                select(Room).where(Room.id == room_id, Room.project_id == project_id)
+                select(Room).where(Room.id == room_id, Room.project_id == project.id)
             )
         ).scalar_one_or_none()
 

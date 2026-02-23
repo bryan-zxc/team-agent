@@ -177,10 +177,14 @@ async def _persist_workloads(
     """
     conn = await asyncpg.connect(_dsn)
     try:
-        room_id = await conn.fetchval(
-            "SELECT room_id FROM chats WHERE id = $1",
+        row = await conn.fetchrow(
+            "SELECT c.room_id, r.project_id FROM chats c "
+            "JOIN rooms r ON r.id = c.room_id "
+            "WHERE c.id = $1",
             uuid.UUID(main_chat_id),
         )
+        room_id = row["room_id"]
+        project_id = str(row["project_id"])
 
         results = []
         for w in workloads:
@@ -207,6 +211,7 @@ async def _persist_workloads(
 
             results.append({
                 "id": str(workload_id),
+                "project_id": project_id,
                 "main_chat_id": main_chat_id,
                 "chat_id": str(chat_id),
                 "member_id": str(member_id),

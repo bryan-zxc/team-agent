@@ -2,9 +2,11 @@
 
 Drops/recreates all tables. Inserts users, a fully-formed project with:
 - Real git clone of https://github.com/bryan-zxc/popmart.git
-- Zimomo coordinator agent (profile written to {clone_path}/.agent/zimomo.md)
+- Zimomo coordinator agent (profile written to {clone_path}/.team-agent/agents/zimomo.md)
+- Manifest file written to {clone_path}/.team-agent/manifest.json
 - Alice and Bob as human members
 - No rooms — rooms are created through the UI
+- Initial commit with manifest + Zimomo profile (not pushed — local dev only)
 
 No LLM calls — the agent profile is written directly by the seed.
 
@@ -12,6 +14,7 @@ Usage: docker compose exec api .venv/bin/python db/seeds/with_project.py
 """
 
 import asyncio
+import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -82,12 +85,46 @@ async def seed():
         )
         print("Inserted project: popmart")
 
-        # --- Write Zimomo profile into the cloned repo ---
-        agent_dir = Path(clone_path) / ".agent"
-        agent_dir.mkdir(parents=True, exist_ok=True)
-        profile_path = agent_dir / "zimomo.md"
+        # --- Write manifest and Zimomo profile into the cloned repo ---
+        team_agent_dir = Path(clone_path) / ".team-agent"
+        agents_dir = team_agent_dir / "agents"
+        agents_dir.mkdir(parents=True, exist_ok=True)
+
+        manifest = {
+            "version": 1,
+            "env": "dev",
+            "project_id": str(project_id),
+            "project_name": "popmart",
+            "claimed_at": now.isoformat(),
+        }
+        (team_agent_dir / "manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n"
+        )
+        print("Wrote manifest.json")
+
+        profile_path = agents_dir / "zimomo.md"
         profile_path.write_text(ZIMOMO_PROFILE)
         print(f"Wrote Zimomo profile to {profile_path}")
+
+        # --- Initial commit (local only — don't push to upstream in dev seed) ---
+        async def _run_git(*args: str) -> None:
+            proc = await asyncio.create_subprocess_exec(
+                "git", *args,
+                cwd=clone_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                print(f"  git {' '.join(args)} failed: {stderr.decode().strip()}")
+
+        await _run_git("add", ".team-agent/")
+        await _run_git(
+            "-c", "user.name=seed",
+            "-c", "user.email=seed@team-agent",
+            "commit", "-m", "Initial seed: manifest + Zimomo profile",
+        )
+        print("Committed .team-agent/ to local repo")
 
         # --- Members ---
         alice_member_id = uuid.uuid4()

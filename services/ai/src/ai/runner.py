@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 async def _load_all_agent_profiles(project_name: str) -> str:
-    """Load all agent markdown files from the project's .agent/ directory."""
+    """Load all agent markdown files from the project's .team-agent/agents/ directory."""
     clone_path = await _get_clone_path(project_name)
-    agent_dir = clone_path / ".agent"
+    agent_dir = clone_path / ".team-agent" / "agents"
     if not agent_dir.exists():
         return ""
 

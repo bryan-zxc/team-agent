@@ -52,6 +52,22 @@ export default function LandingPage() {
     [router],
   );
 
+  const refreshProject = useCallback(
+    async (e: React.MouseEvent, projectId: string) => {
+      e.stopPropagation();
+      try {
+        await fetch(`${API_URL}/projects/${projectId}/check-manifest`, {
+          method: "POST",
+        });
+        const res = await fetch(`${API_URL}/projects`);
+        setProjects(await res.json());
+      } catch {
+        // Silently fail — user can retry
+      }
+    },
+    [],
+  );
+
   return (
     <div className={styles.page}>
       <header className={styles.topBar}>
@@ -120,14 +136,26 @@ export default function LandingPage() {
           {projects.map((project) => (
             <button
               key={project.id}
-              className={styles.projectCard}
+              className={clsx(styles.projectCard, project.is_locked && styles.projectCardLocked)}
               onClick={() => openProject(project.id)}
             >
-              <div className={styles.projectIcon}>
-                {project.name[0].toUpperCase()}
+              <div className={clsx(styles.projectIcon, project.is_locked && styles.projectIconLocked)}>
+                {project.is_locked ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                ) : (
+                  project.name[0].toUpperCase()
+                )}
               </div>
               <div className={styles.projectInfo}>
-                <div className={styles.projectName}>{project.name}</div>
+                <div className={styles.projectNameRow}>
+                  <span className={styles.projectName}>{project.name}</span>
+                  {project.is_locked && (
+                    <span className={styles.lockedBadge}>Locked</span>
+                  )}
+                </div>
                 {project.git_repo_url && (
                   <div className={styles.projectRepo}>{project.git_repo_url}</div>
                 )}
@@ -137,6 +165,16 @@ export default function LandingPage() {
                   {project.room_count} room{project.room_count !== 1 ? "s" : ""}
                 </div>
               </div>
+              <button
+                className={styles.refreshBtn}
+                onClick={(e) => refreshProject(e, project.id)}
+                aria-label="Refresh project"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10" />
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                </svg>
+              </button>
             </button>
           ))}
 

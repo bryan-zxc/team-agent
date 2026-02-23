@@ -1,11 +1,12 @@
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from ..database import async_session
+from ..guards import get_unlocked_project
 from ..models.project import Project
 
 router = APIRouter()
@@ -104,8 +105,14 @@ class WriteFileRequest(BaseModel):
 
 
 @router.put("/projects/{project_id}/files/content")
-async def write_file(project_id: uuid.UUID, path: str, req: WriteFileRequest):
-    clone_path = await _get_clone_path(project_id)
+async def write_file(
+    path: str,
+    req: WriteFileRequest,
+    project: Project = Depends(get_unlocked_project),
+):
+    if not project.clone_path:
+        raise HTTPException(status_code=404, detail="Project has no cloned repo")
+    clone_path = Path(project.clone_path)
     target = _validate_path(clone_path, path)
 
     if not target.parent.exists():
@@ -125,8 +132,13 @@ class CreateFileRequest(BaseModel):
 
 
 @router.post("/projects/{project_id}/files")
-async def create_file(project_id: uuid.UUID, req: CreateFileRequest):
-    clone_path = await _get_clone_path(project_id)
+async def create_file(
+    req: CreateFileRequest,
+    project: Project = Depends(get_unlocked_project),
+):
+    if not project.clone_path:
+        raise HTTPException(status_code=404, detail="Project has no cloned repo")
+    clone_path = Path(project.clone_path)
     target = _validate_path(clone_path, req.path)
 
     if target.exists():
@@ -145,8 +157,13 @@ async def create_file(project_id: uuid.UUID, req: CreateFileRequest):
 
 
 @router.delete("/projects/{project_id}/files")
-async def delete_file(project_id: uuid.UUID, path: str):
-    clone_path = await _get_clone_path(project_id)
+async def delete_file(
+    path: str,
+    project: Project = Depends(get_unlocked_project),
+):
+    if not project.clone_path:
+        raise HTTPException(status_code=404, detail="Project has no cloned repo")
+    clone_path = Path(project.clone_path)
     target = _validate_path(clone_path, path)
 
     if not target.exists():
@@ -169,8 +186,13 @@ class RenameFileRequest(BaseModel):
 
 
 @router.patch("/projects/{project_id}/files")
-async def rename_file(project_id: uuid.UUID, req: RenameFileRequest):
-    clone_path = await _get_clone_path(project_id)
+async def rename_file(
+    req: RenameFileRequest,
+    project: Project = Depends(get_unlocked_project),
+):
+    if not project.clone_path:
+        raise HTTPException(status_code=404, detail="Project has no cloned repo")
+    clone_path = Path(project.clone_path)
     source = _validate_path(clone_path, req.old_path)
 
     if not source.exists():

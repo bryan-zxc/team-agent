@@ -216,12 +216,22 @@
   width: 100%;
   font-family: var(--font-body);
   color: var(--text-primary);
+  position: relative;
 }
 
 .projectCard:hover {
   border-color: var(--accent);
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
+}
+
+.projectCardLocked {
+  opacity: 0.7;
+  border-color: var(--error);
+}
+
+.projectCardLocked:hover {
+  border-color: var(--error);
 }
 
 .projectIcon {
@@ -239,15 +249,64 @@
   flex-shrink: 0;
 }
 
+.projectIconLocked {
+  background: rgba(204, 68, 68, 0.1);
+  color: var(--error);
+}
+
 .projectInfo {
   flex: 1;
   min-width: 0;
 }
 
+.projectNameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
 .projectName {
   font-weight: 600;
   font-size: 15px;
-  margin-bottom: 4px;
+}
+
+.lockedBadge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--error);
+  background: rgba(204, 68, 68, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.refreshBtn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  opacity: 0;
+}
+
+.projectCard:hover .refreshBtn {
+  opacity: 1;
+}
+
+.refreshBtn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
 
 .projectRepo {

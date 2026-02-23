@@ -1,5 +1,6 @@
 """Agent profile generation."""
 
+import asyncio
 import logging
 import uuid
 from pathlib import Path
@@ -30,7 +31,7 @@ async def _get_clone_path(project_name: str) -> Path:
 
 
 def _agent_dir(clone_path: Path) -> Path:
-    return clone_path / ".agent"
+    return clone_path / ".team-agent" / "agents"
 
 
 def _profile_path(clone_path: Path, agent_name: str) -> Path:
@@ -87,7 +88,7 @@ async def generate_agent_profile(
 
     If name is not provided, the LLM picks a Pop Mart character name.
     Creates a project_member record and writes the profile to
-    {clone_path}/.agent/{name}.md.
+    {clone_path}/.team-agent/agents/{name}.md.
 
     Returns {"id": str, "display_name": str, "file_path": str}.
     """
@@ -142,9 +143,52 @@ async def generate_agent_profile(
     file_path = _profile_path(clone_path, result.name)
     file_path.write_text(md_content)
 
+    # Commit and push the profile (and manifest if present) to the remote
+    await _git_commit_and_push(
+        clone_path, f"Add agent profile: {result.name}",
+    )
+
     logger.info("Generated agent profile: %s", file_path)
     return {
         "id": str(member_id),
         "display_name": result.name,
         "file_path": str(file_path),
     }
+
+
+async def _run_git(*args: str, cwd: Path) -> tuple[int, str, str]:
+    """Run a git command and return (returncode, stdout, stderr)."""
+    proc = await asyncio.create_subprocess_exec(
+        "git", *args,
+        cwd=str(cwd),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    return proc.returncode, stdout.decode().strip(), stderr.decode().strip()
+
+
+async def _git_commit_and_push(clone_path: Path, message: str) -> None:
+    """Stage .team-agent/, commit, and push. Logs warnings on failure."""
+    rc, _, err = await _run_git("add", ".team-agent/", cwd=clone_path)
+    if rc != 0:
+        logger.warning("git add failed: %s", err)
+        return
+
+    rc, _, err = await _run_git(
+        "-c", "user.name=team-agent",
+        "-c", "user.email=noreply@team-agent",
+        "commit", "-m", message,
+        cwd=clone_path,
+    )
+    if rc != 0:
+        logger.warning("git commit failed: %s", err)
+        return
+
+    logger.info("Committed: %s", message)
+
+    rc, _, err = await _run_git("push", cwd=clone_path)
+    if rc != 0:
+        logger.warning("git push failed (non-blocking): %s", err)
+    else:
+        logger.info("Pushed to remote")

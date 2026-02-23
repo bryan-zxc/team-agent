@@ -9,12 +9,21 @@ For Playwright command reference, use `/playwright-cli`.
 
 ## Seed Scenarios
 
-Seeds run inside Docker. Each drops all tables and rebuilds from scratch.
+Seeds run inside Docker. Each drops all tables and rebuilds from scratch, but **does not** clean up cloned project files on disk. Always wipe `/data/projects/` before re-seeding to avoid stale directories from previous runs.
 
-| Scenario | Command | State |
+### Seed commands
+
+Always run the cleanup command first, then the seed:
+
+```bash
+docker compose exec api rm -rf /data/projects/*
+docker compose exec api .venv/bin/python db/seeds/with_project.py
+```
+
+| Scenario | Seed command | State |
 |---|---|---|
-| **clean** | `docker compose exec api .venv/bin/python db/seeds/clean.py` | Users only (Alice, Bob). No projects. |
-| **with_project** | `docker compose exec api .venv/bin/python db/seeds/with_project.py` | Users + popmart project (git clone, Zimomo AI, General room, 3 members). |
+| **clean** | `db/seeds/clean.py` | Users only (Alice, Bob). No projects. |
+| **with_project** | `db/seeds/with_project.py` | Users + popmart project (git clone, manifest, Zimomo AI, 3 members, initial commit). |
 
 ### Choosing a scenario
 
@@ -24,10 +33,11 @@ Seeds run inside Docker. Each drops all tables and rebuilds from scratch.
 ## Pre-test checklist
 
 1. Services running: `docker compose up -d`
-2. Run the appropriate seed
-3. Open: `playwright-cli open http://localhost:3000`
+2. Wipe stale project files: `docker compose exec api rm -rf /data/projects/*`
+3. Run the appropriate seed
+4. Open: `playwright-cli open http://localhost:3000`
 
-Always re-seed before a test run — seeds are destructive (DROP + CREATE).
+Always wipe and re-seed before a test run — seeds are destructive (DROP + CREATE) but only clean the database, not the filesystem.
 
 ## Common flows
 
@@ -55,6 +65,8 @@ Always re-seed before a test run — seeds are destructive (DROP + CREATE).
 ## Notes
 
 - `with_project` seed performs a real git clone — requires network access from Docker
+- `with_project` writes `.team-agent/manifest.json` and `.team-agent/agents/zimomo.md`, then commits locally (no push)
 - User selection is stored in `localStorage` as `user_id` — persists across navigations
+- Projects have `is_locked` / `lock_reason` columns — set `is_locked=true` in DB to test lockdown UI
 - Use `playwright-cli snapshot` after each navigation to inspect element tree
 - Use `playwright-cli screenshot` to capture visual state

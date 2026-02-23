@@ -13,7 +13,7 @@ import { ChatTab } from "./ChatTab";
 import { FileTab } from "./FileTab";
 import { MemberProfileTab } from "./MemberProfileTab";
 import { AddMemberModal } from "@/components/members/AddMemberModal";
-import type { Member, Room } from "@/types";
+import type { Member, Project, Room } from "@/types";
 import styles from "./Workbench.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -45,11 +45,25 @@ export function Workbench({ projectId }: WorkbenchProps) {
   const [memberId, setMemberId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeRoomId, setActiveRoomId] = useState<string | undefined>();
+  const [project, setProject] = useState<Project | null>(null);
   const apiRef = useRef<DockviewApi | null>(null);
 
+  const isLocked = project?.is_locked ?? false;
+
   useEffect(() => {
+    fetch(`${API_URL}/projects/${projectId}`).then((r) => r.json()).then(setProject);
     fetch(`${API_URL}/projects/${projectId}/rooms`).then((r) => r.json()).then(setRooms);
     fetch(`${API_URL}/projects/${projectId}/members`).then((r) => r.json()).then(setMembers);
+
+    // Check manifest on project entry
+    fetch(`${API_URL}/projects/${projectId}/check-manifest`, { method: "POST" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.is_locked) {
+          setProject((prev) => prev ? { ...prev, is_locked: true, lock_reason: data.reason } : prev);
+        }
+      })
+      .catch(() => {});
   }, [projectId]);
 
   useEffect(() => {
@@ -162,6 +176,19 @@ export function Workbench({ projectId }: WorkbenchProps) {
 
   return (
     <div className={styles.workbench}>
+      {isLocked && (
+        <div className={styles.lockdownBanner}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          <span>
+            <strong>Project locked</strong>
+            {project?.lock_reason ? ` \u2014 ${project.lock_reason}` : ""}
+          </span>
+        </div>
+      )}
+
       <ActivityBar activePanel={activePanel} onPanelChange={setActivePanel} />
 
       <aside className={styles.sidePanel}>
@@ -170,14 +197,14 @@ export function Workbench({ projectId }: WorkbenchProps) {
             rooms={rooms}
             activeRoomId={activeRoomId}
             onRoomClick={openRoom}
-            onCreateRoom={handleCreateRoom}
-            onRenameRoom={handleRenameRoom}
+            onCreateRoom={isLocked ? undefined : handleCreateRoom}
+            onRenameRoom={isLocked ? undefined : handleRenameRoom}
             currentMember={currentMember}
           />
         ) : activePanel === "members" ? (
           <MembersSidePanel
             members={members}
-            onAddMember={() => setShowAddModal(true)}
+            onAddMember={isLocked ? undefined : () => setShowAddModal(true)}
             onMemberClick={(id) => {
               const api = apiRef.current;
               if (!api) return;
@@ -196,7 +223,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
                 id: panelId,
                 component: "memberTab",
                 title: member.display_name,
-                params: { memberId: id, memberName: member.display_name },
+                params: { projectId, memberId: id, memberName: member.display_name },
               });
             }}
           />

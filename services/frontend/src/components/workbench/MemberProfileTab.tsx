@@ -8,24 +8,25 @@ import { MemberProfileEditor } from "@/components/members/MemberProfileEditor";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type Params = {
+  projectId: string;
   memberId: string;
   memberName: string;
 };
 
 export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
-  const { memberId, memberName } = params;
+  const { projectId, memberId, memberName } = params;
   const [content, setContent] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/members/${memberId}/profile`)
+    fetch(`${API_URL}/projects/${projectId}/members/${memberId}/profile`)
       .then((r) => r.json())
       .then((data) => setContent(data.content ?? ""));
-  }, [memberId]);
+  }, [projectId, memberId]);
 
   const handleSave = useCallback(
     async (draft: string) => {
-      await fetch(`${API_URL}/members/${memberId}/profile`, {
+      await fetch(`${API_URL}/projects/${projectId}/members/${memberId}/profile`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: draft }),
@@ -33,7 +34,7 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
       setContent(draft);
       setEditing(false);
     },
-    [memberId],
+    [projectId, memberId],
   );
 
   if (content === null) return null;

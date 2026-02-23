@@ -20,7 +20,7 @@ Use the Claude Agent SDK's `Stop` hook to trigger a deterministic git merge when
 2. `Stop` hook fires — our code runs `git merge <worktree-branch>` into main
 3. If merge succeeds → clean up worktree, return `continue_: false` (let the agent stop)
 4. If merge conflicts → return `continue_: true` with a `systemMessage` describing the conflicts, extending the session so the agent resolves them with full context
-5. Max 3 merge-resolve retry cycles. If still failing, give up, keep worktree alive, and set status to `needs_attention`
+5. Max 2 merge-resolve retry cycles. If still failing, give up, keep worktree alive, and set status to `needs_attention`
 
 Starting or resuming a workload session is a single packaged function that:
 
@@ -36,5 +36,5 @@ This decouples conversation context (managed by the SDK via session ID) from fil
 - Merge conflicts are resolved within the agent's original session, preserving full context of why changes were made
 - Completed workloads have their changes already on main — no separate merge step for the human
 - Humans can resume completed workloads; a new worktree is created transparently while conversation context is preserved
-- The Stop hook introduces a retry loop that could theoretically not terminate, mitigated by the 3-retry cap
+- The Stop hook introduces a retry loop that could theoretically not terminate, mitigated by the 2-retry cap
 - Worktree cleanup is tied to successful merge, not to workload status — a `needs_attention` workload may still have a live worktree if merge failed
