@@ -217,6 +217,9 @@ node_modules/
 # Playwright CLI
 .playwright-cli/
 
+# TLS certificates (provisioned by Tailscale)
+certs/
+
 # External repositories (cloned for reference)
 # Keep the README but ignore all cloned repos
 external/*

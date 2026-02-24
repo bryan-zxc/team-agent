@@ -1,4 +1,6 @@
 {$SITE_ADDRESS} {
+	tls /etc/caddy/certs/{$SITE_ADDRESS}.crt /etc/caddy/certs/{$SITE_ADDRESS}.key
+
 	handle_path /api/* {
 		reverse_proxy api:8000
 	}
