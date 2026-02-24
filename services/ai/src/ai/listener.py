@@ -11,12 +11,15 @@ from .agents import generate_agent_profile
 from .config import settings
 from .runner import run_agent
 from .tool_approval import resolve_tool_approval
-from .workload import route_message, start_workload_session
+from .workload import fetch_workload_data_for_resume, route_message, start_workload_session
 
 logger = logging.getLogger(__name__)
 
 # asyncpg uses postgresql:// not postgresql+asyncpg://
 _dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+
+# Guard against concurrent resume attempts for the same workload
+_resuming: set[str] = set()
 
 
 def _extract_text(content: str) -> str:
@@ -318,6 +321,40 @@ async def listen(redis_client: aioredis.Redis):
         logger.info("Published response to chat:responses")
 
 
+async def _resume_and_deliver(
+    workload_id: str,
+    workload_data: dict,
+    content: str,
+    redis_client: aioredis.Redis,
+) -> None:
+    """Resume a workload session and deliver the pending human message."""
+    _resuming.add(workload_id)
+    try:
+        clone_path = workload_data.pop("clone_path")
+        await start_workload_session(workload_data, clone_path, redis_client)
+
+        delivered = await route_message(workload_id, content)
+        if delivered:
+            logger.info("Resumed and delivered message to workload %s", workload_id[:8])
+        else:
+            logger.warning("Resume succeeded but delivery failed for workload %s", workload_id[:8])
+    except Exception:
+        logger.exception("Resume failed for workload %s", workload_id[:8])
+    finally:
+        _resuming.discard(workload_id)
+
+
+async def _retry_route(workload_id: str, content: str, retries: int = 3, delay: float = 2.0) -> None:
+    """Retry routing a message to a workload session that is being resumed."""
+    for attempt in range(retries):
+        await asyncio.sleep(delay)
+        delivered = await route_message(workload_id, content)
+        if delivered:
+            logger.info("Retry-routed message to workload %s (attempt %d)", workload_id[:8], attempt + 1)
+            return
+    logger.warning("Failed to route message to workload %s after %d retries", workload_id[:8], retries)
+
+
 async def listen_workload_messages(redis_client: aioredis.Redis):
     """Subscribe to workload:messages and route follow-ups to active sessions."""
     pubsub = redis_client.pubsub()
@@ -335,8 +372,37 @@ async def listen_workload_messages(redis_client: aioredis.Redis):
         delivered = await route_message(workload_id, content)
         if delivered:
             logger.info("Routed follow-up to workload %s", workload_id[:8])
-        else:
-            logger.warning("No active session for workload %s, message dropped", workload_id[:8])
+            continue
+
+        # No active session — attempt to resume
+        if workload_id in _resuming:
+            # Resume already in progress — retry delivery after a delay
+            logger.info("Resume in progress for workload %s, scheduling retry", workload_id[:8])
+            asyncio.create_task(
+                _retry_route(workload_id, content),
+                name=f"workload-retry-{workload_id[:8]}",
+            )
+            continue
+
+        workload_data = await fetch_workload_data_for_resume(workload_id)
+        if not workload_data:
+            logger.warning(
+                "Cannot resume workload %s — not found or no session_id", workload_id[:8],
+            )
+            continue
+
+        if workload_data["status"] not in ("needs_attention", "completed"):
+            logger.warning(
+                "Cannot resume workload %s — status is '%s'",
+                workload_id[:8], workload_data["status"],
+            )
+            continue
+
+        logger.info("No active session for workload %s, starting resume", workload_id[:8])
+        asyncio.create_task(
+            _resume_and_deliver(workload_id, workload_data, content, redis_client),
+            name=f"workload-resume-{workload_id[:8]}",
+        )
 
 
 async def listen_tool_approvals(redis_client: aioredis.Redis):

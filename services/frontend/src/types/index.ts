@@ -64,6 +64,7 @@ export type WorkloadChat = {
   title: string;
   description: string;
   status: string;
+  has_session: boolean;
   owner_name: string | null;
   owner_id: string | null;
   created_at: string;

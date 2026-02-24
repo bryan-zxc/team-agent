@@ -55,6 +55,7 @@ type ChatViewProps = {
   onAiMessage?: () => void;
   onRoomEvent?: (event: Record<string, unknown>) => void;
   workloadStatus?: string;
+  workloadHasSession?: boolean;
   onInterrupt?: () => void;
 };
 
@@ -66,11 +67,14 @@ function ChatView({
   onAiMessage,
   onRoomEvent,
   workloadStatus,
+  workloadHasSession,
   onInterrupt,
 }: ChatViewProps) {
   const [input, setInput] = useState("");
+  const [resuming, setResuming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(0);
+  const prevStatusRef = useRef(workloadStatus);
 
   const { messages, sendMessage, setMessages } = useWebSocket(chatId, memberId, onRoomEvent);
 
@@ -95,7 +99,17 @@ function ChatView({
     prevCountRef.current = messages.length;
   }, [messages, onAiMessage]);
 
+  // Clear resuming state when workload transitions to running
+  useEffect(() => {
+    if (prevStatusRef.current !== "running" && workloadStatus === "running") {
+      setResuming(false);
+    }
+    prevStatusRef.current = workloadStatus;
+  }, [workloadStatus]);
+
   const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
+
+  const isPaused = workloadStatus === "needs_attention" || workloadStatus === "completed";
 
   const handleSend = useCallback(() => {
     if (!input.trim()) return;
@@ -109,7 +123,10 @@ function ChatView({
     }
     sendMessage([{ type: "text", value: text }], mentions);
     setInput("");
-  }, [input, members, sendMessage]);
+    if (isPaused && workloadHasSession) {
+      setResuming(true);
+    }
+  }, [input, members, sendMessage, isPaused, workloadHasSession]);
 
   const isRunning = workloadStatus === "running" || workloadStatus === "assigned";
 
@@ -174,6 +191,21 @@ function ChatView({
         })}
         <div ref={messagesEndRef} />
       </div>
+
+      {workloadStatus && !isRunning && (
+        <div className={styles.statusBanner}>
+          {resuming ? (
+            <>
+              <span className={styles.statusDot} />
+              <span>Resuming session...</span>
+            </>
+          ) : isPaused && workloadHasSession ? (
+            <span>Agent paused — send a message to resume</span>
+          ) : isPaused && !workloadHasSession ? (
+            <span>Agent session ended</span>
+          ) : null}
+        </div>
+      )}
 
       <div className={styles.inputArea}>
         <div className={styles.inputWrapper}>
@@ -360,6 +392,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
           onAiMessage={activeChatId === room.primary_chat_id ? refreshWorkloads : undefined}
           onRoomEvent={handleRoomEvent}
           workloadStatus={activeWorkload?.status}
+          workloadHasSession={activeWorkload?.has_session}
           onInterrupt={
             activeWorkload
               ? () => handleInterrupt(activeWorkload.workload_id)

@@ -35,6 +35,51 @@ _dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
 _sessions: dict[str, dict] = {}
 
 
+async def fetch_workload_data_for_resume(workload_id: str) -> dict | None:
+    """Fetch full workload data from DB for session resume.
+
+    Returns the workload_data dict compatible with start_workload_session(),
+    or None if the workload is not found or has no session_id.
+    """
+    conn = await asyncpg.connect(_dsn)
+    try:
+        row = await conn.fetchrow(
+            "SELECT w.id, w.title, w.description, w.status, w.session_id, "
+            "w.member_id, w.main_chat_id, "
+            "c.id AS chat_id, c.room_id, "
+            "pm.display_name, "
+            "p.clone_path "
+            "FROM workloads w "
+            "JOIN chats c ON c.workload_id = w.id AND c.type = 'workload' "
+            "JOIN project_members pm ON pm.id = w.member_id "
+            "JOIN rooms r ON r.id = c.room_id "
+            "JOIN projects p ON p.id = r.project_id "
+            "WHERE w.id = $1",
+            uuid.UUID(workload_id),
+        )
+        if not row or not row["session_id"]:
+            return None
+
+        return {
+            "id": str(row["id"]),
+            "title": row["title"],
+            "description": row["description"],
+            "status": row["status"],
+            "session_id": row["session_id"],
+            "chat_id": str(row["chat_id"]),
+            "member_id": str(row["member_id"]),
+            "display_name": row["display_name"],
+            "room_id": str(row["room_id"]),
+            "main_chat_id": str(row["main_chat_id"]),
+            "clone_path": row["clone_path"],
+            # Not needed for resume (initial prompt is skipped)
+            "background_context": None,
+            "problem": None,
+        }
+    finally:
+        await conn.close()
+
+
 async def _publish_status(
     redis_client: aioredis.Redis,
     workload_id: str,
