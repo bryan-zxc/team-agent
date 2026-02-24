@@ -72,6 +72,20 @@ async def cancel_workload(workload_id: str):
     return {"status": "cancelled"}
 
 
+@app.get("/health")
+async def health():
+    redis_status = "disconnected"
+
+    try:
+        await app.state.redis.ping()
+        redis_status = "connected"
+    except Exception:
+        pass
+
+    ok = redis_status == "connected"
+    return {"status": "ok" if ok else "degraded", "redis": redis_status}
+
+
 @app.post("/generate-agent")
 async def generate_agent(req: GenerateAgentRequest):
     """Generate an AI agent profile via LLM."""

@@ -7,7 +7,10 @@
 services:
   frontend:
     image: ghcr.io/bryan-zxc/team-agent/frontend:${TAG:-latest}
-    command: ["npm", "run", "start"]
+    build:
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     ports: !override []
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
@@ -16,7 +19,7 @@ services:
 
   api:
     image: ghcr.io/bryan-zxc/team-agent/api:${TAG:-latest}
-    command: ["uv", "run", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: !reset
     ports: !override []
     environment:
       - DATABASE_URL=${DATABASE_URL}
