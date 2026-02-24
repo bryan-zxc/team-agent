@@ -4,12 +4,15 @@ import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 
+from datetime import datetime, timezone
+
 from ..database import async_session
 from ..models.chat import Chat
 from ..models.message import Message
 from ..models.project import Project
 from ..models.project_member import ProjectMember
 from ..models.room import Room
+from ..models.session import Session
 from .manager import manager
 
 router = APIRouter()
@@ -44,6 +47,23 @@ async def websocket_endpoint(
     chat_id: uuid.UUID,
     member_id: uuid.UUID = Query(...),
 ):
+    # Validate session cookie
+    session_id = websocket.cookies.get("session_id")
+    if not session_id:
+        await websocket.close(code=4001, reason="Not authenticated")
+        return
+
+    async with async_session() as db:
+        auth_session = await db.get(Session, session_id)
+        if not auth_session or auth_session.expires_at < datetime.now(timezone.utc):
+            await websocket.close(code=4001, reason="Invalid or expired session")
+            return
+
+        member = await db.get(ProjectMember, member_id)
+        if not member or member.user_id != auth_session.user_id:
+            await websocket.close(code=4003, reason="Forbidden")
+            return
+
     await manager.connect(chat_id, websocket)
 
     # Look up display name, type, and owning project

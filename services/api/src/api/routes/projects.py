@@ -5,7 +5,7 @@ import uuid
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -21,9 +21,10 @@ from ..manifest import (
 from ..models.project import Project
 from ..models.project_member import ProjectMember
 from ..models.room import Room
+from ..guards import get_current_user
 from ..models.user import User
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = logging.getLogger(__name__)
 
 CLONE_BASE = Path("/data/projects")
@@ -32,7 +33,6 @@ CLONE_BASE = Path("/data/projects")
 class CreateProjectRequest(BaseModel):
     name: str
     git_repo_url: str
-    creator_user_id: str
 
 
 @router.get("/projects")
@@ -90,13 +90,8 @@ async def get_project(project_id: uuid.UUID):
 
 
 @router.post("/projects")
-async def create_project(req: CreateProjectRequest):
+async def create_project(req: CreateProjectRequest, creator: User = Depends(get_current_user)):
     async with async_session() as session:
-        # Validate creator exists
-        creator = await session.get(User, uuid.UUID(req.creator_user_id))
-        if not creator:
-            raise HTTPException(status_code=404, detail="Creator user not found")
-
         # Check name uniqueness
         existing = (
             await session.execute(select(Project).where(Project.name == req.name))

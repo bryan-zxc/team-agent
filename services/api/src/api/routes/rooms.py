@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from ..database import async_session
-from ..guards import get_unlocked_project
+from ..guards import get_current_user, get_unlocked_project
 from ..models.room import Room
 from ..models.chat import Chat
 from ..models.message import Message
@@ -13,7 +13,7 @@ from ..models.project import Project
 from ..models.project_member import ProjectMember
 from ..models.workload import Workload
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 class CreateRoomRequest(BaseModel):

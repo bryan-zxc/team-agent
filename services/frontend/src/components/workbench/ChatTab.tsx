@@ -5,11 +5,10 @@ import clsx from "clsx";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type { IDockviewPanelProps } from "dockview";
 import type { Member, Message, Room, ToolApprovalBlock, WorkloadChat, WorkloadStatusEvent } from "@/types";
+import { apiFetch } from "@/lib/api";
 import { ToolApprovalCard } from "./ToolApprovalCard";
 import { WorkloadPanel } from "./WorkloadPanel";
 import styles from "./ChatTab.module.css";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type ChatTabParams = {
   roomId: string;
@@ -80,7 +79,7 @@ function ChatView({
 
   useEffect(() => {
     if (!chatId) return;
-    fetch(`${API_URL}/chats/${chatId}/messages`)
+    apiFetch(`/chats/${chatId}/messages`)
       .then((r) => r.json())
       .then((history: Message[]) => setMessages(history));
   }, [chatId, setMessages]);
@@ -250,7 +249,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
   const [panelOpen, setPanelOpen] = useState(false);
 
   const refreshWorkloads = useCallback(() => {
-    fetch(`${API_URL}/rooms/${roomId}/workloads`)
+    apiFetch(`/rooms/${roomId}/workloads`)
       .then((r) => r.json())
       .then((data: WorkloadChat[]) => setWorkloads(data))
       .catch(() => {});
@@ -291,7 +290,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
         ),
       );
       try {
-        const resp = await fetch(`${API_URL}/workloads/${workloadId}/cancel`, {
+        const resp = await apiFetch(`/workloads/${workloadId}/cancel`, {
           method: "POST",
         });
         if (!resp.ok) refreshWorkloads();
@@ -313,9 +312,8 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
         ),
       );
       try {
-        const resp = await fetch(`${API_URL}/workloads/${workloadId}`, {
+        const resp = await apiFetch(`/workloads/${workloadId}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "completed" }),
         });
         if (!resp.ok) refreshWorkloads();
@@ -336,7 +334,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
         ),
       );
       try {
-        const resp = await fetch(`${API_URL}/workloads/${workloadId}/interrupt`, {
+        const resp = await apiFetch(`/workloads/${workloadId}/interrupt`, {
           method: "POST",
         });
         if (!resp.ok) refreshWorkloads();

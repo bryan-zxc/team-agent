@@ -9,12 +9,12 @@ from sqlalchemy import select
 
 from ..config import settings
 from ..database import async_session
-from ..guards import get_unlocked_project
+from ..guards import get_current_user, get_unlocked_project
 from ..models.project import Project
 from ..models.project_member import ProjectMember
 from ..models.user import User
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = logging.getLogger(__name__)
 
 

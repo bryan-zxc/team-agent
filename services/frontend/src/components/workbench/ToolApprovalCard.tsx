@@ -4,10 +4,9 @@ import { useCallback, useRef, useState } from "react";
 import { DiffEditor, type Monaco } from "@monaco-editor/react";
 import { useTheme } from "@/hooks/useTheme";
 import { getLanguage } from "@/lib/fileIcons";
+import { apiFetch } from "@/lib/api";
 import type { ToolApprovalBlock } from "@/types";
 import styles from "./ToolApprovalCard.module.css";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type Decision = "approve" | "approve_session" | "approve_project" | "deny";
 
@@ -115,11 +114,10 @@ export function ToolApprovalCard({ block, disabled }: Props) {
     async (decision: Decision, reason?: string) => {
       setSubmitting(true);
       try {
-        await fetch(
-          `${API_URL}/workloads/${block.workload_id}/tool-approval`,
+        await apiFetch(
+          `/workloads/${block.workload_id}/tool-approval`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               approval_request_id: block.approval_request_id,
               decision,

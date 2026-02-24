@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import clsx from "clsx";
+import { apiFetch } from "@/lib/api";
 import type { AvailableUser, Member } from "@/types";
 import styles from "./AddMemberModal.module.css";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type AddMemberModalProps = {
   open: boolean;
@@ -26,7 +25,7 @@ export function AddMemberModal({ open, projectId, onClose, onMemberAdded }: AddM
 
   useEffect(() => {
     if (open && tab === "human") {
-      fetch(`${API_URL}/projects/${projectId}/available-users`)
+      apiFetch(`/projects/${projectId}/available-users`)
         .then((r) => r.json())
         .then(setAvailableUsers);
     }
@@ -34,9 +33,8 @@ export function AddMemberModal({ open, projectId, onClose, onMemberAdded }: AddM
 
   const addHuman = useCallback(async (userId: string) => {
     setError(null);
-    const res = await fetch(`${API_URL}/projects/${projectId}/members/human`, {
+    const res = await apiFetch(`/projects/${projectId}/members/human`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: userId }),
     });
     if (!res.ok) {
@@ -52,9 +50,8 @@ export function AddMemberModal({ open, projectId, onClose, onMemberAdded }: AddM
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/projects/${projectId}/members/ai`, {
+      const res = await apiFetch(`/projects/${projectId}/members/ai`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: agentName.trim() || null }),
       });
       if (!res.ok) {

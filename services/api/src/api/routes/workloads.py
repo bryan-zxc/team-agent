@@ -5,12 +5,13 @@ from datetime import datetime, timezone
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from ..config import settings
 from ..database import async_session
+from ..guards import get_current_user
 from ..models.workload import Workload
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ def _get_redis():
     from ..main import redis_client
     return redis_client
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 class ToolApprovalRequest(BaseModel):

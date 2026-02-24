@@ -1,4 +1,5 @@
 import { Bricolage_Grotesque, Plus_Jakarta_Sans } from "next/font/google";
+import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import "./globals.css";
 
@@ -33,7 +34,9 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="light" className={`${heading.variable} ${body.variable}`}>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

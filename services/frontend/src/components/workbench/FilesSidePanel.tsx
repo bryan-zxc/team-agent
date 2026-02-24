@@ -5,10 +5,9 @@ import { Tree, type NodeRendererProps } from "react-arborist";
 import clsx from "clsx";
 import { getFileIcon } from "@/lib/fileIcons";
 import { SetiIcon } from "./SetiIcon";
+import { apiFetch } from "@/lib/api";
 import { FileContextMenu } from "./FileContextMenu";
 import styles from "./FilesSidePanel.module.css";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type FileNode = {
   id: string;
@@ -23,8 +22,8 @@ type FilesSidePanelProps = {
 };
 
 async function fetchDirectory(projectId: string, path: string): Promise<FileNode[]> {
-  const res = await fetch(
-    `${API_URL}/projects/${projectId}/files?path=${encodeURIComponent(path)}`,
+  const res = await apiFetch(
+    `/projects/${projectId}/files?path=${encodeURIComponent(path)}`,
   );
   if (!res.ok) return [];
   const items: { name: string; type: "file" | "dir"; path: string }[] = await res.json();
@@ -143,9 +142,8 @@ export function FilesSidePanel({ projectId, onFileClick }: FilesSidePanelProps) 
 
   const handleCreate = useCallback(
     async (parentPath: string, name: string, isDir: boolean) => {
-      const res = await fetch(`${API_URL}/projects/${projectId}/files`, {
+      const res = await apiFetch(`/projects/${projectId}/files`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: parentPath ? `${parentPath}/${name}` : name, is_directory: isDir }),
       });
       if (res.ok) {
@@ -166,8 +164,8 @@ export function FilesSidePanel({ projectId, onFileClick }: FilesSidePanelProps) 
 
   const handleDelete = useCallback(
     async (path: string) => {
-      const res = await fetch(
-        `${API_URL}/projects/${projectId}/files?path=${encodeURIComponent(path)}`,
+      const res = await apiFetch(
+        `/projects/${projectId}/files?path=${encodeURIComponent(path)}`,
         { method: "DELETE" },
       );
       if (res.ok) {
@@ -189,9 +187,8 @@ export function FilesSidePanel({ projectId, onFileClick }: FilesSidePanelProps) 
 
   const handleRename = useCallback(
     async (oldPath: string, newName: string) => {
-      const res = await fetch(`${API_URL}/projects/${projectId}/files`, {
+      const res = await apiFetch(`/projects/${projectId}/files`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ old_path: oldPath, new_name: newName }),
       });
       if (res.ok) {

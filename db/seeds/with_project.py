@@ -52,12 +52,12 @@ async def seed():
         bob_id = uuid.uuid4()
 
         await conn.execute(
-            "INSERT INTO users (id, display_name, created_at) VALUES ($1, $2, $3)",
-            alice_id, "Alice", now,
+            "INSERT INTO users (id, display_name, email, created_at) VALUES ($1, $2, $3, $4)",
+            alice_id, "Alice", "alice@example.com", now,
         )
         await conn.execute(
-            "INSERT INTO users (id, display_name, created_at) VALUES ($1, $2, $3)",
-            bob_id, "Bob", now,
+            "INSERT INTO users (id, display_name, email, created_at) VALUES ($1, $2, $3, $4)",
+            bob_id, "Bob", "bob@example.com", now,
         )
         print("Inserted 2 users (Alice, Bob)")
 

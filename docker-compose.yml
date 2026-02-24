@@ -22,6 +22,10 @@ services:
       - LOG_FORMAT=${LOG_FORMAT:-text}
       - AI_SERVICE_URL=${AI_SERVICE_URL:-http://ai-service:8001}
       - TEAM_AGENT_ENV=${TEAM_AGENT_ENV:-dev}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:8000/auth/callback}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
     volumes:
       - ./db:/app/db
       - project_data:/data/projects

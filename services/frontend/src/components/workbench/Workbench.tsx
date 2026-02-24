@@ -13,10 +13,10 @@ import { ChatTab } from "./ChatTab";
 import { FileTab } from "./FileTab";
 import { MemberProfileTab } from "./MemberProfileTab";
 import { AddMemberModal } from "@/components/members/AddMemberModal";
+import { useAuth } from "@/hooks/useAuth";
+import { apiFetch } from "@/lib/api";
 import type { Member, Project, Room } from "@/types";
 import styles from "./Workbench.module.css";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type Panel = "chat" | "files" | "members";
 
@@ -39,6 +39,7 @@ const components: Record<string, React.FunctionComponent<IDockviewPanelProps<any
 };
 
 export function Workbench({ projectId }: WorkbenchProps) {
+  const { user: authUser } = useAuth();
   const [activePanel, setActivePanel] = useState<Panel>("chat");
   const [rooms, setRooms] = useState<Room[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -51,12 +52,12 @@ export function Workbench({ projectId }: WorkbenchProps) {
   const isLocked = project?.is_locked ?? false;
 
   useEffect(() => {
-    fetch(`${API_URL}/projects/${projectId}`).then((r) => r.json()).then(setProject);
-    fetch(`${API_URL}/projects/${projectId}/rooms`).then((r) => r.json()).then(setRooms);
-    fetch(`${API_URL}/projects/${projectId}/members`).then((r) => r.json()).then(setMembers);
+    apiFetch(`/projects/${projectId}`).then((r) => r.json()).then(setProject).catch(() => {});
+    apiFetch(`/projects/${projectId}/rooms`).then((r) => r.json()).then(setRooms).catch(() => {});
+    apiFetch(`/projects/${projectId}/members`).then((r) => r.json()).then(setMembers).catch(() => {});
 
     // Check manifest on project entry
-    fetch(`${API_URL}/projects/${projectId}/check-manifest`, { method: "POST" })
+    apiFetch(`/projects/${projectId}/check-manifest`, { method: "POST" })
       .then((r) => r.json())
       .then((data) => {
         if (data.is_locked) {
@@ -67,12 +68,11 @@ export function Workbench({ projectId }: WorkbenchProps) {
   }, [projectId]);
 
   useEffect(() => {
-    const userId = typeof window !== "undefined" ? localStorage.getItem("user_id") : null;
-    if (userId && members.length > 0) {
-      const match = members.find((m) => m.user_id === userId);
+    if (authUser && members.length > 0) {
+      const match = members.find((m) => m.user_id === authUser.id);
       if (match) setMemberId(match.id);
     }
-  }, [members]);
+  }, [members, authUser]);
 
   const currentMember = members.find((m) => m.id === memberId) ?? null;
 
@@ -128,9 +128,8 @@ export function Workbench({ projectId }: WorkbenchProps) {
 
   const handleCreateRoom = useCallback(
     async (name: string) => {
-      const res = await fetch(`${API_URL}/projects/${projectId}/rooms`, {
+      const res = await apiFetch(`/projects/${projectId}/rooms`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
       const room: Room = await res.json();
@@ -141,9 +140,8 @@ export function Workbench({ projectId }: WorkbenchProps) {
 
   const handleRenameRoom = useCallback(
     async (roomId: string, newName: string) => {
-      const res = await fetch(`${API_URL}/projects/${projectId}/rooms/${roomId}`, {
+      const res = await apiFetch(`/projects/${projectId}/rooms/${roomId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newName }),
       });
       const updated: Room = await res.json();

@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { IDockviewPanelProps } from "dockview";
+import { apiFetch } from "@/lib/api";
 import { MemberProfile } from "@/components/members/MemberProfile";
 import { MemberProfileEditor } from "@/components/members/MemberProfileEditor";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type Params = {
   projectId: string;
@@ -19,16 +18,15 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
   const [editing, setEditing] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/projects/${projectId}/members/${memberId}/profile`)
+    apiFetch(`/projects/${projectId}/members/${memberId}/profile`)
       .then((r) => r.json())
       .then((data) => setContent(data.content ?? ""));
   }, [projectId, memberId]);
 
   const handleSave = useCallback(
     async (draft: string) => {
-      await fetch(`${API_URL}/projects/${projectId}/members/${memberId}/profile`, {
+      await apiFetch(`/projects/${projectId}/members/${memberId}/profile`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: draft }),
       });
       setContent(draft);

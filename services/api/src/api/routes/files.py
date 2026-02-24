@@ -6,10 +6,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from ..database import async_session
-from ..guards import get_unlocked_project
+from ..guards import get_current_user, get_unlocked_project
 from ..models.project import Project
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 async def _get_clone_path(project_id: uuid.UUID) -> Path:

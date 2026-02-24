@@ -2,9 +2,8 @@
 
 import { useCallback, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { apiFetch } from "@/lib/api";
 import styles from "./CreateProjectModal.module.css";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type CreateProjectModalProps = {
   open: boolean;
@@ -21,23 +20,15 @@ export function CreateProjectModal({ open, onClose, onCreated }: CreateProjectMo
   const handleSubmit = useCallback(async () => {
     if (!name.trim() || !gitRepoUrl.trim()) return;
 
-    const userId = localStorage.getItem("user_id");
-    if (!userId) {
-      setError("Please select a user first");
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
-      const res = await fetch(`${API_URL}/projects`, {
+      const res = await apiFetch("/projects", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
           git_repo_url: gitRepoUrl.trim(),
-          creator_user_id: userId,
         }),
       });
 

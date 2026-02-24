@@ -3,46 +3,33 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
+import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
+import { apiFetch } from "@/lib/api";
 import { CreateProjectModal } from "@/components/project/CreateProjectModal";
-import type { Project, User } from "@/types";
+import type { Project } from "@/types";
 import styles from "./page.module.css";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function LandingPage() {
   const router = useRouter();
   const { theme, toggle } = useTheme();
+  const { user, isLoading, devUsers, login, devLogin, logout } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [showUserPicker, setShowUserPicker] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/projects`).then((r) => r.json()).then(setProjects);
-    fetch(`${API_URL}/users`).then((r) => r.json()).then(setUsers);
-    const stored = localStorage.getItem("user_id");
-    if (stored) setSelectedUserId(stored);
-  }, []);
-
-  const currentUser = users.find((u) => u.id === selectedUserId);
-
-  const selectUser = useCallback((id: string) => {
-    setSelectedUserId(id);
-    localStorage.setItem("user_id", id);
-    setShowUserPicker(false);
-  }, []);
+    if (!user) return;
+    apiFetch("/projects")
+      .then((r) => r.json())
+      .then(setProjects)
+      .catch(() => {});
+  }, [user]);
 
   const openProject = useCallback(
     (projectId: string) => {
-      if (!selectedUserId) {
-        setShowUserPicker(true);
-        return;
-      }
       router.push(`/project/${projectId}`);
     },
-    [selectedUserId, router],
+    [router],
   );
 
   const handleProjectCreated = useCallback(
@@ -56,10 +43,10 @@ export default function LandingPage() {
     async (e: React.MouseEvent, projectId: string) => {
       e.stopPropagation();
       try {
-        await fetch(`${API_URL}/projects/${projectId}/check-manifest`, {
+        await apiFetch(`/projects/${projectId}/check-manifest`, {
           method: "POST",
         });
-        const res = await fetch(`${API_URL}/projects`);
+        const res = await apiFetch("/projects");
         setProjects(await res.json());
       } catch {
         // Silently fail — user can retry
@@ -68,6 +55,51 @@ export default function LandingPage() {
     [],
   );
 
+  if (isLoading) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.loadingState}>Loading...</div>
+      </div>
+    );
+  }
+
+  // Not authenticated — show login
+  if (!user) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.loginContainer}>
+          <div className={styles.logoMark}>ta</div>
+          <h1 className={styles.loginTitle}>Team Agent</h1>
+
+          <button className={styles.googleBtn} onClick={login}>
+            Sign in with Google
+          </button>
+
+          {devUsers && devUsers.length > 0 && (
+            <div className={styles.devSection}>
+              <div className={styles.devDivider}>
+                <span>Dev login</span>
+              </div>
+              <div className={styles.devUserList}>
+                {devUsers.map((u) => (
+                  <button
+                    key={u.id}
+                    className={styles.devUserBtn}
+                    onClick={() => devLogin(u.id)}
+                  >
+                    <div className={styles.avatar}>{u.display_name[0]}</div>
+                    <span>{u.display_name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Authenticated — show projects
   return (
     <div className={styles.page}>
       <header className={styles.topBar}>
@@ -81,36 +113,20 @@ export default function LandingPage() {
             {theme === "light" ? "\u263D" : "\u2600"}
           </button>
 
-          <div className={styles.userPickerWrapper}>
-            <button
-              className={styles.userSelector}
-              onClick={() => setShowUserPicker(!showUserPicker)}
-            >
-              {currentUser ? (
-                <>
-                  <div className={styles.avatar}>{currentUser.display_name[0]}</div>
-                  <span className={styles.userName}>{currentUser.display_name}</span>
-                </>
-              ) : (
-                <span className={styles.userName}>Select user</span>
-              )}
-              <span className={styles.chevron}>{showUserPicker ? "\u25B2" : "\u25BC"}</span>
-            </button>
-
-            {showUserPicker && (
-              <div className={styles.userDropdown}>
-                {users.map((user) => (
-                  <button
-                    key={user.id}
-                    className={clsx(styles.userOption, user.id === selectedUserId && styles.userOptionActive)}
-                    onClick={() => selectUser(user.id)}
-                  >
-                    <div className={styles.avatar}>{user.display_name[0]}</div>
-                    <span>{user.display_name}</span>
-                  </button>
-                ))}
-              </div>
+          <div className={styles.userInfo}>
+            {user.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt={user.display_name}
+                className={styles.avatarImg}
+              />
+            ) : (
+              <div className={styles.avatar}>{user.display_name[0]}</div>
             )}
+            <span className={styles.userName}>{user.display_name}</span>
+            <button className={styles.logoutBtn} onClick={logout}>
+              Sign out
+            </button>
           </div>
         </div>
       </header>
@@ -120,13 +136,7 @@ export default function LandingPage() {
           <h2 className={styles.sectionTitle}>Projects</h2>
           <button
             className={styles.createBtn}
-            onClick={() => {
-              if (!selectedUserId) {
-                setShowUserPicker(true);
-                return;
-              }
-              setShowCreateModal(true);
-            }}
+            onClick={() => setShowCreateModal(true)}
           >
             + New Project
           </button>

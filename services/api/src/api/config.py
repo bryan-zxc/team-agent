@@ -11,6 +11,19 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_format: str = "text"
 
+    # OAuth
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/auth/callback"
+
+    # Auth
+    session_max_age_days: int = 7
+    frontend_url: str = "http://localhost:3000"
+
+    @property
+    def cookie_secure(self) -> bool:
+        return self.team_agent_env == "prod"
+
 
 settings = Settings()
 

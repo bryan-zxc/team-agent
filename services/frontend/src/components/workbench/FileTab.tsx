@@ -4,10 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
 import { useTheme } from "@/hooks/useTheme";
 import { getLanguage } from "@/lib/fileIcons";
+import { apiFetch } from "@/lib/api";
 import type { IDockviewPanelProps } from "dockview";
 import styles from "./FileTab.module.css";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type FileTabParams = {
   filePath: string;
@@ -66,7 +65,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   );
 
   useEffect(() => {
-    fetch(`${API_URL}/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`)
+    apiFetch(`/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`)
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load file");
         return r.json();
@@ -87,11 +86,10 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      const res = await fetch(
-        `${API_URL}/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`,
+      const res = await apiFetch(
+        `/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: editContent }),
         },
       );

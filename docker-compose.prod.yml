@@ -28,6 +28,10 @@ services:
       - LOG_FORMAT=${LOG_FORMAT:-json}
       - AI_SERVICE_URL=${AI_SERVICE_URL:-http://ai-service:8001}
       - TEAM_AGENT_ENV=prod
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      - FRONTEND_URL=${FRONTEND_URL}
     volumes: !override
       - project_data:/data/projects
     restart: unless-stopped
