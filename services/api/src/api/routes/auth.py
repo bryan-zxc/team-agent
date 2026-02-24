@@ -3,6 +3,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import httpx
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -20,6 +21,18 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
 
 GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
+_google_metadata: dict | None = None
+
+
+async def _get_google_metadata() -> dict:
+    """Fetch and cache the Google OpenID Connect discovery document."""
+    global _google_metadata
+    if _google_metadata is None:
+        async with httpx.AsyncClient() as http:
+            resp = await http.get(GOOGLE_DISCOVERY_URL)
+            resp.raise_for_status()
+            _google_metadata = resp.json()
+    return _google_metadata
 
 
 def _set_session_cookie(response, session_id: str) -> None:
@@ -64,7 +77,7 @@ async def login():
         redirect_uri=settings.google_redirect_uri,
         scope="openid email profile",
     )
-    metadata = await client.fetch_server_metadata(GOOGLE_DISCOVERY_URL)
+    metadata = await _get_google_metadata()
     uri, state = client.create_authorization_url(metadata["authorization_endpoint"])
 
     response = RedirectResponse(url=uri)
@@ -92,7 +105,7 @@ async def callback(request: Request):
         redirect_uri=settings.google_redirect_uri,
         state=stored_state,
     )
-    metadata = await client.fetch_server_metadata(GOOGLE_DISCOVERY_URL)
+    metadata = await _get_google_metadata()
     token = await client.fetch_token(
         metadata["token_endpoint"],
         authorization_response=str(request.url),
