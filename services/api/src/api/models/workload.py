@@ -20,7 +20,7 @@ class Workload(UUIDPrimaryKey, TimestampMixin, Base):
     )
     title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[str] = mapped_column(String, nullable=False, default="assigned")
+    status: Mapped[str] = mapped_column(String, nullable=False, default="assigned", server_default="assigned")
     worktree_branch: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     session_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(

@@ -36,6 +36,11 @@ team-agent/
 │   │
 │   ├── api/                            # FastAPI (Python)
 │   │   ├── Dockerfile
+│   │   ├── alembic.ini                 # Alembic migration configuration
+│   │   ├── alembic/                    # Database migration scripts
+│   │   │   ├── env.py                  # Async migration runner
+│   │   │   ├── script.py.mako          # Migration file template
+│   │   │   └── versions/               # Migration version files
 │   │   ├── src/
 │   │   │   └── api/
 │   │   │       ├── main.py             # FastAPI app entry point
@@ -76,7 +81,6 @@ team-agent/
 │   │   ├── base.py                     # Shared schema + connection helper
 │   │   ├── clean.py                    # Users only (project creation testing)
 │   │   └── with_project.py             # Full project with git clone + Zimomo
-│   └── migrations/                     # Database migrations (shared schema for api + ai)
 │
 ├── scripts/
 │   └── setup-external-repos.sh
@@ -93,7 +97,7 @@ team-agent/
 | `services/frontend/` | TypeScript | `frontend` | Chat UI served to browsers |
 | `services/api/` | Python | `api` | REST API + WebSocket server |
 | `services/ai/` | Python | `ai-service` | Listener + ephemeral agent runners |
-| `db/` | SQL | — | Shared database migrations |
+| `db/` | SQL | — | Seed scripts for test data |
 
 ## Key Locations
 
@@ -110,7 +114,7 @@ team-agent/
 | Persona definitions and loading | `services/ai/src/ai/personas/` |
 | Agent memory skills | `services/ai/src/ai/skills/` |
 | Database seed scenarios | `db/seeds/` |
-| Database migrations | `db/migrations/` |
+| Database migrations | `services/api/alembic/versions/` |
 | Docker orchestration | `docker-compose.yml` |
 | Landing page (projects + user picker) | `services/frontend/src/app/page.tsx` |
 | Project dashboard | `services/frontend/src/app/project/[projectId]/page.tsx` |

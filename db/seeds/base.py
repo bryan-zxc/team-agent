@@ -1,9 +1,10 @@
 """Shared schema and utilities for seed scripts.
 
-Provides DROP/CREATE SQL and a database connection helper.
-All seed scenarios import from this module.
+Provides a database reset helper and connection function.
+Schema is managed by Alembic migrations in services/api/.
 """
 
+import asyncio
 import os
 
 import asyncpg
@@ -16,6 +17,7 @@ DATABASE_URL = os.environ.get(
 DSN = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
 
 DROP_TABLES = """
+DROP TABLE IF EXISTS alembic_version CASCADE;
 DROP TABLE IF EXISTS llm_usage CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS workloads CASCADE;
@@ -26,101 +28,22 @@ DROP TABLE IF EXISTS projects CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 """
 
-CREATE_TABLES = """
-CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY,
-    display_name TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS projects (
-    id UUID PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
-    git_repo_url TEXT UNIQUE,
-    clone_path TEXT,
-    is_locked BOOLEAN NOT NULL DEFAULT FALSE,
-    lock_reason TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS project_members (
-    id UUID PRIMARY KEY,
-    project_id UUID NOT NULL REFERENCES projects(id),
-    user_id UUID REFERENCES users(id),
-    display_name TEXT NOT NULL,
-    type TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (project_id, display_name)
-);
-
-CREATE TABLE IF NOT EXISTS rooms (
-    id UUID PRIMARY KEY,
-    project_id UUID NOT NULL REFERENCES projects(id),
-    name TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS chats (
-    id UUID PRIMARY KEY,
-    room_id UUID NOT NULL REFERENCES rooms(id),
-    type TEXT NOT NULL,
-    title TEXT,
-    owner_id UUID REFERENCES project_members(id),
-    workload_id UUID,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS workloads (
-    id UUID PRIMARY KEY,
-    main_chat_id UUID NOT NULL REFERENCES chats(id),
-    member_id UUID NOT NULL REFERENCES project_members(id),
-    title TEXT NOT NULL,
-    description TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'assigned',
-    worktree_branch TEXT,
-    session_id TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-ALTER TABLE chats ADD CONSTRAINT fk_chats_workload_id
-    FOREIGN KEY (workload_id) REFERENCES workloads(id);
-
-CREATE TABLE IF NOT EXISTS messages (
-    id UUID PRIMARY KEY,
-    chat_id UUID NOT NULL REFERENCES chats(id),
-    member_id UUID NOT NULL REFERENCES project_members(id),
-    content TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS ix_messages_created_at ON messages(created_at);
-
-CREATE TABLE IF NOT EXISTS llm_usage (
-    id UUID PRIMARY KEY,
-    model TEXT NOT NULL,
-    provider TEXT NOT NULL,
-    input_tokens INTEGER,
-    output_tokens INTEGER,
-    cost FLOAT NOT NULL,
-    request_type TEXT NOT NULL,
-    caller TEXT NOT NULL,
-    session_id TEXT,
-    num_turns INTEGER,
-    duration_ms INTEGER,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS ix_llm_usage_caller_created_at ON llm_usage(caller, created_at);
-"""
-
 
 async def reset_schema(conn: asyncpg.Connection) -> None:
-    """Drop and recreate all tables."""
+    """Drop all tables then recreate via Alembic migrations."""
     await conn.execute(DROP_TABLES)
     print("Dropped existing tables")
-    await conn.execute(CREATE_TABLES)
-    print("Created tables")
+
+    proc = await asyncio.create_subprocess_exec(
+        "uv", "run", "alembic", "upgrade", "head",
+        cwd="/app",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(f"Alembic upgrade failed: {stderr.decode()}")
+    print(f"Created tables via Alembic: {stdout.decode().strip()}")
 
 
 async def connect() -> asyncpg.Connection:

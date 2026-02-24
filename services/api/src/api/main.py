@@ -11,6 +11,7 @@ from sqlalchemy import text
 
 from .config import settings, setup_logging
 from .database import async_session, engine
+from .models.llm_usage import LLMUsage
 from .models.message import Message
 from .routes.files import router as files_router
 from .routes.members import router as members_router
@@ -87,13 +88,67 @@ async def _listen_for_ai_responses():
         await sub_client.aclose()
 
 
+async def _run_migrations() -> None:
+    """Run Alembic migrations on startup."""
+    logger.info("Running database migrations...")
+    proc = await asyncio.create_subprocess_exec(
+        "uv", "run", "alembic", "upgrade", "head",
+        cwd="/app",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        logger.error("Migration failed: %s", stderr.decode())
+        raise RuntimeError(f"Database migration failed: {stderr.decode()}")
+    logger.info("Migrations applied: %s", stdout.decode().strip())
+
+
+async def _listen_for_cost_tracking():
+    """Subscribe to cost:usage and persist LLM cost records."""
+    sub_client = aioredis.from_url(settings.redis_url)
+    pubsub = sub_client.pubsub()
+    await pubsub.subscribe("cost:usage")
+    logger.info("Subscribed to cost:usage")
+
+    try:
+        async for raw in pubsub.listen():
+            if raw["type"] != "message":
+                continue
+            data = json.loads(raw["data"])
+
+            record = LLMUsage(
+                model=data["model"],
+                provider=data["provider"],
+                input_tokens=data.get("input_tokens"),
+                output_tokens=data.get("output_tokens"),
+                cost=data["cost"],
+                request_type=data["request_type"],
+                caller=data["caller"],
+                session_id=data.get("session_id"),
+                num_turns=data.get("num_turns"),
+                duration_ms=data.get("duration_ms"),
+            )
+            async with async_session() as session:
+                session.add(record)
+                await session.commit()
+    except asyncio.CancelledError:
+        pass
+    finally:
+        await pubsub.unsubscribe("cost:usage")
+        await sub_client.aclose()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await _run_migrations()
     ai_task = asyncio.create_task(_listen_for_ai_responses())
     status_task = asyncio.create_task(_listen_for_workload_status())
+    cost_task = asyncio.create_task(_listen_for_cost_tracking())
     yield
     ai_task.cancel()
     status_task.cancel()
+    cost_task.cancel()
     await engine.dispose()
     await redis_client.aclose()
 

@@ -1,24 +1,15 @@
-import uuid
-from datetime import datetime, timezone
+from sqlalchemy import Float, Index, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
 
-from sqlalchemy import DateTime, Float, Index, Integer, String
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from .base import Base, UUIDPrimaryKey, TimestampMixin
 
 
-class Base(DeclarativeBase):
-    pass
-
-
-class LLMUsage(Base):
+class LLMUsage(UUIDPrimaryKey, TimestampMixin, Base):
     __tablename__ = "llm_usage"
     __table_args__ = (
         Index("ix_llm_usage_caller_created_at", "caller", "created_at"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
     model: Mapped[str] = mapped_column(String, nullable=False)
     provider: Mapped[str] = mapped_column(String, nullable=False)
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -29,6 +20,3 @@ class LLMUsage(Base):
     session_id: Mapped[str | None] = mapped_column(String, nullable=True)
     num_turns: Mapped[int | None] = mapped_column(Integer, nullable=True)
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
-    )

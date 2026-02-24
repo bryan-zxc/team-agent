@@ -1,18 +1,20 @@
 """Cost tracking module for the AI service."""
 
-from .models import Base, LLMUsage
 from .tracker import CostTracker
 
-__all__ = ["Base", "CostTracker", "LLMUsage"]
+__all__ = ["CostTracker"]
 
 _cost_tracker: CostTracker | None = None
 
 
+def init_cost_tracker(redis_client) -> None:
+    """Initialise the singleton CostTracker with a Redis client."""
+    global _cost_tracker
+    _cost_tracker = CostTracker(redis_client)
+
+
 def get_cost_tracker() -> CostTracker:
     """Get the singleton CostTracker instance."""
-    global _cost_tracker
     if _cost_tracker is None:
-        from ..database import async_session
-
-        _cost_tracker = CostTracker(async_session)
+        raise RuntimeError("CostTracker not initialised — call init_cost_tracker() first")
     return _cost_tracker

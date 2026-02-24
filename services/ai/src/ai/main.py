@@ -9,8 +9,7 @@ from pydantic import BaseModel
 
 from .agents import generate_agent_profile
 from .config import settings, setup_logging
-from .cost.models import Base
-from .database import engine
+from .cost import init_cost_tracker
 from .listener import listen, listen_tool_approvals, listen_workload_messages
 from .workload import shutdown_all_sessions, stop_workload_session
 
@@ -26,11 +25,6 @@ class GenerateAgentRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create cost tracking table if it doesn't exist
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables verified")
-
     client = aioredis.from_url(settings.redis_url)
 
     try:
@@ -41,6 +35,7 @@ async def lifespan(app: FastAPI):
         raise
 
     app.state.redis = client
+    init_cost_tracker(client)
 
     listener_task = asyncio.create_task(listen(client))
     workload_listener_task = asyncio.create_task(listen_workload_messages(client))
@@ -53,7 +48,6 @@ async def lifespan(app: FastAPI):
     workload_listener_task.cancel()
     tool_approval_task.cancel()
     await client.aclose()
-    await engine.dispose()
     logger.info("AI service shut down")
 
 
