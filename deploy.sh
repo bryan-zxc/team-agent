@@ -47,23 +47,13 @@ if [[ -z "$SITE_ADDRESS" ]]; then
     exit 1
 fi
 
-# ---------- Docker credential workaround ----------
-# Docker Desktop's credential helper requires keychain access, which fails in
-# non-interactive SSH sessions. Copy the real Docker config but strip the
-# credential store so base image pulls work without the keychain.
-if [[ -z "${DOCKER_CONFIG:-}" && ! -t 0 ]]; then
-    export DOCKER_CONFIG="$SCRIPT_DIR/.docker-ci"
-    mkdir -p "$DOCKER_CONFIG"
-    cp -r ~/.docker/* "$DOCKER_CONFIG/" 2>/dev/null || true
-    if command -v python3 &>/dev/null; then
-        python3 -c "
-import json, pathlib
-p = pathlib.Path('$DOCKER_CONFIG/config.json')
-c = json.loads(p.read_text()) if p.exists() else {}
-c.pop('credsStore', None)
-p.write_text(json.dumps(c))
-"
-    fi
+# ---------- Keychain unlock for non-interactive sessions ----------
+# Docker Desktop's credential helper needs macOS keychain access, which is
+# locked in non-interactive SSH sessions. If KEYCHAIN_PASSWORD is set, unlock
+# the login keychain so Docker can pull base images.
+if [[ ! -t 0 ]] && [[ -n "${KEYCHAIN_PASSWORD:-}" ]]; then
+    echo "==> Unlocking keychain for Docker credential access..."
+    security unlock-keychain -p "$KEYCHAIN_PASSWORD" ~/Library/Keychains/login.keychain-db
 fi
 
 echo "==> Deploying for $SITE_ADDRESS"
