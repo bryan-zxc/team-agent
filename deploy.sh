@@ -47,6 +47,15 @@ if [[ -z "$SITE_ADDRESS" ]]; then
     exit 1
 fi
 
+# ---------- Docker credential workaround ----------
+# Docker Desktop's credential helper requires keychain access, which fails in
+# non-interactive SSH sessions. Use a clean DOCKER_CONFIG to bypass it.
+if [[ -z "$DOCKER_CONFIG" && ! -t 0 ]]; then
+    export DOCKER_CONFIG="$SCRIPT_DIR/.docker-ci"
+    mkdir -p "$DOCKER_CONFIG"
+    echo '{"currentContext":"desktop-linux"}' > "$DOCKER_CONFIG/config.json"
+fi
+
 echo "==> Deploying for $SITE_ADDRESS"
 
 # ---------- Provision TLS certificates ----------
