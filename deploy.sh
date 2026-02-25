@@ -6,14 +6,16 @@ cd "$SCRIPT_DIR"
 
 # ---------- Defaults ----------
 BUILD=false
+SKIP_CERTS=false
 ENV_FILE=".env.prod"
 
 # ---------- Usage ----------
 usage() {
-    echo "Usage: $0 [--build] [--env-file FILE]"
+    echo "Usage: $0 [--build] [--skip-certs] [--env-file FILE]"
     echo
     echo "Options:"
     echo "  --build       Build images locally instead of pulling from GHCR"
+    echo "  --skip-certs  Skip TLS certificate provisioning (certs already exist)"
     echo "  --env-file    Path to env file (default: .env.prod)"
     echo "  --help        Show this help message"
     exit 0
@@ -23,6 +25,7 @@ usage() {
 while [[ $# -gt 0 ]]; do
     case $1 in
         --build) BUILD=true; shift ;;
+        --skip-certs) SKIP_CERTS=true; shift ;;
         --env-file) ENV_FILE="$2"; shift 2 ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;

@@ -1,0 +1,131 @@
+# CI/CD pipeline for team-agent
+#
+# Triggered on push to main (typically via the /release skill which merges
+# develop into main and tags a version).
+#
+# Job 1 (build-and-push): Builds Docker images for all 3 services on a
+# GitHub-hosted runner, pushes to GitHub Container Registry (GHCR).
+# Images are built for both amd64 and arm64 (Mac Mini is Apple Silicon).
+#
+# Job 2 (deploy): Joins the Tailscale network ephemerally, SSHes into the
+# Mac Mini, pulls the new images, and runs deploy.sh.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/bryan-zxc/team-agent
+
+# contents:read  — checkout code
+# packages:write — push images to GHCR
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # ── Job 1: Build and push Docker images ──────────────────────────
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: frontend
+            context: services/frontend
+            target: production
+          - service: api
+            context: services/api
+            target: ""
+          - service: ai-service
+            context: services/ai
+            target: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      # QEMU lets Docker build ARM64 images on an AMD64 runner
+      - uses: docker/setup-qemu-action@v3
+
+      # Buildx is the modern Docker build engine with multi-platform support
+      - uses: docker/setup-buildx-action@v3
+
+      # GHCR authentication — uses the built-in GITHUB_TOKEN (no extra secret)
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Compute image tags: sha-<short>, latest, and version tag if present
+      - name: Generate image tags
+        id: tags
+        run: |
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          TAGS="${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:sha-${SHORT_SHA}"
+          TAGS="${TAGS},${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest"
+
+          # If a version tag (v1.2.3) points at this commit, include it
+          VERSION_TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.' | head -1 || true)
+          if [[ -n "$VERSION_TAG" ]]; then
+            TAGS="${TAGS},${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${VERSION_TAG}"
+          fi
+
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target || '' }}
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Job 2: Deploy to Mac Mini via Tailscale SSH ──────────────────
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      # Join the Tailscale network so we can reach the Mac Mini.
+      # The OAuth client creates an ephemeral node tagged "ci" that is
+      # automatically removed when the workflow ends.
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_CLIENT_SECRET }}
+          tags: tag:ci
+
+      - name: Deploy via SSH
+        env:
+          SSH_KEY: ${{ secrets.MAC_MINI_SSH_KEY }}
+          SSH_USER: ${{ secrets.MAC_MINI_USER }}
+          SSH_HOST: bryans-mac-mini.tail22e956.ts.net
+          TAG: sha-${{ github.sha }}
+        run: |
+          # Truncate TAG to short SHA (first 7 chars of the commit hash)
+          TAG="sha-${GITHUB_SHA:0:7}"
+
+          # Set up SSH key
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # Accept the host key on first connection
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # SSH into the Mac Mini and deploy
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+            "${SSH_USER}@${SSH_HOST}" \
+            "cd ~/team-agent && git pull && TAG=${TAG} ./deploy.sh --skip-certs"
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
