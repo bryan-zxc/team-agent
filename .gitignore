@@ -218,6 +218,9 @@ node_modules/
 # Playwright CLI
 .playwright-cli/
 
+# HTML mockups (temporary design previews)
+.mockups/
+
 # TLS certificates (provisioned by Tailscale)
 certs/
 
