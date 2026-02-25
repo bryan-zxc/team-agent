@@ -10,10 +10,13 @@ type ContentBlock =
   | { type: "text"; value: string }
   | { type: "mention"; member_id: string; display_name: string };
 
+export type TypingEvent = { member_id: string; display_name: string };
+
 export function useWebSocket(
   chatId: string | null,
   memberId: string | null,
   onRoomEvent?: (event: Record<string, unknown>) => void,
+  onTypingEvent?: (event: TypingEvent) => void,
 ) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -21,6 +24,8 @@ export function useWebSocket(
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const roomEventRef = useRef(onRoomEvent);
   roomEventRef.current = onRoomEvent;
+  const typingEventRef = useRef(onTypingEvent);
+  typingEventRef.current = onTypingEvent;
 
   const connect = useCallback(() => {
     if (!chatId || !memberId) return;
@@ -32,6 +37,12 @@ export function useWebSocket(
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+
+      // Typing events — ephemeral, handled separately
+      if (data._event === "typing") {
+        typingEventRef.current?.(data as TypingEvent);
+        return;
+      }
 
       // Room-level events (e.g. workload status) have an _event marker
       if (data._event) {
@@ -71,5 +82,11 @@ export function useWebSocket(
     [],
   );
 
-  return { messages, sendMessage, isConnected, setMessages };
+  const sendTyping = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ _event: "typing" }));
+    }
+  }, []);
+
+  return { messages, sendMessage, sendTyping, isConnected, setMessages };
 }

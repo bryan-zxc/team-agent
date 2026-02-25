@@ -34,6 +34,12 @@ async def _notify_ai_if_mentioned(mentions: list[str], chat_id: str):
                 continue
 
             if member and member.type in ("ai", "coordinator"):
+                # Typing indicator so users see immediate feedback
+                await manager.broadcast(uuid.UUID(chat_id), {
+                    "_event": "typing",
+                    "member_id": mid,
+                    "display_name": member.display_name,
+                })
                 await _get_redis().publish(
                     "ai:respond", json.dumps({"chat_id": chat_id})
                 )
@@ -92,6 +98,15 @@ async def websocket_endpoint(
     try:
         while True:
             data = await websocket.receive_json()
+
+            # Typing indicator — ephemeral, no persistence
+            if data.get("_event") == "typing":
+                await manager.broadcast_except(chat_id, {
+                    "_event": "typing",
+                    "member_id": str(member_id),
+                    "display_name": display_name,
+                }, exclude=websocket)
+                continue
 
             # Check project lockdown before processing each message
             if project_id:

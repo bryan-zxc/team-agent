@@ -23,6 +23,11 @@ class ConnectionManager:
         for ws in self._connections.get(chat_id, []):
             await ws.send_json(data)
 
+    async def broadcast_except(self, chat_id: uuid.UUID, data: dict, exclude: WebSocket):
+        for ws in self._connections.get(chat_id, []):
+            if ws is not exclude:
+                await ws.send_json(data)
+
     def connect_room(self, room_id: uuid.UUID, websocket: WebSocket):
         if room_id not in self._room_connections:
             self._room_connections[room_id] = []

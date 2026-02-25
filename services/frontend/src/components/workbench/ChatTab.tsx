@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { AnimatePresence } from "motion/react";
-import { useWebSocket } from "@/hooks/useWebSocket";
+import { useWebSocket, type TypingEvent } from "@/hooks/useWebSocket";
 import type { IDockviewPanelProps } from "dockview";
 import type { Member, Message, Room, ToolApprovalBlock, WorkloadChat, WorkloadStatusEvent } from "@/types";
 import { apiFetch } from "@/lib/api";
@@ -63,6 +63,13 @@ function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}...` : text;
 }
 
+function formatTypingText(members: Map<string, { display_name: string }>): string {
+  const names = Array.from(members.values()).map((m) => m.display_name);
+  if (names.length === 1) return `${names[0]} is typing...`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} are typing...`;
+  return `${names[0]} and ${names.length - 1} others are typing...`;
+}
+
 function getToolApprovalBlock(content: string): ToolApprovalBlock | null {
   try {
     const data = JSON.parse(content);
@@ -105,12 +112,38 @@ function ChatView({
   const [mentionState, setMentionState] = useState<{ query: string; startPos: number } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [typingMembers, setTypingMembers] = useState<
+    Map<string, { display_name: string; timeout: ReturnType<typeof setTimeout> }>
+  >(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevCountRef = useRef(0);
   const prevStatusRef = useRef(workloadStatus);
+  const lastTypingRef = useRef(0);
 
-  const { messages, sendMessage, setMessages } = useWebSocket(chatId, memberId, onRoomEvent);
+  const handleTypingEvent = useCallback((event: TypingEvent) => {
+    setTypingMembers((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(event.member_id);
+      if (existing) clearTimeout(existing.timeout);
+      const timeout = setTimeout(() => {
+        setTypingMembers((p) => {
+          const n = new Map(p);
+          n.delete(event.member_id);
+          return n;
+        });
+      }, 5000);
+      next.set(event.member_id, { display_name: event.display_name, timeout });
+      return next;
+    });
+  }, []);
+
+  const { messages, sendMessage, sendTyping, setMessages } = useWebSocket(
+    chatId,
+    memberId,
+    onRoomEvent,
+    handleTypingEvent,
+  );
 
   useEffect(() => {
     if (!chatId) return;
@@ -124,11 +157,20 @@ function ChatView({
   }, [messages]);
 
   useEffect(() => {
-    if (messages.length > prevCountRef.current && onAiMessage) {
+    if (messages.length > prevCountRef.current) {
       const latest = messages[messages.length - 1];
-      if (latest.type !== "human") {
+      if (latest.type !== "human" && onAiMessage) {
         onAiMessage();
       }
+      // Clear typing indicator when a message arrives from that member
+      setTypingMembers((prev) => {
+        if (!prev.has(latest.member_id)) return prev;
+        const next = new Map(prev);
+        const existing = next.get(latest.member_id);
+        if (existing) clearTimeout(existing.timeout);
+        next.delete(latest.member_id);
+        return next;
+      });
     }
     prevCountRef.current = messages.length;
   }, [messages, onAiMessage]);
@@ -165,6 +207,13 @@ function ChatView({
       const cursorPos = e.target.selectionStart;
       setInput(value);
 
+      // Throttled typing indicator — at most once per 3 seconds
+      const now = Date.now();
+      if (value.trim() && now - lastTypingRef.current > 3000) {
+        sendTyping();
+        lastTypingRef.current = now;
+      }
+
       // Scan backwards from cursor for an unmatched @
       const textBeforeCursor = value.slice(0, cursorPos);
       const atIndex = textBeforeCursor.lastIndexOf("@");
@@ -182,7 +231,7 @@ function ChatView({
       }
       setMentionState(null);
     },
-    [],
+    [sendTyping],
   );
 
   const handleMentionSelect = useCallback(
@@ -379,6 +428,17 @@ function ChatView({
         })}
         <div ref={messagesEndRef} />
       </div>
+
+      {typingMembers.size > 0 && (
+        <div className={styles.typingIndicator}>
+          <span className={styles.typingDots}>
+            <span />
+            <span />
+            <span />
+          </span>
+          <span>{formatTypingText(typingMembers)}</span>
+        </div>
+      )}
 
       {workloadStatus && !isRunning && (
         <div className={styles.statusBanner}>
