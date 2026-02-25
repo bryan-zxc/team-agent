@@ -56,3 +56,4 @@ Every ticket must be tested before completion.
 1. Commit and push to the current branch
 2. Update the ticket description to reflect what was delivered (use `/github-board`)
 3. Transition to **Done** and close the issue (use `/github-board`)
+4. Check if the ticket belongs to an epic — if all sibling sub-issues are now closed, close the epic and trigger a release with `/release`
