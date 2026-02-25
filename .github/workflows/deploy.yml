@@ -124,7 +124,7 @@ jobs:
           # SSH into the Mac Mini and deploy
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
             "${SSH_USER}@${SSH_HOST}" \
-            "cd ~/team-agent && git pull && TAG=${TAG} ./deploy.sh --skip-certs"
+            "cd ~/git/team-agent && git pull && TAG=${TAG} ./deploy.sh --skip-certs"
 
       - name: Clean up SSH key
         if: always()
