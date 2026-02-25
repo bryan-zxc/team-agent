@@ -47,9 +47,9 @@ Only after the user agrees with the approach (and mockup if applicable):
 
 Every ticket must be tested before completion.
 
-**Frontend changes:** Use `/fe-testing` seed setup, then validate with `/playwright-cli` — open the app, navigate to the feature, interact, take screenshots, and verify the expected behaviour.
+**Frontend changes:** Use `/fe-testing` for seed setup and Playwright validation — open the app, navigate to the feature, interact, take screenshots, and verify the expected behaviour.
 
-**Backend changes:** Run relevant backend tests. Unless the change is trivial, **also** do a frontend validation via `/playwright-cli` to confirm the backend change is reflected in the UI.
+**Backend changes:** Run relevant backend tests. Unless the change is trivial, **also** do a frontend validation via `/fe-testing` to confirm the backend change is reflected in the UI.
 
 ### 6. Complete
 

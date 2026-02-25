@@ -7,6 +7,16 @@ description: Frontend testing workflow for the Team Agent project. Use when veri
 
 For Playwright command reference, use `/playwright-cli`.
 
+## Headed mode
+
+Always run Playwright in headed mode so the user can watch the test in real time:
+
+```bash
+PLAYWRIGHT_MCP_SANDBOX=false playwright-cli open http://localhost:3000 --headed
+```
+
+Both `--headed` and `PLAYWRIGHT_MCP_SANDBOX=false` are required — without them the browser is invisible to the user.
+
 ## Seed Scenarios
 
 Seeds run inside Docker. Each drops all tables and rebuilds from scratch, but **does not** clean up cloned project files on disk. Always wipe `/data/projects/` before re-seeding to avoid stale directories from previous runs.
@@ -35,7 +45,7 @@ docker compose exec api .venv/bin/python db/seeds/with_project.py
 1. Services running: `docker compose up -d`
 2. Wipe stale project files: `docker compose exec api rm -rf /data/projects/*`
 3. Run the appropriate seed
-4. Open: `playwright-cli open http://localhost:3000`
+4. Open: `PLAYWRIGHT_MCP_SANDBOX=false playwright-cli open http://localhost:3000 --headed`
 
 Always wipe and re-seed before a test run — seeds are destructive (DROP + CREATE) but only clean the database, not the filesystem.
 
