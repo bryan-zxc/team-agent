@@ -222,5 +222,5 @@ certs/
 
 # External repositories (cloned for reference)
 # Keep the README but ignore all cloned repos
-external/*
-!external/README.md
+.external/*
+!.external/README.md

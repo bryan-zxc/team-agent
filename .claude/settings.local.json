@@ -1,13 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(./scripts/setup-external-repos.sh:*)",
       "Bash(git add:*)",
       "Bash(git push:*)",
       "WebSearch",
       "Bash(git -C /Users/bryanye/git/team-agent log:*)",
       "Bash(git -C /Users/bryanye/git/team-agent show:*)",
-      "Bash(git -C /Users/bryanye/git/team-agent/external/claude-agent-sdk-python log --oneline -5)",
+      "Bash(git -C /Users/bryanye/git/team-agent/.external/claude-agent-sdk-python log --oneline -5)",
       "Bash(find:*)",
       "Bash(gh project:*)",
       "Bash(gh api:*)",

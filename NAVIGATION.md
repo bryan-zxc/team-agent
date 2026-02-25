@@ -82,10 +82,7 @@ team-agent/
 │   │   ├── clean.py                    # Users only (project creation testing)
 │   │   └── with_project.py             # Full project with git clone + Zimomo
 │
-├── scripts/
-│   └── setup-external-repos.sh
-│
-└── external/
+└── .external/
     ├── README.md
     └── claude-agent-sdk-python/        # Vendored SDK (gitignored)
 ```
