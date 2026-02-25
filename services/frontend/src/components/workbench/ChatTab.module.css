@@ -160,6 +160,7 @@
 }
 
 .msgBody {
+  position: relative;
   flex: 1;
   min-width: 0;
 }
@@ -334,4 +335,152 @@
 @keyframes pulse {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 1; }
+}
+
+/* ── Mention highlighting ── */
+
+.mention {
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--accent-light);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+/* ── Reply button on hover ── */
+
+.replyBtn {
+  position: absolute;
+  top: 2px;
+  right: -4px;
+  opacity: 0;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.15s ease;
+}
+
+.messageGroup:hover .replyBtn {
+  opacity: 1;
+}
+
+.replyBtn:hover {
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+}
+
+.self .replyBtn {
+  right: auto;
+  left: -4px;
+}
+
+/* ── Reply reference on message ── */
+
+.replyRef {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  border: none;
+  border-left: 2px solid var(--accent);
+  padding: 2px 8px;
+  margin: 0 4px 4px;
+  color: var(--text-muted);
+  background: none;
+  border-radius: 0;
+  transition: color 0.15s ease;
+  text-align: left;
+  max-width: 100%;
+}
+
+.replyRef:hover {
+  color: var(--text-secondary);
+}
+
+.replyRefAuthor {
+  font-weight: 600;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.replyRefText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Reply preview above input ── */
+
+.replyPreview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 14px 14px 0 0;
+  font-size: 12px;
+  font-family: var(--font-body);
+  color: var(--text-muted);
+}
+
+.replyPreview + .inputWrapper {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.replyPreviewAuthor {
+  font-weight: 600;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.replyPreviewText {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.replyPreviewClose {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.replyPreviewClose:hover {
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+}
+
+/* ── Highlight flash on scroll-to ── */
+
+.highlighted {
+  animation: highlightFlash 1.5s ease;
+}
+
+@keyframes highlightFlash {
+  0%, 100% { background: transparent; border-radius: 12px; }
+  20% { background: var(--accent-light); border-radius: 12px; }
 }

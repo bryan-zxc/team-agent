@@ -24,6 +24,7 @@ export type Message = {
   type: "human" | "ai" | "coordinator" | "tool_approval_request";
   content: string;
   created_at: string;
+  reply_to_id: string | null;
 };
 
 export type ToolApprovalBlock = {

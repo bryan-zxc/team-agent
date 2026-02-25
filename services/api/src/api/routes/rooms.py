@@ -1,3 +1,4 @@
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -162,6 +163,13 @@ async def get_chat_messages(chat_id: uuid.UUID):
         return await _messages_for_chat(session, chat_id)
 
 
+def _extract_reply_to_id(content: str) -> str | None:
+    try:
+        return json.loads(content).get("reply_to_id")
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
 async def _messages_for_chat(session, chat_id: uuid.UUID):
     rows = (
         await session.execute(
@@ -181,6 +189,7 @@ async def _messages_for_chat(session, chat_id: uuid.UUID):
             "type": member_type,
             "content": msg.content,
             "created_at": msg.created_at.isoformat(),
+            "reply_to_id": _extract_reply_to_id(msg.content),
         }
         for msg, display_name, member_type in rows
     ]

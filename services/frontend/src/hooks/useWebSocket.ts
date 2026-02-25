@@ -6,7 +6,9 @@ import type { Message } from "@/types";
 
 const WS_URL = API_URL.replace(/^http/, "ws");
 
-type ContentBlock = { type: "text"; value: string };
+type ContentBlock =
+  | { type: "text"; value: string }
+  | { type: "mention"; member_id: string; display_name: string };
 
 export function useWebSocket(
   chatId: string | null,
@@ -59,9 +61,11 @@ export function useWebSocket(
   }, [connect]);
 
   const sendMessage = useCallback(
-    (blocks: ContentBlock[], mentions: string[]) => {
+    (blocks: ContentBlock[], mentions: string[], replyToId?: string) => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ blocks, mentions }));
+        wsRef.current.send(
+          JSON.stringify({ blocks, mentions, reply_to_id: replyToId ?? null }),
+        );
       }
     },
     [],
