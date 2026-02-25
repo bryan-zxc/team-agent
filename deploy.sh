@@ -50,13 +50,17 @@ fi
 echo "==> Deploying for $SITE_ADDRESS"
 
 # ---------- Provision TLS certificates ----------
-echo "==> Provisioning Tailscale TLS certificates..."
-mkdir -p certs
-tailscale cert \
-    --cert-file "certs/${SITE_ADDRESS}.crt" \
-    --key-file "certs/${SITE_ADDRESS}.key" \
-    "$SITE_ADDRESS"
-echo "    Certificates written to certs/"
+if [[ "$SKIP_CERTS" == true ]]; then
+    echo "==> Skipping TLS certificate provisioning"
+else
+    echo "==> Provisioning Tailscale TLS certificates..."
+    mkdir -p certs
+    tailscale cert \
+        --cert-file "certs/${SITE_ADDRESS}.crt" \
+        --key-file "certs/${SITE_ADDRESS}.key" \
+        "$SITE_ADDRESS"
+    echo "    Certificates written to certs/"
+fi
 
 # ---------- Build or pull ----------
 COMPOSE_CMD="docker compose --env-file $ENV_FILE -f docker-compose.yml -f docker-compose.prod.yml"
