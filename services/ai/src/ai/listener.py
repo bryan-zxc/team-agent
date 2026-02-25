@@ -25,17 +25,19 @@ _resuming: set[str] = set()
 def _extract_text(content: str) -> str:
     """Extract plain text from structured content JSON.
 
-    Handles both structured ``{"blocks": [...], "mentions": [...]}`` and
+    Handles text blocks, mention blocks (rendered as ``@name``), and
     legacy plain-text content for backward compatibility.
     """
     try:
         data = json.loads(content)
         if isinstance(data, dict) and "blocks" in data:
-            return " ".join(
-                block["value"]
-                for block in data["blocks"]
-                if block.get("type") == "text"
-            )
+            parts = []
+            for block in data["blocks"]:
+                if block.get("type") == "text":
+                    parts.append(block["value"])
+                elif block.get("type") == "mention":
+                    parts.append(f"@{block['display_name']}")
+            return "".join(parts)
     except (json.JSONDecodeError, KeyError, TypeError):
         pass
     return content
@@ -315,6 +317,7 @@ async def listen(redis_client: aioredis.Redis):
             "type": "coordinator",
             "content": structured_content,
             "created_at": datetime.now(timezone.utc).isoformat(),
+            "reply_to_id": None,
         }
 
         await redis_client.publish("chat:responses", json.dumps(response))

@@ -104,15 +104,16 @@ async def websocket_endpoint(
                         })
                         continue
 
-            # Expect structured format: {"blocks": [...], "mentions": [...]}
+            # Expect structured format: {"blocks": [...], "mentions": [...], "reply_to_id": ...}
             blocks = data.get("blocks", [])
             mentions = data.get("mentions", [])
+            reply_to_id = data.get("reply_to_id")
 
             if not blocks:
                 continue
 
             # Store full structured JSON as content
-            content = json.dumps({"blocks": blocks, "mentions": mentions})
+            content = json.dumps({"blocks": blocks, "mentions": mentions, "reply_to_id": reply_to_id})
 
             # Persist message
             message = Message(
@@ -133,6 +134,7 @@ async def websocket_endpoint(
                 "type": member_type,
                 "content": message.content,
                 "created_at": message.created_at.isoformat(),
+                "reply_to_id": reply_to_id,
             }
 
             # Broadcast to all connections in this chat

@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
+import { AnimatePresence } from "motion/react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type { IDockviewPanelProps } from "dockview";
 import type { Member, Message, Room, ToolApprovalBlock, WorkloadChat, WorkloadStatusEvent } from "@/types";
 import { apiFetch } from "@/lib/api";
 import { ToolApprovalCard } from "./ToolApprovalCard";
 import { WorkloadPanel } from "./WorkloadPanel";
+import { MentionDropdown, filterMembers } from "./MentionDropdown";
 import styles from "./ChatTab.module.css";
 
 type ChatTabParams = {
@@ -22,14 +24,43 @@ function getMessageText(content: string): string {
     const data = JSON.parse(content);
     if (data?.blocks) {
       return data.blocks
-        .filter((b: { type: string }) => b.type === "text")
-        .map((b: { value: string }) => b.value)
-        .join(" ");
+        .map((b: { type: string; value?: string; display_name?: string }) => {
+          if (b.type === "mention") return `@${b.display_name}`;
+          return b.value ?? "";
+        })
+        .join("");
     }
   } catch {
     /* legacy plain text */
   }
   return content;
+}
+
+function renderMessageContent(content: string): React.ReactNode {
+  try {
+    const data = JSON.parse(content);
+    if (data?.blocks) {
+      return data.blocks.map(
+        (block: { type: string; value?: string; display_name?: string }, i: number) => {
+          if (block.type === "mention") {
+            return (
+              <span key={i} className={styles.mention}>
+                @{block.display_name}
+              </span>
+            );
+          }
+          return <span key={i}>{block.value}</span>;
+        },
+      );
+    }
+  } catch {
+    /* legacy plain text */
+  }
+  return content;
+}
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}...` : text;
 }
 
 function getToolApprovalBlock(content: string): ToolApprovalBlock | null {
@@ -71,7 +102,11 @@ function ChatView({
 }: ChatViewProps) {
   const [input, setInput] = useState("");
   const [resuming, setResuming] = useState(false);
+  const [mentionState, setMentionState] = useState<{ query: string; startPos: number } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevCountRef = useRef(0);
   const prevStatusRef = useRef(workloadStatus);
 
@@ -108,29 +143,142 @@ function ChatView({
 
   const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
 
+  // Exclude self from mentions; in workload chats also exclude other agents
+  const mentionableMembers = useMemo(() => {
+    let list = members.filter((m) => m.id !== memberId);
+    if (workloadStatus !== undefined) {
+      list = list.filter((m) => m.type === "human");
+    }
+    return list;
+  }, [members, memberId, workloadStatus]);
+
+  const filteredMentionMembers = useMemo(
+    () => (mentionState ? filterMembers(mentionableMembers, mentionState.query) : []),
+    [mentionableMembers, mentionState],
+  );
+
   const isPaused = workloadStatus === "needs_attention" || workloadStatus === "completed";
+
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      const cursorPos = e.target.selectionStart;
+      setInput(value);
+
+      // Scan backwards from cursor for an unmatched @
+      const textBeforeCursor = value.slice(0, cursorPos);
+      const atIndex = textBeforeCursor.lastIndexOf("@");
+
+      if (atIndex >= 0) {
+        const query = textBeforeCursor.slice(atIndex + 1);
+        // Mention is valid if no whitespace between @ and cursor, and @ is at start or after whitespace
+        if (!query.includes(" ") && !query.includes("\n")) {
+          if (atIndex === 0 || /\s/.test(textBeforeCursor[atIndex - 1])) {
+            setMentionState({ query, startPos: atIndex });
+            setMentionIndex(0);
+            return;
+          }
+        }
+      }
+      setMentionState(null);
+    },
+    [],
+  );
+
+  const handleMentionSelect = useCallback(
+    (member: Member) => {
+      if (!mentionState) return;
+      const before = input.slice(0, mentionState.startPos);
+      const after = input.slice(mentionState.startPos + 1 + mentionState.query.length);
+      setInput(`${before}@${member.display_name} ${after}`);
+      setMentionState(null);
+      textareaRef.current?.focus();
+    },
+    [input, mentionState],
+  );
 
   const handleSend = useCallback(() => {
     if (!input.trim()) return;
     const text = input.trim();
+
+    // Build structured blocks: split text at @mention boundaries
+    type Block =
+      | { type: "text"; value: string }
+      | { type: "mention"; member_id: string; display_name: string };
+    const blocks: Block[] = [];
     const mentions: string[] = [];
-    const textLower = text.toLowerCase();
-    for (const member of members) {
-      if (textLower.includes(`@${member.display_name.toLowerCase()}`)) {
-        mentions.push(member.id);
+    let remaining = text;
+
+    while (remaining.length > 0) {
+      let earliestIdx = -1;
+      let earliestMember: Member | null = null;
+
+      for (const member of members) {
+        const idx = remaining.toLowerCase().indexOf(`@${member.display_name.toLowerCase()}`);
+        if (idx !== -1 && (earliestIdx === -1 || idx < earliestIdx)) {
+          earliestIdx = idx;
+          earliestMember = member;
+        }
       }
+
+      if (earliestIdx === -1 || !earliestMember) {
+        if (remaining) blocks.push({ type: "text", value: remaining });
+        break;
+      }
+
+      if (earliestIdx > 0) {
+        blocks.push({ type: "text", value: remaining.slice(0, earliestIdx) });
+      }
+
+      blocks.push({
+        type: "mention",
+        member_id: earliestMember.id,
+        display_name: earliestMember.display_name,
+      });
+      if (!mentions.includes(earliestMember.id)) {
+        mentions.push(earliestMember.id);
+      }
+
+      remaining = remaining.slice(earliestIdx + 1 + earliestMember.display_name.length);
     }
-    sendMessage([{ type: "text", value: text }], mentions);
+
+    sendMessage(blocks, mentions, replyTo?.id);
     setInput("");
+    setReplyTo(null);
+    setMentionState(null);
     if (isPaused && workloadHasSession) {
       setResuming(true);
     }
-  }, [input, members, sendMessage, isPaused, workloadHasSession]);
+  }, [input, members, sendMessage, replyTo, isPaused, workloadHasSession]);
 
   const isRunning = workloadStatus === "running" || workloadStatus === "assigned";
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // When mention dropdown is open, intercept navigation keys
+      if (mentionState && filteredMentionMembers.length > 0) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setMentionIndex((i) => Math.min(i + 1, filteredMentionMembers.length - 1));
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setMentionIndex((i) => Math.max(i - 1, 0));
+          return;
+        }
+        if (e.key === "Enter" || e.key === "Tab") {
+          e.preventDefault();
+          handleMentionSelect(filteredMentionMembers[mentionIndex]);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setMentionState(null);
+          return;
+        }
+      }
+
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         handleSend();
@@ -144,8 +292,17 @@ function ChatView({
         }
       }
     },
-    [handleSend, isRunning, onInterrupt, input],
+    [handleSend, isRunning, onInterrupt, input, mentionState, filteredMentionMembers, mentionIndex, handleMentionSelect],
   );
+
+  const scrollToMessage = useCallback((messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add(styles.highlighted);
+      setTimeout(() => el.classList.remove(styles.highlighted), 1500);
+    }
+  }, []);
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);
@@ -168,10 +325,14 @@ function ChatView({
 
           const isSelf = msg.member_id === memberId;
           const isAi = msg.type !== "human";
+          const replyParent = msg.reply_to_id
+            ? messages.find((m) => m.id === msg.reply_to_id)
+            : null;
 
           return (
             <div
               key={msg.id}
+              id={`msg-${msg.id}`}
               className={clsx(styles.messageGroup, isSelf && styles.self, isAi && styles.ai)}
             >
               <div className={clsx(styles.msgAvatar, isAi ? styles.avatarAi : styles.avatarHuman)}>
@@ -183,7 +344,35 @@ function ChatView({
                   {isAi && <span className={styles.aiBadge}>AI</span>}
                   <span className={styles.msgTime}>{formatTime(msg.created_at)}</span>
                 </div>
-                <div className={styles.msgBubble}>{getMessageText(msg.content)}</div>
+                {replyParent && (
+                  <button
+                    className={styles.replyRef}
+                    onClick={() => scrollToMessage(replyParent.id)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 14 4 9 9 4" />
+                      <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+                    </svg>
+                    <span className={styles.replyRefAuthor}>{replyParent.display_name}</span>
+                    <span className={styles.replyRefText}>
+                      {truncate(getMessageText(replyParent.content), 60)}
+                    </span>
+                  </button>
+                )}
+                <div className={styles.msgBubble}>{renderMessageContent(msg.content)}</div>
+                <button
+                  className={styles.replyBtn}
+                  onClick={() => {
+                    setReplyTo(msg);
+                    textareaRef.current?.focus();
+                  }}
+                  aria-label="Reply"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 14 4 9 9 4" />
+                    <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+                  </svg>
+                </button>
               </div>
             </div>
           );
@@ -207,12 +396,45 @@ function ChatView({
       )}
 
       <div className={styles.inputArea}>
+        {replyTo && (
+          <div className={styles.replyPreview}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 14 4 9 9 4" />
+              <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+            </svg>
+            <span className={styles.replyPreviewAuthor}>{replyTo.display_name}</span>
+            <span className={styles.replyPreviewText}>
+              {truncate(getMessageText(replyTo.content), 80)}
+            </span>
+            <button
+              className={styles.replyPreviewClose}
+              onClick={() => setReplyTo(null)}
+              aria-label="Cancel reply"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        )}
         <div className={styles.inputWrapper}>
+          <AnimatePresence>
+            {mentionState && filteredMentionMembers.length > 0 && (
+              <MentionDropdown
+                members={filteredMentionMembers}
+                query={mentionState.query}
+                selectedIndex={mentionIndex}
+                onSelect={handleMentionSelect}
+              />
+            )}
+          </AnimatePresence>
           <textarea
+            ref={textareaRef}
             className={styles.inputField}
             placeholder={placeholder}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             rows={1}
           />
