@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
+import { AnimatePresence } from "motion/react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type { IDockviewPanelProps } from "dockview";
 import type { Member, Message, Room, ToolApprovalBlock, WorkloadChat, WorkloadStatusEvent } from "@/types";
 import { apiFetch } from "@/lib/api";
 import { ToolApprovalCard } from "./ToolApprovalCard";
 import { WorkloadPanel } from "./WorkloadPanel";
+import { MentionDropdown, filterMembers } from "./MentionDropdown";
 import styles from "./ChatTab.module.css";
 
 type ChatTabParams = {
@@ -71,7 +73,10 @@ function ChatView({
 }: ChatViewProps) {
   const [input, setInput] = useState("");
   const [resuming, setResuming] = useState(false);
+  const [mentionState, setMentionState] = useState<{ query: string; startPos: number } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevCountRef = useRef(0);
   const prevStatusRef = useRef(workloadStatus);
 
@@ -108,7 +113,59 @@ function ChatView({
 
   const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
 
+  // Exclude self from mentions; in workload chats also exclude other agents
+  const mentionableMembers = useMemo(() => {
+    let list = members.filter((m) => m.id !== memberId);
+    if (workloadStatus !== undefined) {
+      list = list.filter((m) => m.type === "human");
+    }
+    return list;
+  }, [members, memberId, workloadStatus]);
+
+  const filteredMentionMembers = useMemo(
+    () => (mentionState ? filterMembers(mentionableMembers, mentionState.query) : []),
+    [mentionableMembers, mentionState],
+  );
+
   const isPaused = workloadStatus === "needs_attention" || workloadStatus === "completed";
+
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      const cursorPos = e.target.selectionStart;
+      setInput(value);
+
+      // Scan backwards from cursor for an unmatched @
+      const textBeforeCursor = value.slice(0, cursorPos);
+      const atIndex = textBeforeCursor.lastIndexOf("@");
+
+      if (atIndex >= 0) {
+        const query = textBeforeCursor.slice(atIndex + 1);
+        // Mention is valid if no whitespace between @ and cursor, and @ is at start or after whitespace
+        if (!query.includes(" ") && !query.includes("\n")) {
+          if (atIndex === 0 || /\s/.test(textBeforeCursor[atIndex - 1])) {
+            setMentionState({ query, startPos: atIndex });
+            setMentionIndex(0);
+            return;
+          }
+        }
+      }
+      setMentionState(null);
+    },
+    [],
+  );
+
+  const handleMentionSelect = useCallback(
+    (member: Member) => {
+      if (!mentionState) return;
+      const before = input.slice(0, mentionState.startPos);
+      const after = input.slice(mentionState.startPos + 1 + mentionState.query.length);
+      setInput(`${before}@${member.display_name} ${after}`);
+      setMentionState(null);
+      textareaRef.current?.focus();
+    },
+    [input, mentionState],
+  );
 
   const handleSend = useCallback(() => {
     if (!input.trim()) return;
@@ -122,6 +179,7 @@ function ChatView({
     }
     sendMessage([{ type: "text", value: text }], mentions);
     setInput("");
+    setMentionState(null);
     if (isPaused && workloadHasSession) {
       setResuming(true);
     }
@@ -131,6 +189,30 @@ function ChatView({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // When mention dropdown is open, intercept navigation keys
+      if (mentionState && filteredMentionMembers.length > 0) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setMentionIndex((i) => Math.min(i + 1, filteredMentionMembers.length - 1));
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setMentionIndex((i) => Math.max(i - 1, 0));
+          return;
+        }
+        if (e.key === "Enter" || e.key === "Tab") {
+          e.preventDefault();
+          handleMentionSelect(filteredMentionMembers[mentionIndex]);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setMentionState(null);
+          return;
+        }
+      }
+
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         handleSend();
@@ -144,7 +226,7 @@ function ChatView({
         }
       }
     },
-    [handleSend, isRunning, onInterrupt, input],
+    [handleSend, isRunning, onInterrupt, input, mentionState, filteredMentionMembers, mentionIndex, handleMentionSelect],
   );
 
   const formatTime = (iso: string) => {
@@ -208,11 +290,22 @@ function ChatView({
 
       <div className={styles.inputArea}>
         <div className={styles.inputWrapper}>
+          <AnimatePresence>
+            {mentionState && filteredMentionMembers.length > 0 && (
+              <MentionDropdown
+                members={filteredMentionMembers}
+                query={mentionState.query}
+                selectedIndex={mentionIndex}
+                onSelect={handleMentionSelect}
+              />
+            )}
+          </AnimatePresence>
           <textarea
+            ref={textareaRef}
             className={styles.inputField}
             placeholder={placeholder}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             rows={1}
           />
