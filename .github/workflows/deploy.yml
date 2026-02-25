@@ -82,7 +82,7 @@ jobs:
           target: ${{ matrix.target || '' }}
           push: true
           tags: ${{ steps.tags.outputs.tags }}
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
           cache-from: type=gha
@@ -124,7 +124,7 @@ jobs:
           # SSH into the Mac Mini and deploy
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
             "${SSH_USER}@${SSH_HOST}" \
-            "cd ~/git/team-agent && git pull && TAG=${TAG} ./deploy.sh --skip-certs"
+            "export PATH=/usr/local/bin:\$PATH && cd ~/git/team-agent && git pull && TAG=${TAG} ./deploy.sh --skip-certs"
 
       - name: Clean up SSH key
         if: always()
