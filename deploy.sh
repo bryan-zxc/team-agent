@@ -49,11 +49,21 @@ fi
 
 # ---------- Docker credential workaround ----------
 # Docker Desktop's credential helper requires keychain access, which fails in
-# non-interactive SSH sessions. Use a clean DOCKER_CONFIG to bypass it.
+# non-interactive SSH sessions. Copy the real Docker config but strip the
+# credential store so base image pulls work without the keychain.
 if [[ -z "${DOCKER_CONFIG:-}" && ! -t 0 ]]; then
     export DOCKER_CONFIG="$SCRIPT_DIR/.docker-ci"
     mkdir -p "$DOCKER_CONFIG"
-    echo '{"currentContext":"desktop-linux"}' > "$DOCKER_CONFIG/config.json"
+    cp -r ~/.docker/* "$DOCKER_CONFIG/" 2>/dev/null || true
+    if command -v python3 &>/dev/null; then
+        python3 -c "
+import json, pathlib
+p = pathlib.Path('$DOCKER_CONFIG/config.json')
+c = json.loads(p.read_text()) if p.exists() else {}
+c.pop('credsStore', None)
+p.write_text(json.dumps(c))
+"
+    fi
 fi
 
 echo "==> Deploying for $SITE_ADDRESS"

@@ -220,6 +220,9 @@ node_modules/
 # TLS certificates (provisioned by Tailscale)
 certs/
 
+# Docker config workaround for CI (created by deploy.sh)
+.docker-ci/
+
 # External repositories (cloned for reference)
 # Keep the README but ignore all cloned repos
 .external/*
