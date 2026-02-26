@@ -28,8 +28,9 @@ function getMessageText(content: string): string {
     const data = JSON.parse(content);
     if (data?.blocks) {
       return data.blocks
-        .map((b: { type: string; value?: string; display_name?: string }) => {
+        .map((b: { type: string; value?: string; display_name?: string; name?: string }) => {
           if (b.type === "mention") return `@${b.display_name}`;
+          if (b.type === "skill") return `/${b.name}`;
           return b.value ?? "";
         })
         .join("");
@@ -45,11 +46,18 @@ function renderMessageContent(content: string): React.ReactNode {
     const data = JSON.parse(content);
     if (data?.blocks) {
       return data.blocks.map(
-        (block: { type: string; value?: string; display_name?: string }, i: number) => {
+        (block: { type: string; value?: string; display_name?: string; name?: string }, i: number) => {
           if (block.type === "mention") {
             return (
               <span key={i} className={styles.mention}>
                 @{block.display_name}
+              </span>
+            );
+          }
+          if (block.type === "skill") {
+            return (
+              <span key={i} className={styles.skillTag}>
+                /{block.name}
               </span>
             );
           }
@@ -484,45 +492,75 @@ function ChatView({
     if (!input.trim()) return;
     const text = input.trim();
 
-    // Build structured blocks: split text at @mention boundaries
+    // Build structured blocks: split text at @mention and /skill boundaries
     type Block =
       | { type: "text"; value: string }
-      | { type: "mention"; member_id: string; display_name: string };
+      | { type: "mention"; member_id: string; display_name: string }
+      | { type: "skill"; name: string };
     const blocks: Block[] = [];
     const mentions: string[] = [];
     let remaining = text;
 
     while (remaining.length > 0) {
-      let earliestIdx = -1;
+      // Find earliest @mention
+      let earliestMentionIdx = -1;
       let earliestMember: Member | null = null;
 
       for (const member of members) {
         const idx = remaining.toLowerCase().indexOf(`@${member.display_name.toLowerCase()}`);
-        if (idx !== -1 && (earliestIdx === -1 || idx < earliestIdx)) {
-          earliestIdx = idx;
+        if (idx !== -1 && (earliestMentionIdx === -1 || idx < earliestMentionIdx)) {
+          earliestMentionIdx = idx;
           earliestMember = member;
         }
       }
 
-      if (earliestIdx === -1 || !earliestMember) {
+      // Find earliest /skill
+      let earliestSkillIdx = -1;
+      let earliestSkill: Skill | null = null;
+
+      for (const skill of skills) {
+        const pattern = `/${skill.name}`;
+        const idx = remaining.indexOf(pattern);
+        if (idx !== -1 && (earliestSkillIdx === -1 || idx < earliestSkillIdx)) {
+          // Ensure /skill is at start or after whitespace, and followed by whitespace or end
+          const charAfter = remaining[idx + pattern.length];
+          if (
+            (idx === 0 || /\s/.test(remaining[idx - 1])) &&
+            (charAfter === undefined || /\s/.test(charAfter))
+          ) {
+            earliestSkillIdx = idx;
+            earliestSkill = skill;
+          }
+        }
+      }
+
+      // Determine which comes first
+      const mentionFirst = earliestMentionIdx !== -1 && (earliestSkillIdx === -1 || earliestMentionIdx <= earliestSkillIdx);
+      const skillFirst = earliestSkillIdx !== -1 && (earliestMentionIdx === -1 || earliestSkillIdx < earliestMentionIdx);
+
+      if (mentionFirst && earliestMember) {
+        if (earliestMentionIdx > 0) {
+          blocks.push({ type: "text", value: remaining.slice(0, earliestMentionIdx) });
+        }
+        blocks.push({
+          type: "mention",
+          member_id: earliestMember.id,
+          display_name: earliestMember.display_name,
+        });
+        if (!mentions.includes(earliestMember.id)) {
+          mentions.push(earliestMember.id);
+        }
+        remaining = remaining.slice(earliestMentionIdx + 1 + earliestMember.display_name.length);
+      } else if (skillFirst && earliestSkill) {
+        if (earliestSkillIdx > 0) {
+          blocks.push({ type: "text", value: remaining.slice(0, earliestSkillIdx) });
+        }
+        blocks.push({ type: "skill", name: earliestSkill.name });
+        remaining = remaining.slice(earliestSkillIdx + 1 + earliestSkill.name.length);
+      } else {
         if (remaining) blocks.push({ type: "text", value: remaining });
         break;
       }
-
-      if (earliestIdx > 0) {
-        blocks.push({ type: "text", value: remaining.slice(0, earliestIdx) });
-      }
-
-      blocks.push({
-        type: "mention",
-        member_id: earliestMember.id,
-        display_name: earliestMember.display_name,
-      });
-      if (!mentions.includes(earliestMember.id)) {
-        mentions.push(earliestMember.id);
-      }
-
-      remaining = remaining.slice(earliestIdx + 1 + earliestMember.display_name.length);
     }
 
     sendMessage(blocks, mentions, replyTo?.id);

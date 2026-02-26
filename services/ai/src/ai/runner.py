@@ -78,6 +78,13 @@ async def run_agent(
         "- IMPORTANT: Never assign workloads to yourself. Always delegate to "
         "other agents.\n"
         "- Keep your response concise and natural.\n\n"
+        "Skills:\n"
+        "Skills are a special feature of Claude Code that can only be interpreted by agents, "
+        "not by you. When a message contains a confirmed skill (indicated by a line like "
+        "'/<name> is a skill.'), you MUST always delegate it as a workload to an agent. "
+        "Include the /skill-name in the workload description so the agent knows to use it. "
+        "If you do not see a '/<name> is a skill.' confirmation, treat any /text as "
+        "ordinary text, not a skill.\n\n"
         f"Agents you can pick from:\n\n{all_profiles}"
     )
 

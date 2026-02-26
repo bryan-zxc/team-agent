@@ -687,6 +687,7 @@ async def start_workload_session(
         permission_mode="default",
         can_use_tool=can_use_tool,
         hooks={"Stop": [HookMatcher(hooks=[stop_hook])]},
+        setting_sources=["project"],
     )
 
     # 6. Connect

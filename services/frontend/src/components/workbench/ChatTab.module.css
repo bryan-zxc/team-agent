@@ -342,8 +342,20 @@
 .mention {
   color: var(--accent);
   font-weight: 600;
-  background: var(--accent-light);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
   padding: 1px 4px;
+  border-radius: 4px;
+}
+
+/* ── Skill tag highlighting ── */
+
+.skillTag {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  font-weight: 500;
+  color: var(--warm);
+  background: color-mix(in srgb, var(--warm) 18%, transparent);
+  padding: 1px 6px;
   border-radius: 4px;
 }
 

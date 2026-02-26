@@ -25,19 +25,28 @@ _resuming: set[str] = set()
 def _extract_text(content: str) -> str:
     """Extract plain text from structured content JSON.
 
-    Handles text blocks, mention blocks (rendered as ``@name``), and
-    legacy plain-text content for backward compatibility.
+    Handles text blocks, mention blocks (rendered as ``@name``), skill blocks
+    (rendered as ``/name`` with a trailing annotation), and legacy plain-text
+    content for backward compatibility.
     """
     try:
         data = json.loads(content)
         if isinstance(data, dict) and "blocks" in data:
             parts = []
+            skill_names = []
             for block in data["blocks"]:
                 if block.get("type") == "text":
                     parts.append(block["value"])
                 elif block.get("type") == "mention":
                     parts.append(f"@{block['display_name']}")
-            return "".join(parts)
+                elif block.get("type") == "skill":
+                    name = block["name"]
+                    parts.append(f"/{name}")
+                    skill_names.append(name)
+            text = "".join(parts)
+            for name in skill_names:
+                text += f"\n/{name} is a skill."
+            return text
     except (json.JSONDecodeError, KeyError, TypeError):
         pass
     return content
