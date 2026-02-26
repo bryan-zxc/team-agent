@@ -54,6 +54,34 @@ Every ticket must be tested before completion.
 ### 6. Complete
 
 1. Commit and push to the current branch
-2. Update the ticket description to reflect what was delivered (use `/github-board`)
-3. Transition to **Done** and close the issue (use `/github-board`)
-4. Check if the ticket belongs to an epic — if all sibling sub-issues are now closed, close the epic and trigger a release with `/release`
+2. Update the ticket description to reflect what was delivered
+3. Transition to **Done** and close the issue
+
+### 7. Check for epic completion
+
+After closing the ticket, check whether it belongs to a parent epic and whether that epic is now fully delivered.
+
+**Find the parent epic:**
+
+```bash
+PARENT=$(gh api repos/bryan-zxc/team-agent/issues/<TICKET_NUMBER> --jq '.parent.number // empty')
+```
+
+If `PARENT` is empty, there is no parent epic — stop here.
+
+**Check if all sub-issues of the epic are closed:**
+
+```bash
+gh api graphql -f query='
+  query {
+    repository(owner: "bryan-zxc", name: "team-agent") {
+      issue(number: <EPIC_NUMBER>) {
+        subIssues(first: 50) {
+          nodes { number title state }
+        }
+      }
+    }
+  }' --jq '.data.repository.issue.subIssues.nodes[] | select(.state == "OPEN") | .number'
+```
+
+If the output is empty (no open sub-issues), close the epic and trigger a release with `/release`.
