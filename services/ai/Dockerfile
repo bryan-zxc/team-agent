@@ -2,7 +2,7 @@ FROM python:3.13
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Install Node.js (required for Claude CLI) and GitHub CLI
+# Install Node.js (required for Playwright CLI) and GitHub CLI
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates curl gnupg && \
     # Node.js 22.x via nodesource
@@ -18,8 +18,17 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends nodejs gh && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Claude CLI
-RUN npm install -g @anthropic-ai/claude-code
+# Install Claude Code (native installer) and Playwright CLI
+RUN curl -fsSL https://claude.ai/install.sh | bash && \
+    cp /root/.local/bin/claude /usr/local/bin/claude && \
+    npm install -g @playwright/cli@latest
+
+# Install Chromium (required by playwright-cli) and symlink to expected Chrome path
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends chromium && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /opt/google/chrome && \
+    ln -s /usr/bin/chromium /opt/google/chrome/chrome
 
 # Non-root user (UID 1000) shared with api service for project_data volume
 RUN useradd -m -u 1000 -s /bin/bash agent && \

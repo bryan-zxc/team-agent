@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 import re
 import uuid
 from datetime import datetime, timezone
@@ -472,6 +473,8 @@ async def _relay_messages(
                         await redis_client.publish("chat:responses", json.dumps(response))
 
             elif isinstance(msg, ResultMessage):
+                _stop_heartbeat()
+
                 logger.info(
                     "Workload %s completed (session: %s, error: %s, turns: %d)",
                     workload_id[:8], msg.session_id, msg.is_error, msg.num_turns,
@@ -680,6 +683,12 @@ async def start_workload_session(
         display_name=workload_data["display_name"],
     )
 
+    # Build a clean environment for the Claude CLI subprocess:
+    # - Strip ANTHROPIC_API_KEY so it uses the subscription OAuth token
+    # - Set PLAYWRIGHT_MCP_SANDBOX=false so playwright-cli can run headless in Docker
+    cli_env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+    cli_env["PLAYWRIGHT_MCP_SANDBOX"] = "false"
+
     options = ClaudeAgentOptions(
         cwd=str(worktree_path),
         resume=workload_data.get("session_id") if is_resume else None,
@@ -688,6 +697,7 @@ async def start_workload_session(
         can_use_tool=can_use_tool,
         hooks={"Stop": [HookMatcher(hooks=[stop_hook])]},
         setting_sources=["project"],
+        env=cli_env,
     )
 
     # 6. Connect

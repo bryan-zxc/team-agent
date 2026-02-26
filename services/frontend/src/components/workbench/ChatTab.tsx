@@ -307,13 +307,15 @@ function ChatView({
   }, []);
 
   const handleAgentActivity = useCallback((event: AgentActivityEvent) => {
+    // Ignore stale heartbeat events if the workload is no longer running
+    if (workloadStatus !== "running") return;
     setAgentActivity((prev) => {
       if (!prev) {
         return { verb: pickVerb(), startTime: Date.now(), phase: event.phase, tokens: event.tokens, elapsed: 0 };
       }
       return { ...prev, phase: event.phase, tokens: event.tokens };
     });
-  }, []);
+  }, [workloadStatus]);
 
   const { messages, sendMessage, sendTyping, setMessages } = useWebSocket(
     chatId,
