@@ -6,7 +6,8 @@
 <title>{{TITLE}}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -26,6 +27,16 @@
     --image-bg: linear-gradient(135deg, #1a1a24 0%, #14141a 100%);
     --nav-bg: rgba(17,17,19,0.88);
     --progress-track: #1f1f24;
+    /* Font scale — change this ONE value to resize all text globally */
+    --font-scale: 1;
+    /* Typography scale — computed from --font-scale */
+    --text-xs: calc(11px * var(--font-scale));    /* footnotes, smallest allowed */
+    --text-sm: calc(13px * var(--font-scale));    /* labels, captions, tags */
+    --text-base: calc(15px * var(--font-scale));  /* body / paragraph text */
+    --text-lg: calc(20px * var(--font-scale));    /* sub-headings */
+    --text-xl: calc(28px * var(--font-scale));    /* content headings */
+    --text-2xl: calc(42px * var(--font-scale));   /* section divider headings */
+    --text-3xl: calc(54px * var(--font-scale));   /* title slide heading */
   }
   html.light {
     --bg: #faf9f7; --surface: #ffffff; --elevated: #f5f3ef;
@@ -46,15 +57,16 @@
   }
 
   body {
-    font-family: 'Cabinet Grotesk', system-ui, sans-serif;
-    background: #0e0e0e; margin: 0; padding: 0;
-    min-height: 100vh; display: flex; align-items: center;
-    justify-content: center;
+    font-family: 'Outfit', system-ui, sans-serif;
+    background: #0e0e10; margin: 0; padding: 0;
+    overflow: hidden; height: 100vh; width: 100vw;
+    display: flex; align-items: center; justify-content: center;
   }
   html.light body { background: #e8e5e0; }
 
   .viewport {
-    width: 100vw; height: 100vh; position: relative;
+    width: 1280px; height: 720px; position: absolute;
+    top: 50%; left: 50%; transform-origin: center center;
     overflow: hidden; background: var(--bg); outline: none;
   }
 
@@ -70,78 +82,79 @@
   .slide {
     position: absolute; inset: 0; top: 3px;
     display: none; flex-direction: column;
-    font-family: 'Cabinet Grotesk', sans-serif;
+    font-family: 'Outfit', sans-serif;
+    font-size: var(--text-base); color: var(--body);
   }
   .slide.active { display: flex; }
 
   /* -- Title Slide -- */
   .slide-title {
     justify-content: center; align-items: center; text-align: center;
-    padding: 4vh 5vw;
+    padding: 28px 64px;
   }
   .slide-title .inner-frame {
-    position: absolute; inset: 3vh 3vw; border-radius: 18px;
+    position: absolute; inset: 22px 38px; border-radius: 18px;
     background: var(--frame-bg); border: 1px solid var(--frame-border);
   }
   .slide-title .accent-dot {
-    position: absolute; top: 5vh; right: 5vw; width: 12px; height: 12px;
+    position: absolute; top: 36px; right: 64px; width: 12px; height: 12px;
     border-radius: 50%; background: var(--accent); z-index: 2;
   }
   .slide-title h2 {
-    font-weight: 800; font-size: 7vw;
+    font-weight: 800; font-size: 90px;
     color: var(--heading); line-height: 1.05; position: relative; z-index: 1;
-    margin-bottom: 1.5vh;
+    margin-bottom: 12px;
   }
   .slide-title .subtitle {
-    font-weight: 400; font-size: 1.8vw;
+    font-weight: 400; font-size: 23px;
     color: var(--muted); position: relative; z-index: 1;
   }
   .slide-title .pill {
-    display: inline-block; font-size: 1.2vw;
+    display: inline-block; font-size: 15px;
     font-weight: 500; color: var(--accent);
     background: var(--accent-tint); border: 1px solid var(--accent-border);
-    padding: 0.4vh 1.2vw; border-radius: 100px;
-    margin-top: 2vh; position: relative; z-index: 1;
+    padding: 3px 15px; border-radius: 100px;
+    margin-top: 14px; position: relative; z-index: 1;
   }
 
   /* -- Section Divider -- */
   .slide-section {
-    justify-content: flex-end; padding: 6vh 5vw 12vh;
+    justify-content: flex-end; padding: 43px 64px 86px;
   }
   .slide-section .section-num {
-    font-weight: 800; font-size: 20vw;
+    font-weight: 800; font-size: 256px;
     color: var(--accent); opacity: 0.06; position: absolute;
-    top: 5vh; right: 4vw; line-height: 1;
+    top: 36px; right: 50px; line-height: 1;
   }
   .slide-section .accent-line {
-    width: 4vw; height: 4px; background: var(--accent);
-    border-radius: 2px; margin-bottom: 2vh;
+    width: 50px; height: 4px; background: var(--accent);
+    border-radius: 2px; margin-bottom: 14px;
   }
   .slide-section h2 {
-    font-weight: 700; font-size: 6vw;
+    font-weight: 700; font-size: 76px;
     color: var(--heading); line-height: 1.1; position: relative; z-index: 1;
-    margin-bottom: 1vh;
+    margin-bottom: 8px;
   }
   .slide-section .section-sub {
-    font-weight: 400; font-size: 1.6vw;
+    font-weight: 400; font-size: 20px;
     color: var(--muted); position: relative; z-index: 1;
   }
 
   /* -- Text + Image -- */
   .slide-text-image { flex-direction: row; }
   .slide-text-image .text-side {
-    flex: 1; padding: 5vh 3vw 5vh 5vw;
-    display: flex; flex-direction: column; justify-content: center; gap: 2vh;
+    flex: 1; padding: 36px 38px 36px 64px;
+    display: flex; flex-direction: column; justify-content: center; gap: 14px;
   }
   .slide-text-image .text-side .accent-line {
-    width: 3vw; height: 3px; background: var(--accent); border-radius: 1px;
+    width: 40px; height: 3px; background: var(--accent); border-radius: 1px;
   }
   .slide-text-image .text-side h3 {
-    font-weight: 700; font-size: 3.2vw;
+    font-weight: 700; font-size: 40px;
     color: var(--heading); line-height: 1.15;
   }
   .slide-text-image .text-side p {
-    font-weight: 400; font-size: 1.4vw;
+    font-weight: 400; font-size: 18px;
     color: var(--body); line-height: 1.6;
   }
   .slide-text-image .image-side {
@@ -152,277 +165,277 @@
     width: 80%; aspect-ratio: 4/3; border-radius: 12px;
     background: var(--surface); border: 1px solid var(--border);
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.1vw; color: var(--disabled);
+    font-size: 14px; color: var(--disabled);
   }
 
   /* -- Big Stat -- */
   .slide-stat {
     justify-content: center; align-items: center;
-    text-align: center; padding: 4vh 8vw;
+    text-align: center; padding: 28px 100px;
   }
   .slide-stat .stat-label {
-    font-size: 1.2vw; font-weight: 500;
+    font-size: 15px; font-weight: 500;
     text-transform: uppercase; letter-spacing: 0.12em;
-    color: var(--muted); margin-bottom: 1vh;
+    color: var(--muted); margin-bottom: 8px;
   }
   .slide-stat .stat-number {
-    font-weight: 800; font-size: 18vw;
+    font-weight: 800; font-size: 230px;
     color: var(--heading); line-height: 1;
   }
   .slide-stat .stat-number span { color: var(--accent); }
   .slide-stat .stat-context {
-    font-size: 1.4vw; color: var(--body);
-    max-width: 50vw; line-height: 1.5; margin-top: 1vh;
+    font-size: 18px; color: var(--body);
+    max-width: 640px; line-height: 1.5; margin-top: 8px;
   }
   .slide-stat .stat-badge {
-    display: inline-flex; align-items: center; gap: 0.3rem;
-    font-size: 1.1vw; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 14px; font-weight: 500;
     color: var(--green); background: var(--green-tint);
     border: 1px solid var(--green-border);
-    padding: 0.5vh 1vw; border-radius: 100px; margin-top: 2vh;
+    padding: 4px 13px; border-radius: 100px; margin-top: 14px;
   }
 
   /* -- Quote -- */
   .slide-quote {
-    justify-content: center; padding: 6vh 6vw;
+    justify-content: center; padding: 44px 76px;
   }
   .slide-quote .quote-mark {
-    font-weight: 800; font-size: 18vw;
+    font-weight: 800; font-size: 230px;
     color: var(--accent); opacity: 0.08; line-height: 1;
-    position: absolute; top: 2vh; left: 4vw;
+    position: absolute; top: 14px; left: 50px;
   }
   .slide-quote blockquote {
-    font-weight: 600; font-size: 3.2vw;
+    font-weight: 600; font-size: 40px;
     color: var(--heading); line-height: 1.25;
-    max-width: 75vw; position: relative; z-index: 1;
+    max-width: 960px; position: relative; z-index: 1;
   }
   .slide-quote .attribution {
-    margin-top: 4vh; display: flex; align-items: center; gap: 1vw;
+    margin-top: 28px; display: flex; align-items: center; gap: 12px;
     position: relative; z-index: 1;
   }
   .slide-quote .attribution .avatar {
-    width: 3.5vw; height: 3.5vw; border-radius: 50%;
+    width: 44px; height: 44px; border-radius: 50%;
     background: var(--surface); border: 1px solid var(--border);
   }
   .slide-quote .attribution .name {
-    font-size: 1.3vw; font-weight: 600; color: var(--subheading);
+    font-size: 16px; font-weight: 600; color: var(--subheading);
   }
   .slide-quote .attribution .role {
-    font-size: 1.1vw; font-weight: 400; color: var(--muted);
+    font-size: 14px; font-weight: 400; color: var(--muted);
   }
   .slide-quote .accent-bar {
-    position: absolute; left: 6vw; bottom: 6vh;
-    width: 4vw; height: 4px; background: var(--accent); border-radius: 2px;
+    position: absolute; left: 76px; bottom: 44px;
+    width: 50px; height: 4px; background: var(--accent); border-radius: 2px;
   }
 
   /* -- Bullet List -- */
   .slide-bullets {
-    justify-content: center; padding: 5vh 6vw; gap: 3vh;
+    justify-content: center; padding: 36px 76px; gap: 22px;
   }
   .slide-bullets h3 {
-    font-weight: 700; font-size: 3.5vw; color: var(--heading);
+    font-weight: 700; font-size: 44px; color: var(--heading);
   }
   .slide-bullets ul {
-    list-style: none; display: flex; flex-direction: column; gap: 2vh;
+    list-style: none; display: flex; flex-direction: column; gap: 14px;
   }
   .slide-bullets li {
-    display: flex; align-items: flex-start; gap: 1vw;
-    font-size: 1.5vw; color: var(--body); line-height: 1.5;
+    display: flex; align-items: flex-start; gap: 12px;
+    font-size: 20px; color: var(--body); line-height: 1.5;
   }
   .slide-bullets li .b {
-    width: 0.6vw; height: 0.6vw; border-radius: 50%;
-    background: var(--accent); flex-shrink: 0; margin-top: 0.55vw;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); flex-shrink: 0; margin-top: 7px;
   }
   .slide-bullets li strong { color: var(--subheading); font-weight: 600; }
 
   /* -- Two-Column Comparison -- */
   .slide-compare {
-    justify-content: center; padding: 4vh 4vw; gap: 2.5vh;
+    justify-content: center; padding: 28px 50px; gap: 18px;
   }
   .slide-compare h3 {
-    font-weight: 700; font-size: 3.2vw; color: var(--heading);
+    font-weight: 700; font-size: 40px; color: var(--heading);
   }
   .slide-compare .cols {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 1.5vw;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
   }
   .slide-compare .col {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 3vh 2.5vw; display: flex;
-    flex-direction: column; gap: 2vh;
+    border-radius: 14px; padding: 22px 32px; display: flex;
+    flex-direction: column; gap: 14px;
   }
   .slide-compare .col-header {
-    display: flex; align-items: center; gap: 0.6vw;
-    padding-bottom: 1.5vh; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
   }
-  .slide-compare .col-dot { width: 0.7vw; height: 0.7vw; border-radius: 50%; }
+  .slide-compare .col-dot { width: 9px; height: 9px; border-radius: 50%; }
   .slide-compare .col-title {
-    font-size: 1.4vw; font-weight: 600; color: var(--subheading);
+    font-size: 18px; font-weight: 600; color: var(--subheading);
   }
   .slide-compare .col ul {
-    list-style: none; display: flex; flex-direction: column; gap: 1.5vh;
+    list-style: none; display: flex; flex-direction: column; gap: 10px;
   }
   .slide-compare .col li {
-    font-size: 1.2vw; color: var(--body); line-height: 1.5;
-    padding-left: 1.2vw; position: relative;
+    font-size: 15px; color: var(--body); line-height: 1.5;
+    padding-left: 16px; position: relative;
   }
   .slide-compare .col li::before {
-    content: ''; position: absolute; left: 0; top: 0.5vw;
-    width: 0.4vw; height: 0.4vw; border-radius: 50%;
+    content: ''; position: absolute; left: 0; top: 6px;
+    width: 5px; height: 5px; border-radius: 50%;
   }
   .slide-compare .col-a li::before { background: var(--accent); }
   .slide-compare .col-b li::before { background: var(--amber); }
 
   /* -- Cards Grid -- */
   .slide-cards {
-    justify-content: center; padding: 4vh 4vw; gap: 2.5vh;
+    justify-content: center; padding: 28px 50px; gap: 18px;
   }
   .slide-cards h3 {
-    font-weight: 700; font-size: 3.2vw; color: var(--heading);
+    font-weight: 700; font-size: 40px; color: var(--heading);
   }
   .slide-cards .grid {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2vw;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;
   }
   .slide-cards .card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 3vh 2vw; display: flex;
-    flex-direction: column; gap: 1vh;
+    border-radius: 14px; padding: 22px 26px; display: flex;
+    flex-direction: column; gap: 8px;
   }
   .slide-cards .card .icon {
-    width: 3vw; height: 3vw; border-radius: 9px;
+    width: 38px; height: 38px; border-radius: 9px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1vw; font-weight: 700; margin-bottom: 0.5vh;
+    font-size: 13px; font-weight: 700; margin-bottom: 4px;
   }
   .slide-cards .card h4 {
-    font-size: 1.4vw; font-weight: 600; color: var(--subheading);
+    font-size: 18px; font-weight: 600; color: var(--subheading);
   }
   .slide-cards .card p {
-    font-size: 1.1vw; color: var(--muted); line-height: 1.55;
+    font-size: 14px; color: var(--muted); line-height: 1.55;
   }
 
   /* -- Dashboard / KPI Overview -- */
   .slide-dashboard {
-    justify-content: center; padding: 4vh 4vw; gap: 2vh;
+    justify-content: center; padding: 28px 50px; gap: 14px;
   }
   .slide-dashboard .dash-header {
     display: flex; align-items: baseline; justify-content: space-between;
   }
   .slide-dashboard .dash-header h3 {
-    font-weight: 700; font-size: 2.8vw; color: var(--heading);
+    font-weight: 700; font-size: 36px; color: var(--heading);
   }
   .slide-dashboard .dash-header .period {
-    font-size: 1vw; font-weight: 500;
+    font-size: 13px; font-weight: 500;
     color: var(--accent); background: var(--accent-tint);
     border: 1px solid var(--accent-border);
-    padding: 0.4vh 0.8vw; border-radius: 100px;
+    padding: 3px 10px; border-radius: 100px;
   }
   .slide-dashboard .stat-row {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 1vw;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
   }
   .slide-dashboard .stat-card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 12px; padding: 2.5vh 2vw;
-    display: flex; flex-direction: column; justify-content: center; gap: 0.5vh;
+    border-radius: 12px; padding: 18px 26px;
+    display: flex; flex-direction: column; justify-content: center; gap: 4px;
   }
   .slide-dashboard .stat-card .sc-label {
-    font-size: 0.85vw; font-weight: 500;
+    font-size: 11px; font-weight: 500;
     text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
   }
   .slide-dashboard .stat-card .sc-value {
-    font-weight: 800; font-size: 3.5vw;
+    font-weight: 800; font-size: 44px;
     color: var(--heading); line-height: 1.1;
   }
   .slide-dashboard .stat-card .sc-change {
-    font-size: 0.8vw; font-weight: 500;
-    display: inline-flex; align-items: center; gap: 0.2rem;
-    padding: 0.3vh 0.6vw; border-radius: 100px; width: fit-content;
+    font-size: 10px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: 100px; width: fit-content;
   }
   .sc-up { color: var(--green); background: var(--green-tint); }
   .sc-down { color: var(--rose); background: var(--rose-tint); }
   .slide-dashboard .detail-row {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1vw;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
   }
   .slide-dashboard .detail-card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 12px; padding: 2vh 2vw;
-    display: flex; flex-direction: column; gap: 1vh;
+    border-radius: 12px; padding: 14px 26px;
+    display: flex; flex-direction: column; gap: 8px;
   }
   .slide-dashboard .detail-card .dc-header {
-    display: flex; align-items: center; gap: 0.5vw;
-    padding-bottom: 1vh; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 6px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
   }
-  .slide-dashboard .detail-card .dc-dot { width: 0.5vw; height: 0.5vw; border-radius: 50%; }
+  .slide-dashboard .detail-card .dc-dot { width: 6px; height: 6px; border-radius: 50%; }
   .slide-dashboard .detail-card .dc-title {
-    font-size: 1.1vw; font-weight: 600; color: var(--subheading);
+    font-size: 14px; font-weight: 600; color: var(--subheading);
   }
   .slide-dashboard .detail-card ul {
-    list-style: none; display: flex; flex-direction: column; gap: 0.8vh;
+    list-style: none; display: flex; flex-direction: column; gap: 6px;
   }
   .slide-dashboard .detail-card li {
-    font-size: 1vw; color: var(--body); line-height: 1.45;
-    padding-left: 1vw; position: relative;
+    font-size: 13px; color: var(--body); line-height: 1.45;
+    padding-left: 13px; position: relative;
   }
   .slide-dashboard .detail-card li::before {
-    content: ''; position: absolute; left: 0; top: 0.45vw;
-    width: 0.3vw; height: 0.3vw; border-radius: 50%; background: var(--disabled);
+    content: ''; position: absolute; left: 0; top: 6px;
+    width: 4px; height: 4px; border-radius: 50%; background: var(--disabled);
   }
 
   /* -- Stats + Narrative Mixed -- */
   .slide-mixed { flex-direction: row; }
   .slide-mixed .mixed-left {
-    flex: 1; padding: 4vh 2vw 4vh 4vw;
+    flex: 1; padding: 28px 26px 28px 50px;
     display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto;
-    gap: 1.2vw; align-content: center;
+    gap: 16px; align-content: center;
   }
   .slide-mixed .m-stat {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 12px; padding: 3vh 2vw;
-    display: flex; flex-direction: column; justify-content: center; gap: 0.5vh;
+    border-radius: 12px; padding: 22px 26px;
+    display: flex; flex-direction: column; justify-content: center; gap: 4px;
   }
   .slide-mixed .m-stat .ms-value {
-    font-weight: 800; font-size: 3vw;
+    font-weight: 800; font-size: 38px;
     color: var(--heading); line-height: 1.1;
   }
   .slide-mixed .m-stat .ms-label {
-    font-size: 0.85vw; font-weight: 500;
+    font-size: 11px; font-weight: 500;
     text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
   }
   .slide-mixed .m-stat .ms-sub {
-    font-size: 0.8vw; color: var(--body); line-height: 1.4; margin-top: 0.3vh;
+    font-size: 10px; color: var(--body); line-height: 1.4; margin-top: 2px;
   }
   .slide-mixed .mixed-right {
-    flex: 1; padding: 5vh 4vw 5vh 3vw;
-    display: flex; flex-direction: column; justify-content: center; gap: 2vh;
+    flex: 1; padding: 36px 50px 36px 38px;
+    display: flex; flex-direction: column; justify-content: center; gap: 14px;
     border-left: 1px solid var(--border);
   }
   .slide-mixed .mixed-right h3 {
-    font-weight: 700; font-size: 2.4vw;
+    font-weight: 700; font-size: 30px;
     color: var(--heading); line-height: 1.15;
   }
   .slide-mixed .mixed-right .accent-line {
-    width: 2.5vw; height: 3px; background: var(--accent); border-radius: 1px;
+    width: 32px; height: 3px; background: var(--accent); border-radius: 1px;
   }
   .slide-mixed .mixed-right p {
-    font-size: 1.1vw; color: var(--body); line-height: 1.6;
+    font-size: 14px; color: var(--body); line-height: 1.6;
   }
   .slide-mixed .mixed-right ul {
-    list-style: none; display: flex; flex-direction: column; gap: 1.2vh;
+    list-style: none; display: flex; flex-direction: column; gap: 10px;
   }
   .slide-mixed .mixed-right li {
-    display: flex; align-items: flex-start; gap: 0.6vw;
-    font-size: 1vw; color: var(--body); line-height: 1.5;
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 13px; color: var(--body); line-height: 1.5;
   }
   .slide-mixed .mixed-right li .b {
-    width: 0.4vw; height: 0.4vw; border-radius: 50%;
-    background: var(--accent); flex-shrink: 0; margin-top: 0.4vw;
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent); flex-shrink: 0; margin-top: 5px;
   }
   .slide-mixed .mixed-right li strong { color: var(--subheading); font-weight: 600; }
 
   /* -- Data Table -- */
   .slide-table {
-    justify-content: center; padding: 4vh 4vw; gap: 2vh;
+    justify-content: center; padding: 28px 50px; gap: 14px;
   }
   .slide-table h3 {
-    font-weight: 700; font-size: 2.8vw; color: var(--heading);
+    font-weight: 700; font-size: 36px; color: var(--heading);
   }
   .slide-table table {
     width: 100%; border-collapse: separate; border-spacing: 0;
@@ -430,142 +443,155 @@
     border: 1px solid var(--border);
   }
   .slide-table thead th {
-    background: var(--surface); padding: 1.8vh 2vw;
-    font-size: 0.9vw; font-weight: 600;
+    background: var(--surface); padding: 13px 26px;
+    font-size: 12px; font-weight: 600;
     color: var(--subheading); text-align: left;
     text-transform: uppercase; letter-spacing: 0.06em;
     border-bottom: 1px solid var(--border);
   }
   .slide-table thead th:not(:last-child) { border-right: 1px solid var(--border); }
   .slide-table tbody td {
-    padding: 1.5vh 2vw;
-    font-size: 1vw;
+    padding: 11px 26px;
+    font-size: 13px;
     color: var(--body); border-bottom: 1px solid var(--border);
   }
   .slide-table tbody td:not(:last-child) { border-right: 1px solid var(--border); }
   .slide-table tbody tr:last-child td { border-bottom: none; }
   .slide-table tbody td:first-child { font-weight: 600; color: var(--subheading); }
   .slide-table .pill-sm {
-    display: inline-block; font-size: 0.8vw;
-    font-weight: 500; padding: 0.3vh 0.6vw; border-radius: 100px;
+    display: inline-block; font-size: 10px;
+    font-weight: 500; padding: 2px 8px; border-radius: 100px;
   }
   .pill-green { color: var(--green); background: var(--green-tint); }
   .pill-amber { color: var(--amber); background: var(--amber-tint); }
   .pill-rose { color: var(--rose); background: var(--rose-tint); }
   .slide-table .table-footer {
-    font-size: 0.85vw; color: var(--muted); font-style: italic;
+    font-size: 11px; color: var(--muted); font-style: italic;
   }
 
   /* -- Multi-Section Breakdown -- */
   .slide-multi {
-    justify-content: center; padding: 4vh 4vw; gap: 1.5vh;
+    justify-content: center; padding: 28px 50px; gap: 12px;
   }
   .slide-multi .multi-header {
     display: flex; align-items: baseline; justify-content: space-between;
   }
   .slide-multi .multi-header h3 {
-    font-weight: 700; font-size: 3.2vw; color: var(--heading);
+    font-weight: 700; font-size: 40px; color: var(--heading);
   }
   .slide-multi .multi-header .tag {
-    font-size: 1vw; font-weight: 500;
+    font-size: 13px; font-weight: 500;
     color: var(--green); background: var(--green-tint);
     border: 1px solid var(--green-border);
-    padding: 0.3vh 0.8vw; border-radius: 100px;
+    padding: 2px 10px; border-radius: 100px;
   }
   .slide-multi .multi-desc {
-    font-size: 1.3vw; color: var(--body);
-    line-height: 1.5; max-width: 65vw;
+    font-size: 16px; color: var(--body);
+    line-height: 1.5; max-width: 832px;
   }
   .slide-multi .multi-cols {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2vw;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;
   }
   .slide-multi .multi-col {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 3vh 2.5vw;
-    display: flex; flex-direction: column; gap: 1.2vh;
+    border-radius: 14px; padding: 22px 32px;
+    display: flex; flex-direction: column; gap: 8px;
   }
   .slide-multi .mc-top {
     display: flex; align-items: baseline; justify-content: space-between;
-    padding-bottom: 1.2vh; border-bottom: 1px solid var(--border);
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
   }
   .slide-multi .mc-top .mc-title {
-    font-size: 1.3vw; font-weight: 600; color: var(--subheading);
+    font-size: 16px; font-weight: 600; color: var(--subheading);
   }
   .slide-multi .mc-top .mc-stat {
-    font-size: 2.2vw; font-weight: 800; color: var(--heading);
+    font-size: 28px; font-weight: 800; color: var(--heading);
   }
   .slide-multi .mc-body {
-    font-size: 1.1vw; color: var(--body); line-height: 1.5;
+    font-size: 14px; color: var(--body); line-height: 1.5;
   }
   .slide-multi .mc-list {
-    list-style: none; display: flex; flex-direction: column; gap: 1vh;
+    list-style: none; display: flex; flex-direction: column; gap: 8px;
   }
   .slide-multi .mc-list li {
-    font-size: 1vw; color: var(--muted); line-height: 1.45;
-    padding-left: 1vw; position: relative;
+    font-size: 13px; color: var(--muted); line-height: 1.45;
+    padding-left: 13px; position: relative;
   }
   .slide-multi .mc-list li::before {
-    content: ''; position: absolute; left: 0; top: 0.4vw;
-    width: 0.3vw; height: 0.3vw; border-radius: 50%;
+    content: ''; position: absolute; left: 0; top: 5px;
+    width: 4px; height: 4px; border-radius: 50%;
   }
   .mc-col-1 .mc-list li::before { background: var(--accent); }
-  .mc-col-2 .mc-list li::before { background: var(--green); }
-  .mc-col-3 .mc-list li::before { background: var(--amber); }
+  .mc-col-2 .mc-list li::before { background: var(--accent); }
+  .mc-col-3 .mc-list li::before { background: var(--accent); }
 
   /* -- Floating Nav Dock -- */
   .nav-dock {
-    position: absolute; bottom: 1.5vh; left: 50%; transform: translateX(-50%);
-    display: flex; align-items: center; gap: 0.5vw;
+    position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 6px;
     background: var(--nav-bg); backdrop-filter: blur(16px);
-    border: 1px solid var(--border); border-radius: 12px;
-    padding: 0.5vh 0.6vw; z-index: 300;
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 4px 8px; z-index: 300;
     white-space: nowrap; user-select: none;
+    opacity: 0.5; transition: opacity 0.3s ease;
   }
+  .nav-dock:hover { opacity: 1; }
   .nav-dock .arr {
     width: 30px; height: 30px; border-radius: 7px;
     background: transparent; border: 1px solid var(--border);
     color: var(--body); cursor: pointer; transition: all 0.2s;
     display: flex; align-items: center; justify-content: center;
-    font-size: 0.9rem; font-family: 'Cabinet Grotesk', sans-serif; padding: 0;
+    font-size: 14px; font-family: 'Outfit', sans-serif; padding: 0;
   }
   .nav-dock .arr:hover { background: var(--surface); color: var(--heading); }
   .nav-dock .sep { width: 1px; height: 20px; background: var(--border); }
   .nav-dock .slide-title-area {
-    display: flex; align-items: center; gap: 0.4vw; min-width: 140px;
+    display: flex; align-items: center; gap: 5px; min-width: 140px;
   }
-  .nav-dock .tnum { font-size: 0.7rem; font-weight: 600; color: var(--accent); }
+  .nav-dock .tnum { font-size: 11px; font-weight: 600; color: var(--accent); }
   .nav-dock .ttext {
-    font-size: 0.7rem; font-weight: 500; color: var(--subheading);
+    font-size: 11px; font-weight: 500; color: var(--subheading);
     max-width: 200px; overflow: hidden; text-overflow: ellipsis;
   }
-  .nav-dock .page-count { font-size: 0.65rem; font-weight: 500; color: var(--muted); }
+  .nav-dock .page-count { font-size: 10px; font-weight: 500; color: var(--muted); }
   .nav-dock .page-count .pc-current { color: var(--subheading); font-weight: 600; }
-  .nav-dock .pips { display: flex; gap: 0.35rem; }
+  .nav-dock .pips { display: flex; gap: 5px; align-items: center; }
   .nav-dock .pip {
     width: 7px; height: 7px; border-radius: 50%;
     background: var(--disabled); border: none; cursor: pointer;
     transition: all 0.2s; padding: 0;
   }
-  .nav-dock .pip.active { background: var(--accent); }
+  .nav-dock .pip.active { background: var(--accent); width: 18px; border-radius: 4px; }
   .nav-dock .pip:hover:not(.active) { background: var(--body); }
+  .nav-dock .pip-divider {
+    width: 3px; height: 16px; border-radius: 2px;
+    background: var(--disabled); border: none; cursor: pointer;
+    transition: all 0.2s; padding: 0;
+  }
+  .nav-dock .pip-divider.active { background: var(--accent); }
   .nav-dock .theme-toggle {
     width: 30px; height: 30px; border-radius: 7px;
     background: transparent; border: 1px solid var(--border);
     color: var(--muted); cursor: pointer; transition: all 0.2s;
     display: flex; align-items: center; justify-content: center;
-    font-size: 0.85rem; padding: 0;
+    font-size: 13px; padding: 0;
   }
   .nav-dock .theme-toggle:hover { background: var(--surface); color: var(--heading); }
 
   /* -- Print Styles -- */
+  @page { size: 1280px 720px; margin: 0; }
   @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    /* === Light mode defaults === */
     html, html.light { color-scheme: light; }
-    body { background: white !important; padding: 0; margin: 0; display: block; }
-    .viewport { width: auto; height: auto; overflow: visible; background: white !important; }
-    .nav-dock, .progress-bar { display: none !important; }
+    body { background: white !important; padding: 0; margin: 0; display: block; overflow: visible !important; height: auto !important; width: auto !important; }
+    .viewport { width: auto !important; height: auto !important; position: static !important; transform: none !important; overflow: visible !important; background: white !important; }
+    .nav-dock, .progress-bar { display: none !important; height: 0 !important; overflow: hidden !important; }
+    .slide:has(video) { display: none !important; }
     .slide {
       display: flex !important; position: relative !important;
-      width: 100vw; height: 100vh;
+      width: 1280px; height: 720px;
       page-break-after: always; break-after: page;
       background: #faf9f7 !important;
       --bg: #faf9f7; --surface: #ffffff; --elevated: #f5f3ef;
@@ -582,7 +608,35 @@
       --frame-border: #dddcec;
       --image-bg: linear-gradient(135deg, #f0eee8 0%, #e8e5de 100%);
     }
-    .slide:last-child { page-break-after: auto; break-after: auto; }
+
+    /* Material Symbols font safety */
+    .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined' !important;
+      -webkit-font-feature-settings: 'liga' !important;
+      font-feature-settings: 'liga' !important;
+    }
+
+    /* === Dark mode print override === */
+    /* Activate by calling setPrintMode('dark') before printing */
+    html.print-dark, html.print-dark.light { color-scheme: dark; }
+    html.print-dark body { background: #0e0e10 !important; }
+    html.print-dark .viewport { background: #171719 !important; }
+    html.print-dark .slide {
+      background: #171719 !important;
+      --bg: #171719; --surface: #1f1f24; --elevated: #26262c;
+      --border: #2a2a2f; --border-subtle: #35353c;
+      --heading: #f0eff5; --subheading: #c8c8d0; --body: #8a8a95;
+      --muted: #6b6b78; --disabled: #44444f;
+      --accent: #7c8ae5; --accent-tint: rgba(124,138,229,0.1);
+      --accent-border: rgba(124,138,229,0.18);
+      --green: #5b9a7a; --green-tint: rgba(91,154,122,0.1);
+      --green-border: rgba(91,154,122,0.15);
+      --amber: #e0a05f; --amber-tint: rgba(224,160,95,0.12);
+      --rose: #d46b6b; --rose-tint: rgba(212,107,107,0.12);
+      --frame-bg: linear-gradient(160deg, #1a1a22 0%, #171719 100%);
+      --frame-border: #22223a;
+      --image-bg: linear-gradient(135deg, #1a1a24 0%, #14141a 100%);
+    }
   }
 
   {{CUSTOM_CSS}}
@@ -597,6 +651,7 @@
 
   <!-- Floating Nav Dock -->
   <div class="nav-dock" id="navDock">
+    <button class="arr" onclick="goTo(0)" title="First slide">&#x226A;</button>
     <button class="arr" onclick="goPrev()">&#8249;</button>
     <div class="sep"></div>
     <div class="slide-title-area">
@@ -613,6 +668,7 @@
     <button class="theme-toggle" id="btnTheme" onclick="toggleTheme()" title="Toggle light/dark mode">&#9788;</button>
     <div class="sep"></div>
     <button class="arr" onclick="goNext()">&#8250;</button>
+    <button class="arr" onclick="goTo(total-1)" title="Last slide">&#x226B;</button>
   </div>
 </div>
 
@@ -622,9 +678,10 @@
   let current = 0;
 
   const pipsContainer = document.getElementById('navPips');
-  slides.forEach((_, i) => {
+  slides.forEach((s, i) => {
     const pip = document.createElement('button');
-    pip.className = 'pip' + (i === 0 ? ' active' : '');
+    const isSection = s.classList.contains('slide-section');
+    pip.className = (isSection ? 'pip-divider' : 'pip') + (i === 0 ? ' active' : '');
     pip.onclick = () => goTo(i);
     pipsContainer.appendChild(pip);
   });
@@ -646,7 +703,7 @@
     document.getElementById('navTitle').textContent = slide.dataset.title || '';
     document.getElementById('navCurrent').textContent = current + 1;
     document.getElementById('progressFill').style.width = ((current + 1) / total * 100) + '%';
-    document.querySelectorAll('#navPips .pip').forEach((p, i) =>
+    document.querySelectorAll('#navPips .pip, #navPips .pip-divider').forEach((p, i) =>
       p.classList.toggle('active', i === current));
   }
 
@@ -655,6 +712,11 @@
     isDark = !isDark;
     document.documentElement.classList.toggle('light', !isDark);
     document.getElementById('btnTheme').innerHTML = isDark ? '&#9788;' : '&#9790;';
+  }
+
+  // -- Print mode helper (for PDF export) --
+  function setPrintMode(mode) {
+    document.documentElement.classList.toggle('print-dark', mode === 'dark');
   }
 
   document.getElementById('viewport').addEventListener('keydown', (e) => {
@@ -667,6 +729,15 @@
     const rect = e.currentTarget.getBoundingClientRect();
     if (e.clientX - rect.left > rect.width / 2) goNext(); else goPrev();
   });
+
+  // -- Canvas scaling --
+  function scaleViewport() {
+    const vp = document.getElementById('viewport');
+    const scale = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    vp.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+  }
+  window.addEventListener('resize', scaleViewport);
+  scaleViewport();
 
   document.getElementById('viewport').focus();
   updateNav();

@@ -4,21 +4,67 @@
 
 Soft Contemporary — warm, refined, approachable. Light rounded corners, generous spacing, subtle depth through layered surfaces.
 
+## Icons
+
+**Google Material Symbols Outlined** — loaded from Google Fonts (same CDN as Outfit). The template includes the font link.
+
+- Use the **Outlined** variant only (weight 400, fill 0, grade 0, optical size 24)
+- Icons inherit `currentColor` — set colour via the parent element's `color` property
+- **Never use emoji** (e.g. charts emoji) as icons — they are coloured, inconsistent across platforms, and cannot be styled
+- Usage: `<span class="material-symbols-outlined">icon_name</span>`
+- Browse available icons at https://fonts.google.com/icons?icon.set=Material+Symbols
+
+### Icon Containers
+
+When placing icons inside circular containers (common for card headers):
+
+```css
+.icon-circle {
+  width: 52px; height: 52px; border-radius: 50%;
+  border: 2px solid var(--heading);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; /* prevent squishing */
+}
+.icon-circle .material-symbols-outlined {
+  font-size: 26px; color: var(--heading); line-height: 1;
+}
+```
+
 ## Typography
 
-Font: **Cabinet Grotesk** (Google Fonts) — weights 400, 500, 600, 700, 800.
+Font: **Outfit** (Google Fonts) — weights 300 (Light), 400 (Regular), 500 (Medium), 600 (Semibold), 700 (Bold), 800 (ExtraBold).
 
-All sizes use viewport-relative units (`vw`) so slides scale to any screen size.
+Fallback stack: `'Outfit', system-ui, sans-serif`
+
+All sizes use `px` units. The viewport is a fixed 1280x720 canvas that scales uniformly via CSS `transform: scale()` to fit any screen, so px values behave identically to how they would in a 1280x720 design tool. Never use `vw`, `vh`, or `rem` inside slides.
+
+### Typography Scale (CSS tokens)
+
+The template defines CSS custom properties for a consistent type scale. **Always use these tokens** instead of hard-coding px values where possible:
+
+| Token | Value | Use for |
+|-------|-------|---------|
+| `--text-xs` | 11px | Footnotes — **smallest allowed text** |
+| `--text-sm` | 13px | Labels, captions, tags |
+| `--text-base` | 15px | Body / paragraph text (slide default) |
+| `--text-lg` | 20px | Sub-headings |
+| `--text-xl` | 28px | Content headings |
+| `--text-2xl` | 42px | Section divider headings |
+| `--text-3xl` | 54px | Title slide heading |
+
+**Minimum font size:** No text inside slides should be smaller than `var(--text-xs)` (11px). The `.slide` element defaults to `font-size: var(--text-base)` (15px) and `color: var(--body)`, so unstyled text will be readable by default.
+
+### Reference Sizes
 
 | Role | Size | Weight |
 |------|------|--------|
-| Title slide heading | 7vw | 800 |
-| Section divider heading | 6vw | 700 |
-| Big stat number | 18vw | 800 |
-| Content heading | 2.8–3.5vw | 700 |
-| Body / paragraph | 1.1–1.5vw | 400 |
-| Labels / captions | 0.85–1vw | 500 |
-| Nav dock text | 0.65–0.7rem | 500–600 |
+| Title slide heading | 90px | 800 |
+| Section divider heading | 76px | 700 |
+| Big stat number | 230px | 800 |
+| Content heading | 36–44px | 700 |
+| Body / paragraph | 14–20px | 400 |
+| Labels / captions | 11–13px | 500–600 |
+| Nav dock text | 10–11px | 500–600 |
 
 ## Colour Palette
 
@@ -58,9 +104,10 @@ Each semantic colour has a `-tint` variant (low-opacity background) and optional
 
 ## Layout Rules
 
+- The viewport is a fixed 1280x720px canvas. JavaScript applies `transform: scale(Math.min(innerWidth/1280, innerHeight/720))` on load and resize. Non-16:9 screens get centered letterboxing.
 - All slides use `position: absolute; inset: 0; top: 3px;` (3px for progress bar)
 - Slides are `display: flex; flex-direction: column;` when active
-- Padding: `4–6vh` vertical, `4–6vw` horizontal
+- Padding: `28–50px` vertical, `50–76px` horizontal
 - Cards / surfaces: `border-radius: 12–14px`, `1px solid var(--border)`
 - Cards should fit their content — do NOT use `flex: 1` to stretch cards to fill space
 - Use `justify-content: center` to vertically centre content, `flex-end` for bottom-aligned (section dividers)
@@ -74,14 +121,18 @@ Each semantic colour has a `-tint` variant (low-opacity background) and optional
 - `--rose`: negative metrics, at-risk status, decline indicators
 - Apply via inline `style` attribute: `style="color:var(--accent)"` or use utility classes like `.pill-green`, `.sc-up`, `.sc-down`
 
+### Traffic Light Rule (mandatory)
+
+**`--green`, `--amber`, and `--rose` are reserved for semantic meaning only** — use them to indicate status (success/warning/risk), performance (positive/neutral/negative), or urgency. **Never** use traffic light colours purely to differentiate categories that carry no inherent risk or status meaning. For category differentiation, use `--accent` or neutral colours instead.
+
 ## Important CSS Patterns
 
 ```css
 /* Never set position: relative on slide-type classes — it overrides the base position: absolute */
-.slide-title { justify-content: center; align-items: center; text-align: center; padding: 4vh 5vw; }
-.slide-section { justify-content: flex-end; padding: 6vh 5vw 12vh; }
+.slide-title { justify-content: center; align-items: center; text-align: center; padding: 28px 64px; }
+.slide-section { justify-content: flex-end; padding: 43px 64px 86px; }
 
 /* Cards that contain content should NOT stretch to fill available space */
-.grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2vw; }
+.grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
 /* No flex: 1 or max-height on grid containers */
 ```

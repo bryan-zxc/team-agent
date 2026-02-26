@@ -2,49 +2,53 @@
 name: html-slides
 description: >
   Build standalone, shareable HTML slide presentations with a confirmed design system
-  (Soft Contemporary aesthetic, Cabinet Grotesk font, Indigo accent palette). Use when
-  the user asks to create a presentation, slide deck, slide pack, or report as HTML.
-  Triggers on: "create a presentation", "build slides", "make a deck", "HTML slides",
-  "presentation about X", "slide pack for Y". Do NOT use for .pptx — only for HTML output.
+  (Soft Contemporary aesthetic, Outfit font, Indigo accent palette). Use when the user asks
+  to create a presentation, slide deck, slide pack, or report as HTML. Triggers on: "create a
+  presentation", "build slides", "make a deck", "HTML slides", "presentation about X",
+  "slide pack for Y". Do NOT use for .pptx — only for HTML output.
 ---
 
 # HTML Slide Presentations
 
-Build HTML presentations using the confirmed design system. Output is an `.html` file with light/dark mode, keyboard navigation, and print-to-PDF support.
-
-## Architecture
-
-```
-calculate.py  (optional — only when source data needs processing)
-     |
-     v
-slides.json   (structured content — the primary output)
-     |
-     v
-presentation.html  (built from template + JSON, validated with Playwright)
-     |
-     v
-build.py      (optional — creates a static standalone HTML for sharing)
-```
+Build standalone HTML presentations using the confirmed design system. Output is a single shareable `.html` file with light/dark mode, keyboard navigation, and print-to-PDF support.
 
 ## Workflow
 
 ### 1. Analyse Content
 
-Determine what slides are needed. Read [references/design-system.md](references/design-system.md) for the colour palette, typography scale, and layout rules that must be followed.
+Determine what slides are needed. Read [assets/template.html](assets/template.html) for all built-in CSS patterns and [references/design-system.md](references/design-system.md) for the colour palette, typography scale, and layout rules.
 
 ### 2. Write calculate.py (if needed)
 
-If the presentation requires complex data processing from source files (CSV, spreadsheets, databases, APIs), write a `calculate.py` that:
-- Reads and processes the source data
-- Performs calculations, aggregations, or transformations
-- Outputs processed results that feed into slides.json
+If the presentation requires data processing from source files (CSV, spreadsheets, etc.), write a `calculate.py` that reads, processes, and outputs results to feed into the presentation. Skip if content is purely narrative or data is already prepared.
 
-Skip this step if content is purely narrative or data is already prepared.
+### 3. Build the presentation HTML
 
-### 3. Generate slides.json
+Write the presentation as a complete HTML file, using [assets/template.html](assets/template.html) as the base. Copy the template and replace the `{{TITLE}}`, `{{SLIDES_HTML}}`, and `{{CUSTOM_CSS}}` placeholders:
 
-Write a JSON file:
+- `{{TITLE}}`: the `<title>` tag value
+- `{{SLIDES_HTML}}`: all `<div class="slide ...">` elements. First slide must include the `active` class. Every slide div needs class `slide` plus a layout class, and `data-title="Slide Name"`.
+- `{{CUSTOM_CSS}}`: any additional CSS for custom slide layouts
+
+The template includes the full design system CSS, floating nav dock (prev/next arrows, slide title, page count, pips, light/dark toggle), progress bar, keyboard/click navigation, and print styles.
+
+### 4. Validate with Playwright
+
+**Always use the `/playwright-cli` skill to visually verify output.** Start a local server and screenshot key slides:
+
+```bash
+python3 -m http.server 8787 &
+playwright-cli open http://localhost:8787/presentation.html
+playwright-cli screenshot
+playwright-cli press ArrowRight
+playwright-cli screenshot
+```
+
+Check: font sizes fill the screen, content is well-positioned, colours match the design system, cards fit their content without unnecessary stretching.
+
+### 5. Export to standalone file (optional, on request)
+
+Once the presentation is confirmed, the user can optionally create a standalone shareable version using build.py. Write a `slides.json` file:
 
 ```json
 {
@@ -54,51 +58,15 @@ Write a JSON file:
 }
 ```
 
-- `title`: the `<title>` tag value
-- `slides_html`: all `<div class="slide ...">` elements as a single HTML string. First slide must include the `active` class. Every slide div needs class `slide` plus a layout class, and `data-title="Slide Name"`.
-- `custom_css`: any additional CSS for custom slide layouts (inserted after base styles in the template)
-
-### 4. Build and Validate
-
-Build the presentation HTML from the template and JSON, then **always use the `/playwright-cli` skill to visually verify output.** Start a local server and screenshot key slides:
-
-```bash
-python {skill_path}/scripts/build.py slides.json -o presentation.html
-python3 -m http.server 8787 &
-playwright-cli open http://localhost:8787/presentation.html
-playwright-cli screenshot
-playwright-cli press ArrowRight
-playwright-cli screenshot
-```
-
-The template at [assets/template.html](assets/template.html) contains the full design system CSS, floating nav dock (centred, with prev/next arrows, slide title, page count, pips, light/dark toggle), progress bar, keyboard/click navigation, and print styles.
-
-Check: font sizes fill the screen, content is well-positioned, colours match the design system, cards fit their content without unnecessary stretching. Iterate on slides.json and rebuild until the presentation is confirmed.
-
-### 5. Package for Sharing (optional)
-
-Once the presentation is confirmed, the user can optionally create a static standalone HTML for easy sharing:
+Then build:
 
 ```bash
 python {skill_path}/scripts/build.py slides.json -o presentation.html
 ```
-
-The output is a single self-contained `.html` file that works in any browser with no dependencies (except Google Fonts).
 
 ### 6. Export to PDF (if requested)
 
-The template has built-in `@media print` styles that ensure the PDF output:
-- Renders **one slide per page** (each slide gets a page break)
-- **Hides the navigation dock and progress bar** — only slide content is printed
-- **Defaults to light mode** — all colour tokens are overridden to the light palette regardless of the current theme
-
-To generate a PDF:
-
-```bash
-playwright-cli pdf
-```
-
-Or the user can open the HTML in a browser and use `Cmd+P` / `Ctrl+P` to print to PDF.
+Follow the steps in [references/printing-pdf.md](references/printing-pdf.md).
 
 ## Design Rules (mandatory)
 
@@ -111,15 +79,31 @@ Use ONLY the CSS custom property tokens defined in the template. See [references
 - Text: `var(--heading)` > `var(--subheading)` > `var(--body)` > `var(--muted)`
 - Surfaces: `var(--bg)` > `var(--surface)` > `var(--elevated)`
 
+**Traffic Light Rule (mandatory):** `--green`, `--amber`, and `--rose` are reserved for **semantic meaning only** — status (success/warning/risk), performance (positive/neutral/negative), or urgency. **Never** use traffic light colours to differentiate categories that carry no inherent risk or status meaning. For category differentiation, use `--accent` or neutral colours instead.
+
+### Icons
+
+- **Google Material Symbols Outlined** — loaded from Google Fonts in the template
+- **Never use emoji as icons.** Always use Material Symbols for monochrome, styleable line-art icons
+- Usage: `<span class="material-symbols-outlined">icon_name</span>`
+- Colour via parent `color` property — icons inherit `currentColor`
+- For circular icon containers, use `flex-shrink: 0` to prevent squishing
+
 ### Typography
 
-- Font: Cabinet Grotesk (loaded from Google Fonts in the template)
-- All sizes in `vw` units — see [references/design-system.md](references/design-system.md) for the full scale
-- Maximise font sizes to use screen real estate effectively
+- Font: Outfit (loaded from Google Fonts in the template)
+- All sizes in `px` units — the 1280x720 fixed canvas scales uniformly via CSS transform. Never use `vw`, `vh`, or `rem` inside slides.
+- **Use the typography scale tokens** (`--text-xs` through `--text-3xl`) for consistent sizing. The `.slide` element defaults to `font-size: var(--text-base)` (15px).
+- **Minimum font size is 11px** (`--text-xs`). Never use smaller text inside slides.
+- See [references/design-system.md](references/design-system.md) for the full type scale and token values
 
 ### Navigation Panel
 
 Built into the template — do not modify its structure.
+
+- **Regular slides** appear as round dots (7px) that expand into a wider pill (18px) when active
+- **Section divider slides** (`slide-section` class) appear as vertical pipes (3px x 16px) — visually separating content sections in the nav
+- This is automatic: the JS detects `slide-section` on the slide div and renders the correct pip type
 
 ### Layout
 
@@ -127,23 +111,31 @@ Built into the template — do not modify its structure.
 - Never set `position: relative` on slide-type classes (breaks base `position: absolute` sizing)
 - `justify-content: center` for vertically centred content
 - `justify-content: flex-end` for bottom-aligned content (section dividers)
-- Padding: `4–6vh` vertical, `4–6vw` horizontal
+- Padding: `28-50px` vertical, `50-76px` horizontal
+
+### Canvas Architecture
+
+The template uses a fixed 1280x720px canvas that scales uniformly to fit any screen via CSS `transform: scale()`. This means:
+- All sizes must be in `px` — never use `vw`, `vh`, or `rem` inside the viewport
+- Content is authored for a 1280x720 "virtual screen"
+- Non-16:9 displays get centered letterboxing (dark bars on body)
+- Print/PDF export removes the transform so slides flow naturally
 
 ## Slide Patterns
 
-The template CSS includes these base types. Use as starting points — adapt freely:
+Review [assets/template.html](assets/template.html) for all base CSS and HTML structure. Built-in patterns:
 
 - `slide-title` — centred title with inner frame and accent dot
 - `slide-section` — section divider with large background number, bottom-aligned
-- `slide-stat` — hero stat number (18vw)
+- `slide-stat` — hero stat number centred with label and description
 - `slide-text-image` — two-column: text left, image/visual right
 - `slide-bullets` — heading + bullet list
-- `slide-quote` — blockquote with attribution
+- `slide-quote` — blockquote with attribution and accent bar
 - `slide-compare` — two-column comparison cards
 - `slide-cards` — grid of summary cards
 - `slide-dashboard` — KPI row + detail cards
 - `slide-mixed` — stats grid + narrative panel
-- `slide-table` — styled data table
+- `slide-table` — styled data table with status pills
 - `slide-multi` — multi-column breakdown with header stats
 
 For custom layouts, define new CSS classes via `custom_css` in slides.json. These are examples — create whatever layout best serves the content.
