@@ -81,3 +81,30 @@ export type WorkloadStatusEvent = {
   room_id: string;
   updated_at: string;
 };
+
+export type ThinkingBlock = {
+  type: "thinking";
+  thinking: string;
+};
+
+export type ToolUseContentBlock = {
+  type: "tool_use";
+  tool_use_id: string;
+  name: string;
+  input: Record<string, unknown>;
+};
+
+export type ToolResultContentBlock = {
+  type: "tool_result";
+  tool_use_id: string;
+  content: string | null;
+  is_error: boolean | null;
+};
+
+export type AgentActivityEvent = {
+  _event: "agent_activity";
+  chat_id: string;
+  workload_id: string;
+  phase: string;
+  tokens: number;
+};

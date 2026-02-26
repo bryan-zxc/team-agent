@@ -61,7 +61,8 @@
       "Bash(gh run:*)",
       "Bash(echo:*)",
       "Bash(env:*)",
-      "Bash(docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml exec -T ai-service bash -c 'cat > /home/agent/.claude/.credentials.json && chmod 600 /home/agent/.claude/.credentials.json')"
+      "Bash(docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml exec -T ai-service bash -c 'cat > /home/agent/.claude/.credentials.json && chmod 600 /home/agent/.claude/.credentials.json')",
+      "Bash(PLAYWRIGHT_MCP_SANDBOX=false playwright-cli open:*)"
     ]
   }
 }

@@ -22,6 +22,10 @@ from claude_agent_sdk import (
     HookMatcher,
     ResultMessage,
     TextBlock,
+    ThinkingBlock,
+    ToolResultBlock,
+    ToolUseBlock,
+    UserMessage,
 )
 
 from .config import settings
@@ -352,18 +356,83 @@ async def _relay_messages(
     display_name = workload_data["display_name"]
     main_chat_id = workload_data["main_chat_id"]
 
+    # Periodic heartbeat for activity indicator
+    turn_count = 0
+
+    async def _heartbeat():
+        """Send periodic agent_activity events while the SDK is generating."""
+        try:
+            while True:
+                await asyncio.sleep(1)
+                await redis_client.publish("chat:responses", json.dumps({
+                    "_event": "agent_activity",
+                    "chat_id": chat_id,
+                    "workload_id": workload_id,
+                    "phase": "processing",
+                    "tokens": turn_count,
+                }))
+        except asyncio.CancelledError:
+            pass
+
+    heartbeat_task: asyncio.Task | None = None
+    session_state = _sessions.get(workload_id, {})
+
+    def _convert_blocks(content_blocks: list) -> list[dict]:
+        """Convert SDK content blocks to serialisable dicts."""
+        blocks: list[dict] = []
+        for block in content_blocks:
+            if isinstance(block, TextBlock):
+                blocks.append({"type": "text", "value": block.text})
+            elif isinstance(block, ThinkingBlock):
+                blocks.append({"type": "thinking", "thinking": block.thinking})
+            elif isinstance(block, ToolUseBlock):
+                blocks.append({
+                    "type": "tool_use",
+                    "tool_use_id": block.id,
+                    "name": block.name,
+                    "input": block.input,
+                })
+            elif isinstance(block, ToolResultBlock):
+                blocks.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.tool_use_id,
+                    "content": block.content,
+                    "is_error": block.is_error,
+                })
+        return blocks
+
+    def _start_heartbeat():
+        nonlocal heartbeat_task
+        heartbeat_task = asyncio.create_task(_heartbeat())
+        session_state["heartbeat_task"] = heartbeat_task
+
+    def _stop_heartbeat():
+        nonlocal heartbeat_task
+        if heartbeat_task and not heartbeat_task.done():
+            heartbeat_task.cancel()
+        session_state["heartbeat_task"] = None
+
+    # Expose restart callback so tool_approval can resume the heartbeat
+    session_state["restart_heartbeat"] = _start_heartbeat
+
     try:
+        # Start heartbeat before the message loop
+        _start_heartbeat()
+
         async for msg in client.receive_messages():
             if isinstance(msg, AssistantMessage):
-                text_parts = [
-                    block.text for block in msg.content if isinstance(block, TextBlock)
-                ]
-                if not text_parts:
+                # Stop heartbeat while processing a complete message
+                _stop_heartbeat()
+
+                turn_count += 1
+                blocks = _convert_blocks(msg.content)
+                if not blocks:
+                    # Restart heartbeat for the next turn
+                    _start_heartbeat()
                     continue
 
-                text = "\n".join(text_parts)
                 structured_content = json.dumps({
-                    "blocks": [{"type": "text", "value": text}],
+                    "blocks": blocks,
                     "mentions": [],
                 })
 
@@ -377,6 +446,30 @@ async def _relay_messages(
                     "created_at": datetime.now(timezone.utc).isoformat(),
                 }
                 await redis_client.publish("chat:responses", json.dumps(response))
+
+                # Restart heartbeat for the next turn
+                _start_heartbeat()
+
+            elif isinstance(msg, UserMessage):
+                # Relay tool results (user-role messages containing ToolResultBlock)
+                if isinstance(msg.content, list):
+                    blocks = _convert_blocks(msg.content)
+                    result_blocks = [b for b in blocks if b["type"] == "tool_result"]
+                    if result_blocks:
+                        structured_content = json.dumps({
+                            "blocks": result_blocks,
+                            "mentions": [],
+                        })
+                        response = {
+                            "id": str(uuid.uuid4()),
+                            "chat_id": chat_id,
+                            "member_id": member_id,
+                            "display_name": display_name,
+                            "type": "ai",
+                            "content": structured_content,
+                            "created_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                        await redis_client.publish("chat:responses", json.dumps(response))
 
             elif isinstance(msg, ResultMessage):
                 logger.info(
@@ -473,9 +566,13 @@ async def _relay_messages(
 
     except asyncio.CancelledError:
         logger.info("Relay task cancelled for workload %s", workload_id[:8])
+        if heartbeat_task and not heartbeat_task.done():
+            heartbeat_task.cancel()
         _sessions.pop(workload_id, None)
     except Exception:
         logger.exception("Relay task error for workload %s", workload_id[:8])
+        if heartbeat_task and not heartbeat_task.done():
+            heartbeat_task.cancel()
         try:
             conn = await asyncpg.connect(_dsn)
             try:

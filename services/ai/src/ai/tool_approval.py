@@ -230,7 +230,13 @@ def make_can_use_tool(
         if permission_key in session_state["session_approvals"]:
             return PermissionResultAllow()
 
-        # 3. Prompt the human via Redis → WebSocket
+        # 3. Stop the activity heartbeat while waiting for approval
+        hb = session_state.get("heartbeat_task")
+        if hb and not hb.done():
+            hb.cancel()
+            session_state["heartbeat_task"] = None
+
+        # 4. Prompt the human via Redis → WebSocket
         approval_request_id = str(uuid.uuid4())
         future: asyncio.Future[dict] = asyncio.get_event_loop().create_future()
         session_state["pending_approvals"][approval_request_id] = future
@@ -265,7 +271,7 @@ def make_can_use_tool(
             approval_request_id[:8], tool_name, workload_id[:8],
         )
 
-        # 4. Wait for human response
+        # 5. Wait for human response
         try:
             decision = await asyncio.wait_for(future, timeout=APPROVAL_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
@@ -280,7 +286,12 @@ def make_can_use_tool(
         finally:
             session_state["pending_approvals"].pop(approval_request_id, None)
 
-        # 5. Process the decision
+        # 6. Restart activity heartbeat now that approval is resolved
+        restart_hb = session_state.get("restart_heartbeat")
+        if restart_hb:
+            restart_hb()
+
+        # 7. Process the decision
         tier = decision["decision"]
 
         if tier == "deny":

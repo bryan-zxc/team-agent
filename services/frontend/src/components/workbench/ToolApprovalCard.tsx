@@ -139,23 +139,9 @@ export function ToolApprovalCard({ block, disabled }: Props) {
     submitDecision("deny", denyReason.trim());
   }, [denyReason, submitDecision]);
 
-  // Resolved state — compact one-liner
+  // Resolved — disappear completely
   if (status === "approve" || status === "approve_session" || status === "approve_project" || status === "deny") {
-    const approved = status !== "deny";
-    const tierLabel =
-      status === "approve_session" ? " for session" :
-      status === "approve_project" ? " for project" : "";
-    return (
-      <div className={styles.card}>
-        <div className={styles.resolvedRow}>
-          <span className={styles.toolBadge}>{block.tool_name}</span>
-          <span className={styles.resolvedSummary}>{block.input_summary}</span>
-          <span className={approved ? styles.resolvedApproved : styles.resolvedDenied}>
-            {approved ? `Approved${tierLabel}` : "Denied"}
-          </span>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   // Deny input state

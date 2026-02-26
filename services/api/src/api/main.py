@@ -68,6 +68,13 @@ async def _listen_for_ai_responses():
                 continue
             msg_data = json.loads(raw["data"])
 
+            # Ephemeral events (e.g. agent_activity) — broadcast without persisting
+            if msg_data.get("_event"):
+                chat_id = msg_data.get("chat_id")
+                if chat_id:
+                    await manager.broadcast(uuid.UUID(chat_id), msg_data)
+                continue
+
             # Persist to PostgreSQL
             message = Message(
                 id=uuid.UUID(msg_data["id"]),

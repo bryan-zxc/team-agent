@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { AnimatePresence } from "motion/react";
 import { useWebSocket, type TypingEvent } from "@/hooks/useWebSocket";
 import type { IDockviewPanelProps } from "dockview";
-import type { Member, Message, Room, ToolApprovalBlock, WorkloadChat, WorkloadStatusEvent } from "@/types";
+import type { AgentActivityEvent, Member, Message, Room, ToolApprovalBlock, WorkloadChat, WorkloadStatusEvent } from "@/types";
 import { apiFetch } from "@/lib/api";
 import { ToolApprovalCard } from "./ToolApprovalCard";
 import { WorkloadPanel } from "./WorkloadPanel";
@@ -82,6 +84,132 @@ function getToolApprovalBlock(content: string): ToolApprovalBlock | null {
   return null;
 }
 
+/* ── Rich content block helpers ── */
+
+const SPINNER_VERBS = [
+  "Pondering", "Architecting", "Reasoning", "Noodling", "Contemplating",
+  "Synthesising", "Deliberating", "Formulating", "Strategising", "Evaluating",
+  "Analysing", "Composing", "Cogitating", "Ruminating", "Brainstorming",
+];
+
+function pickVerb(): string {
+  return SPINNER_VERBS[Math.floor(Math.random() * SPINNER_VERBS.length)];
+}
+
+function formatElapsed(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}m ${s}s`;
+}
+
+function toolUseSummary(name: string, input: Record<string, unknown>): string {
+  switch (name) {
+    case "Read":
+      return `Read ${input.file_path ?? "file"}`;
+    case "Bash":
+      return `Run: ${truncate(String(input.command ?? ""), 60)}`;
+    case "Edit":
+      return `Edit ${input.file_path ?? "file"}`;
+    case "Write":
+      return `Write ${input.file_path ?? "file"}`;
+    case "MultiEdit":
+      return `Edit ${input.file_path ?? "file"}`;
+    case "Grep":
+      return `Search for '${input.pattern ?? ""}'`;
+    case "Glob":
+      return `Find files matching '${input.pattern ?? ""}'`;
+    case "WebSearch":
+      return `Search web for '${input.query ?? ""}'`;
+    case "WebFetch":
+      return `Fetch ${truncate(String(input.url ?? ""), 50)}`;
+    case "TodoWrite":
+    case "TaskCreate":
+      return `Create task: ${input.subject ?? ""}`;
+    case "TaskUpdate":
+      return `Update task ${input.taskId ?? ""}`;
+    case "TaskList":
+      return "List tasks";
+    default:
+      return name;
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function renderRichBlocks(blocks: any[]): React.ReactNode {
+  return blocks.map((block, i) => {
+    switch (block.type) {
+      case "text":
+        return (
+          <div key={i} className={styles.markdownContent}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.value}</ReactMarkdown>
+          </div>
+        );
+      case "mention":
+        return (
+          <span key={i} className={styles.mention}>
+            @{block.display_name}
+          </span>
+        );
+      case "thinking":
+        return (
+          <details key={i} className={styles.thinkingBlock}>
+            <summary className={styles.thinkingSummary}>Thinking...</summary>
+            <div className={styles.thinkingContent}>{block.thinking}</div>
+          </details>
+        );
+      case "tool_use":
+        return (
+          <details key={i} className={styles.toolUseBlock}>
+            <summary className={styles.toolUseSummary}>
+              <span className={styles.toolBadge}>{block.name}</span>
+              <span>{toolUseSummary(block.name, block.input ?? {})}</span>
+            </summary>
+            <pre className={styles.toolDetails}>
+              {JSON.stringify(block.input, null, 2)}
+            </pre>
+          </details>
+        );
+      case "tool_result": {
+        const isError = block.is_error === true;
+        const content = typeof block.content === "string"
+          ? block.content
+          : block.content != null
+            ? JSON.stringify(block.content, null, 2)
+            : "";
+        const lines = content.split("\n");
+        const isLong = lines.length > 5;
+        return (
+          <div key={i} className={clsx(styles.toolResultBlock, isError ? styles.toolResultError : styles.toolResultSuccess)}>
+            <span className={styles.toolResultIcon}>{isError ? "✕" : "✓"}</span>
+            {isLong && !isError ? (
+              <details className={styles.toolResultDetails}>
+                <summary className={styles.toolResultSummaryLine}>
+                  {truncate(lines[0], 80)} ({lines.length} lines)
+                </summary>
+                <pre className={styles.toolResultContent}>{content}</pre>
+              </details>
+            ) : content ? (
+              <pre className={styles.toolResultContent}>{truncate(content, 500)}</pre>
+            ) : null}
+          </div>
+        );
+      }
+      default:
+        return <span key={i}>{block.value ?? ""}</span>;
+    }
+  });
+}
+
+function renderMsgContent(msg: Message): React.ReactNode {
+  if (msg.type === "human") return renderMessageContent(msg.content);
+  try {
+    const data = JSON.parse(msg.content);
+    if (data?.blocks) return renderRichBlocks(data.blocks);
+  } catch { /* legacy plain text */ }
+  return msg.content;
+}
+
 /* ── ChatView: reusable messages + input for any chat ── */
 
 type ChatViewProps = {
@@ -115,6 +243,13 @@ function ChatView({
   const [typingMembers, setTypingMembers] = useState<
     Map<string, { display_name: string; timeout: ReturnType<typeof setTimeout> }>
   >(new Map());
+  const [agentActivity, setAgentActivity] = useState<{
+    verb: string;
+    startTime: number;
+    phase: string;
+    tokens: number;
+    elapsed: number;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevCountRef = useRef(0);
@@ -138,11 +273,21 @@ function ChatView({
     });
   }, []);
 
+  const handleAgentActivity = useCallback((event: AgentActivityEvent) => {
+    setAgentActivity((prev) => {
+      if (!prev) {
+        return { verb: pickVerb(), startTime: Date.now(), phase: event.phase, tokens: event.tokens, elapsed: 0 };
+      }
+      return { ...prev, phase: event.phase, tokens: event.tokens };
+    });
+  }, []);
+
   const { messages, sendMessage, sendTyping, setMessages } = useWebSocket(
     chatId,
     memberId,
     onRoomEvent,
     handleTypingEvent,
+    handleAgentActivity,
   );
 
   useEffect(() => {
@@ -159,8 +304,13 @@ function ChatView({
   useEffect(() => {
     if (messages.length > prevCountRef.current) {
       const latest = messages[messages.length - 1];
-      if (latest.type !== "human" && onAiMessage) {
-        onAiMessage();
+      if (latest.type !== "human") {
+        onAiMessage?.();
+        // Clear activity indicator on AI messages and tool approval requests
+        // (agent is blocked waiting for human when approval is pending)
+        if (latest.type === "tool_approval_request" || latest.type === "ai") {
+          setAgentActivity(null);
+        }
       }
       // Clear typing indicator when a message arrives from that member
       setTypingMembers((prev) => {
@@ -176,12 +326,26 @@ function ChatView({
   }, [messages, onAiMessage]);
 
   // Clear resuming state when workload transitions to running
+  // Clear agent activity when workload stops running
   useEffect(() => {
     if (prevStatusRef.current !== "running" && workloadStatus === "running") {
       setResuming(false);
     }
+    if (prevStatusRef.current === "running" && workloadStatus !== "running") {
+      setAgentActivity(null);
+    }
     prevStatusRef.current = workloadStatus;
   }, [workloadStatus]);
+
+  // Elapsed timer for agent activity indicator
+  const isAgentActive = agentActivity !== null;
+  useEffect(() => {
+    if (!isAgentActive) return;
+    const interval = setInterval(() => {
+      setAgentActivity((prev) => prev ? { ...prev, elapsed: Date.now() - prev.startTime } : null);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isAgentActive]);
 
   const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
 
@@ -408,7 +572,7 @@ function ChatView({
                     </span>
                   </button>
                 )}
-                <div className={styles.msgBubble}>{renderMessageContent(msg.content)}</div>
+                <div className={styles.msgBubble}>{renderMsgContent(msg)}</div>
                 <button
                   className={styles.replyBtn}
                   onClick={() => {
@@ -428,6 +592,16 @@ function ChatView({
         })}
         <div ref={messagesEndRef} />
       </div>
+
+      {agentActivity && (
+        <div className={styles.agentStatus}>
+          <span className={styles.spinner} />
+          <span className={styles.agentVerb}>{agentActivity.verb}...</span>
+          <span className={styles.agentMeta}>
+            ({formatElapsed(agentActivity.elapsed)} · {agentActivity.tokens} tokens)
+          </span>
+        </div>
+      )}
 
       {typingMembers.size > 0 && (
         <div className={styles.typingIndicator}>

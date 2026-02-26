@@ -523,3 +523,274 @@
   0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
   40% { opacity: 1; transform: translateY(-3px); }
 }
+
+/* ── Rich content blocks ── */
+
+.thinkingBlock {
+  margin: 4px 0;
+  border-left: 2px solid var(--text-muted);
+  border-radius: 0 6px 6px 0;
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.thinkingSummary {
+  cursor: pointer;
+  padding: 6px 12px;
+  font-style: italic;
+  color: var(--text-secondary);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.thinkingSummary::before {
+  content: "▶";
+  font-size: 8px;
+  transition: transform 0.15s ease;
+}
+
+.thinkingBlock[open] .thinkingSummary::before {
+  transform: rotate(90deg);
+}
+
+.thinkingSummary::-webkit-details-marker {
+  display: none;
+}
+
+.thinkingContent {
+  padding: 4px 12px 8px;
+  white-space: pre-wrap;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.toolUseBlock {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.toolUseSummary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  list-style: none;
+}
+
+.toolUseSummary::before {
+  content: "▶";
+  font-size: 8px;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.toolUseBlock[open] .toolUseSummary::before {
+  transform: rotate(90deg);
+}
+
+.toolUseSummary::-webkit-details-marker {
+  display: none;
+}
+
+.toolBadge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.toolDetails {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--surface);
+  padding: 8px;
+  border-radius: 6px;
+  max-height: 200px;
+  overflow: auto;
+  margin: 4px 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.toolResultBlock {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 2px 0 2px 16px;
+  font-size: 12px;
+}
+
+.toolResultSuccess {
+  color: var(--accent);
+}
+
+.toolResultError {
+  color: var(--warm);
+}
+
+.toolResultIcon {
+  font-weight: 700;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.toolResultDetails {
+  flex: 1;
+  min-width: 0;
+}
+
+.toolResultSummaryLine {
+  cursor: pointer;
+  color: var(--text-secondary);
+  list-style: none;
+}
+
+.toolResultSummaryLine::-webkit-details-marker {
+  display: none;
+}
+
+.toolResultContent {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--surface);
+  padding: 6px 8px;
+  border-radius: 4px;
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.4;
+  margin-top: 4px;
+}
+
+/* ── Markdown content (react-markdown inside AI messages) ── */
+
+.markdownContent {
+  line-height: 1.55;
+}
+
+.markdownContent h1,
+.markdownContent h2,
+.markdownContent h3,
+.markdownContent h4 {
+  margin: 8px 0 4px;
+  font-weight: 600;
+}
+
+.markdownContent h1 { font-size: 1.2em; }
+.markdownContent h2 { font-size: 1.1em; }
+.markdownContent h3 { font-size: 1.05em; }
+
+.markdownContent p {
+  margin: 4px 0;
+}
+
+.markdownContent code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--surface);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.markdownContent pre {
+  background: var(--surface);
+  padding: 8px 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 6px 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.markdownContent pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.markdownContent ul,
+.markdownContent ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.markdownContent li {
+  margin: 2px 0;
+}
+
+.markdownContent a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.markdownContent a:hover {
+  text-decoration: underline;
+}
+
+.markdownContent blockquote {
+  border-left: 2px solid var(--border);
+  margin: 4px 0;
+  padding: 2px 12px;
+  color: var(--text-secondary);
+}
+
+.markdownContent table {
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-size: 13px;
+}
+
+.markdownContent th,
+.markdownContent td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+}
+
+.markdownContent th {
+  background: var(--surface);
+  font-weight: 600;
+}
+
+/* ── Agent activity status indicator ── */
+
+.agentStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 20px 8px;
+  font-size: 12px;
+  font-family: var(--font-body);
+  min-height: 24px;
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.agentVerb {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.agentMeta {
+  color: var(--text-muted);
+}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_URL } from "@/lib/api";
-import type { Message } from "@/types";
+import type { AgentActivityEvent, Message } from "@/types";
 
 const WS_URL = API_URL.replace(/^http/, "ws");
 
@@ -17,6 +17,7 @@ export function useWebSocket(
   memberId: string | null,
   onRoomEvent?: (event: Record<string, unknown>) => void,
   onTypingEvent?: (event: TypingEvent) => void,
+  onAgentActivity?: (event: AgentActivityEvent) => void,
 ) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -26,6 +27,8 @@ export function useWebSocket(
   roomEventRef.current = onRoomEvent;
   const typingEventRef = useRef(onTypingEvent);
   typingEventRef.current = onTypingEvent;
+  const agentActivityRef = useRef(onAgentActivity);
+  agentActivityRef.current = onAgentActivity;
 
   const connect = useCallback(() => {
     if (!chatId || !memberId) return;
@@ -41,6 +44,12 @@ export function useWebSocket(
       // Typing events — ephemeral, handled separately
       if (data._event === "typing") {
         typingEventRef.current?.(data as TypingEvent);
+        return;
+      }
+
+      // Agent activity events — streaming status heartbeat
+      if (data._event === "agent_activity") {
+        agentActivityRef.current?.(data as AgentActivityEvent);
         return;
       }
 
