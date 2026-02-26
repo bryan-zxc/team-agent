@@ -20,7 +20,26 @@ version. In all cases, present the recommendation and wait for user approval.
 
 ## Workflow
 
-### 1. Determine the current version
+### 1. Ensure working tree is clean and sync local branches
+
+```bash
+git status --porcelain
+```
+
+If there are uncommitted changes, warn the user and stop.
+
+Then sync local branches with origin so all comparisons are accurate:
+
+```bash
+git fetch origin main develop
+git checkout develop
+git pull origin develop
+git checkout main
+git pull origin main
+git checkout develop
+```
+
+### 2. Determine the current version
 
 Read the latest version tag from git:
 
@@ -30,7 +49,7 @@ git tag --list 'v*' --sort=-version:refname | head -1
 
 If no tags exist, the current version is `v0.0.0`.
 
-### 2. Analyse changes
+### 3. Analyse changes
 
 Run:
 
@@ -54,7 +73,7 @@ Based on the analysis, recommend a bump type:
 
 Compute the proposed next version by bumping from the current version.
 
-### 3. Confirm with the user
+### 4. Confirm with the user
 
 Present:
 - Current version (latest tag, or "no previous release")
@@ -66,39 +85,22 @@ Present:
 Wait for the user to approve, change the version, or cancel. Never proceed
 without explicit approval.
 
-### 4. Ensure working tree is clean
+### 5. Merge develop into main
 
 ```bash
-git status --porcelain
-```
-
-If there are uncommitted changes, warn the user and stop.
-
-### 5. Update local branches
-
-```bash
-git fetch origin main develop
-git checkout develop
-git pull origin develop
 git checkout main
-git pull origin main
-```
-
-### 6. Merge develop into main
-
-```bash
 git merge develop --ff-only
 ```
 
 Fast-forward only. If it fails (main has diverged), stop and explain.
 
-### 7. Create the annotated tag
+### 6. Create the annotated tag
 
 ```bash
 git tag -a vX.Y.Z -m "Release vX.Y.Z"
 ```
 
-### 8. Push main and tag
+### 7. Push main and tag
 
 ```bash
 git push origin main --follow-tags
@@ -106,13 +108,13 @@ git push origin main --follow-tags
 
 This triggers the GitHub Actions deploy workflow automatically.
 
-### 9. Switch back to develop
+### 8. Switch back to develop
 
 ```bash
 git checkout develop
 ```
 
-### 10. Report result
+### 9. Report result
 
 Print:
 - The version released (e.g. `v0.2.0`)
