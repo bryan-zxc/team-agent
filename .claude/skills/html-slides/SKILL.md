@@ -16,7 +16,7 @@ Build standalone HTML presentations using the confirmed design system. Output is
 
 ### 1. Analyse Content
 
-Determine what slides are needed. Read [assets/template.html](assets/template.html) for all built-in CSS patterns and [references/design-system.md](references/design-system.md) for the colour palette, typography scale, and layout rules.
+Determine what slides are needed. Read [assets/template.html](assets/template.html) for all built-in CSS patterns, [../../shared/design-system.md](../../shared/design-system.md) for the colour palette, icons, and semantic rules, and [references/design-system.md](references/design-system.md) for slide-specific typography scale and layout rules.
 
 ### 2. Write calculate.py (if needed)
 
