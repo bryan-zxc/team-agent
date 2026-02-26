@@ -1,0 +1,36 @@
+.richInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text-primary);
+  padding: 4px 0;
+  min-height: 24px;
+  max-height: 120px;
+  overflow-y: auto;
+  line-height: 1.5;
+  outline: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  position: relative;
+}
+
+/* Placeholder when empty */
+.richInput.empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+  position: absolute;
+  top: 4px;
+  left: 0;
+}
+
+/* Chip overrides inside the editor */
+.richInput [data-type] {
+  user-select: all;
+  cursor: default;
+  vertical-align: baseline;
+  display: inline;
+  line-height: inherit;
+}

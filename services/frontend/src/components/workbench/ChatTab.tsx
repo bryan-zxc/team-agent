@@ -13,6 +13,7 @@ import { ToolApprovalCard } from "./ToolApprovalCard";
 import { WorkloadPanel } from "./WorkloadPanel";
 import { MentionDropdown, filterMembers } from "./MentionDropdown";
 import { SlashCommandDropdown, filterSkills } from "./SlashCommandDropdown";
+import { RichInput, type RichInputHandle, type TriggerState } from "./RichInput";
 import styles from "./ChatTab.module.css";
 
 type ChatTabParams = {
@@ -265,11 +266,10 @@ function ChatView({
   workloadHasSession,
   onInterrupt,
 }: ChatViewProps) {
-  const [input, setInput] = useState("");
   const [resuming, setResuming] = useState(false);
-  const [mentionState, setMentionState] = useState<{ query: string; startPos: number } | null>(null);
+  const [mentionState, setMentionState] = useState<{ query: string } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
-  const [commandState, setCommandState] = useState<{ query: string; startPos: number } | null>(null);
+  const [commandState, setCommandState] = useState<{ query: string } | null>(null);
   const [commandIndex, setCommandIndex] = useState(0);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
@@ -284,7 +284,7 @@ function ChatView({
     elapsed: number;
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const richInputRef = useRef<RichInputHandle>(null);
   const prevCountRef = useRef(0);
   const prevStatusRef = useRef(workloadStatus);
   const lastTypingRef = useRef(0);
@@ -414,164 +414,63 @@ function ChatView({
 
   const isPaused = workloadStatus === "needs_attention" || workloadStatus === "completed";
 
-  const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const value = e.target.value;
-      const cursorPos = e.target.selectionStart;
-      setInput(value);
-
-      // Throttled typing indicator — at most once per 3 seconds
-      const now = Date.now();
-      if (value.trim() && now - lastTypingRef.current > 3000) {
-        sendTyping();
-        lastTypingRef.current = now;
-      }
-
-      // Scan backwards from cursor for an unmatched @
-      const textBeforeCursor = value.slice(0, cursorPos);
-      const atIndex = textBeforeCursor.lastIndexOf("@");
-
-      if (atIndex >= 0) {
-        const query = textBeforeCursor.slice(atIndex + 1);
-        // Mention is valid if no whitespace between @ and cursor, and @ is at start or after whitespace
-        if (!query.includes(" ") && !query.includes("\n")) {
-          if (atIndex === 0 || /\s/.test(textBeforeCursor[atIndex - 1])) {
-            setMentionState({ query, startPos: atIndex });
-            setMentionIndex(0);
-            setCommandState(null);
-            return;
-          }
-        }
-      }
-
-      // Scan backwards from cursor for an unmatched /
-      const slashIndex = textBeforeCursor.lastIndexOf("/");
-      if (slashIndex >= 0) {
-        const query = textBeforeCursor.slice(slashIndex + 1);
-        if (!query.includes(" ") && !query.includes("\n")) {
-          if (slashIndex === 0 || /\s/.test(textBeforeCursor[slashIndex - 1])) {
-            setCommandState({ query, startPos: slashIndex });
-            setCommandIndex(0);
-            setMentionState(null);
-            return;
-          }
-        }
-      }
-
+  const handleTriggerChange = useCallback((trigger: TriggerState | null) => {
+    if (!trigger) {
       setMentionState(null);
       setCommandState(null);
-    },
-    [sendTyping],
-  );
+      return;
+    }
+    if (trigger.type === "mention") {
+      setMentionState({ query: trigger.query });
+      setMentionIndex(0);
+      setCommandState(null);
+    } else {
+      setCommandState({ query: trigger.query });
+      setCommandIndex(0);
+      setMentionState(null);
+    }
+  }, []);
+
+  const handleTyping = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTypingRef.current > 3000) {
+      sendTyping();
+      lastTypingRef.current = now;
+    }
+  }, [sendTyping]);
 
   const handleMentionSelect = useCallback(
     (member: Member) => {
-      if (!mentionState) return;
-      const before = input.slice(0, mentionState.startPos);
-      const after = input.slice(mentionState.startPos + 1 + mentionState.query.length);
-      setInput(`${before}@${member.display_name} ${after}`);
+      richInputRef.current?.insertMentionChip(member);
       setMentionState(null);
-      textareaRef.current?.focus();
     },
-    [input, mentionState],
+    [],
   );
 
   const handleCommandSelect = useCallback(
     (skill: Skill) => {
-      if (!commandState) return;
-      const before = input.slice(0, commandState.startPos);
-      const after = input.slice(commandState.startPos + 1 + commandState.query.length);
-      setInput(`${before}/${skill.name} ${after}`);
+      richInputRef.current?.insertSkillChip(skill);
       setCommandState(null);
-      textareaRef.current?.focus();
     },
-    [input, commandState],
+    [],
   );
 
   const handleSend = useCallback(() => {
-    if (!input.trim()) return;
-    const text = input.trim();
+    const ri = richInputRef.current;
+    if (!ri || ri.isEmpty()) return;
 
-    // Build structured blocks: split text at @mention and /skill boundaries
-    type Block =
-      | { type: "text"; value: string }
-      | { type: "mention"; member_id: string; display_name: string }
-      | { type: "skill"; name: string };
-    const blocks: Block[] = [];
-    const mentions: string[] = [];
-    let remaining = text;
-
-    while (remaining.length > 0) {
-      // Find earliest @mention
-      let earliestMentionIdx = -1;
-      let earliestMember: Member | null = null;
-
-      for (const member of members) {
-        const idx = remaining.toLowerCase().indexOf(`@${member.display_name.toLowerCase()}`);
-        if (idx !== -1 && (earliestMentionIdx === -1 || idx < earliestMentionIdx)) {
-          earliestMentionIdx = idx;
-          earliestMember = member;
-        }
-      }
-
-      // Find earliest /skill
-      let earliestSkillIdx = -1;
-      let earliestSkill: Skill | null = null;
-
-      for (const skill of skills) {
-        const pattern = `/${skill.name}`;
-        const idx = remaining.indexOf(pattern);
-        if (idx !== -1 && (earliestSkillIdx === -1 || idx < earliestSkillIdx)) {
-          // Ensure /skill is at start or after whitespace, and followed by whitespace or end
-          const charAfter = remaining[idx + pattern.length];
-          if (
-            (idx === 0 || /\s/.test(remaining[idx - 1])) &&
-            (charAfter === undefined || /\s/.test(charAfter))
-          ) {
-            earliestSkillIdx = idx;
-            earliestSkill = skill;
-          }
-        }
-      }
-
-      // Determine which comes first
-      const mentionFirst = earliestMentionIdx !== -1 && (earliestSkillIdx === -1 || earliestMentionIdx <= earliestSkillIdx);
-      const skillFirst = earliestSkillIdx !== -1 && (earliestMentionIdx === -1 || earliestSkillIdx < earliestMentionIdx);
-
-      if (mentionFirst && earliestMember) {
-        if (earliestMentionIdx > 0) {
-          blocks.push({ type: "text", value: remaining.slice(0, earliestMentionIdx) });
-        }
-        blocks.push({
-          type: "mention",
-          member_id: earliestMember.id,
-          display_name: earliestMember.display_name,
-        });
-        if (!mentions.includes(earliestMember.id)) {
-          mentions.push(earliestMember.id);
-        }
-        remaining = remaining.slice(earliestMentionIdx + 1 + earliestMember.display_name.length);
-      } else if (skillFirst && earliestSkill) {
-        if (earliestSkillIdx > 0) {
-          blocks.push({ type: "text", value: remaining.slice(0, earliestSkillIdx) });
-        }
-        blocks.push({ type: "skill", name: earliestSkill.name });
-        remaining = remaining.slice(earliestSkillIdx + 1 + earliestSkill.name.length);
-      } else {
-        if (remaining) blocks.push({ type: "text", value: remaining });
-        break;
-      }
-    }
+    const blocks = ri.getBlocks();
+    const mentions = ri.getMentionIds();
 
     sendMessage(blocks, mentions, replyTo?.id);
-    setInput("");
+    ri.clear();
     setReplyTo(null);
     setMentionState(null);
     setCommandState(null);
     if (isPaused && workloadHasSession) {
       setResuming(true);
     }
-  }, [input, members, sendMessage, replyTo, isPaused, workloadHasSession]);
+  }, [sendMessage, replyTo, isPaused, workloadHasSession]);
 
   const isRunning = workloadStatus === "running" || workloadStatus === "assigned";
 
@@ -631,14 +530,14 @@ function ChatView({
       }
       if (e.key === "Escape" && isRunning && onInterrupt) {
         e.preventDefault();
-        if (input.trim()) {
-          setInput("");
+        if (!richInputRef.current?.isEmpty()) {
+          richInputRef.current?.clear();
         } else {
           onInterrupt();
         }
       }
     },
-    [handleSend, isRunning, onInterrupt, input, mentionState, filteredMentionMembers, mentionIndex, handleMentionSelect, commandState, filteredCommands, commandIndex, handleCommandSelect],
+    [handleSend, isRunning, onInterrupt, mentionState, filteredMentionMembers, mentionIndex, handleMentionSelect, commandState, filteredCommands, commandIndex, handleCommandSelect],
   );
 
   const scrollToMessage = useCallback((messageId: string) => {
@@ -741,7 +640,7 @@ function ChatView({
                   className={styles.replyBtn}
                   onClick={() => {
                     setReplyTo(msg);
-                    textareaRef.current?.focus();
+                    richInputRef.current?.focus();
                   }}
                   aria-label="Reply"
                 >
@@ -835,14 +734,13 @@ function ChatView({
               />
             )}
           </AnimatePresence>
-          <textarea
-            ref={textareaRef}
+          <RichInput
+            ref={richInputRef}
             className={styles.inputField}
             placeholder={placeholder}
-            value={input}
-            onChange={handleInputChange}
+            onTriggerChange={handleTriggerChange}
             onKeyDown={handleKeyDown}
-            rows={1}
+            onTyping={handleTyping}
           />
           {isRunning && onInterrupt && (
             <button

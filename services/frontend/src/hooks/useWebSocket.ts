@@ -8,7 +8,8 @@ const WS_URL = API_URL.replace(/^http/, "ws");
 
 type ContentBlock =
   | { type: "text"; value: string }
-  | { type: "mention"; member_id: string; display_name: string };
+  | { type: "mention"; member_id: string; display_name: string }
+  | { type: "skill"; name: string };
 
 export type TypingEvent = { member_id: string; display_name: string };
 

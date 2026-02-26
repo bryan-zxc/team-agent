@@ -359,6 +359,14 @@
   border-radius: 4px;
 }
 
+/* ── Chips inside the rich input are atomic ── */
+
+.inputWrapper .mention,
+.inputWrapper .skillTag {
+  user-select: all;
+  cursor: default;
+}
+
 /* ── Reply button on hover ── */
 
 .replyBtn {
