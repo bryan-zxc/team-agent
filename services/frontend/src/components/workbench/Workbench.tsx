@@ -96,7 +96,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
         id: panelId,
         component: "chatTab",
         title: room.name,
-        params: { roomId, room, memberId, members },
+        params: { roomId, room, memberId, members, projectId },
       });
       setActiveRoomId(roomId);
     },

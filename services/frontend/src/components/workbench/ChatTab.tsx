@@ -7,11 +7,12 @@ import remarkGfm from "remark-gfm";
 import { AnimatePresence } from "motion/react";
 import { useWebSocket, type TypingEvent } from "@/hooks/useWebSocket";
 import type { IDockviewPanelProps } from "dockview";
-import type { AgentActivityEvent, Member, Message, Room, TodoItem, ToolApprovalBlock, WorkloadChat, WorkloadStatusEvent } from "@/types";
+import type { AgentActivityEvent, Member, Message, Room, Skill, TodoItem, ToolApprovalBlock, WorkloadChat, WorkloadStatusEvent } from "@/types";
 import { apiFetch } from "@/lib/api";
 import { ToolApprovalCard } from "./ToolApprovalCard";
 import { WorkloadPanel } from "./WorkloadPanel";
 import { MentionDropdown, filterMembers } from "./MentionDropdown";
+import { SlashCommandDropdown, filterSkills } from "./SlashCommandDropdown";
 import styles from "./ChatTab.module.css";
 
 type ChatTabParams = {
@@ -19,6 +20,7 @@ type ChatTabParams = {
   room: Room;
   memberId: string | null;
   members: Member[];
+  projectId: string;
 };
 
 function getMessageText(content: string): string {
@@ -234,6 +236,7 @@ type ChatViewProps = {
   chatId: string | null;
   memberId: string | null;
   members: Member[];
+  projectId: string;
   placeholder: string;
   onAiMessage?: () => void;
   onRoomEvent?: (event: Record<string, unknown>) => void;
@@ -246,6 +249,7 @@ function ChatView({
   chatId,
   memberId,
   members,
+  projectId,
   placeholder,
   onAiMessage,
   onRoomEvent,
@@ -257,6 +261,9 @@ function ChatView({
   const [resuming, setResuming] = useState(false);
   const [mentionState, setMentionState] = useState<{ query: string; startPos: number } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
+  const [commandState, setCommandState] = useState<{ query: string; startPos: number } | null>(null);
+  const [commandIndex, setCommandIndex] = useState(0);
+  const [skills, setSkills] = useState<Skill[]>([]);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [typingMembers, setTypingMembers] = useState<
     Map<string, { display_name: string; timeout: ReturnType<typeof setTimeout> }>
@@ -385,6 +392,18 @@ function ChatView({
     [mentionableMembers, mentionState],
   );
 
+  useEffect(() => {
+    apiFetch(`/projects/${projectId}/skills`)
+      .then((r) => r.json())
+      .then(setSkills)
+      .catch(() => {});
+  }, [projectId]);
+
+  const filteredCommands = useMemo(
+    () => (commandState ? filterSkills(skills, commandState.query) : []),
+    [skills, commandState],
+  );
+
   const isPaused = workloadStatus === "needs_attention" || workloadStatus === "completed";
 
   const handleInputChange = useCallback(
@@ -411,11 +430,28 @@ function ChatView({
           if (atIndex === 0 || /\s/.test(textBeforeCursor[atIndex - 1])) {
             setMentionState({ query, startPos: atIndex });
             setMentionIndex(0);
+            setCommandState(null);
             return;
           }
         }
       }
+
+      // Scan backwards from cursor for an unmatched /
+      const slashIndex = textBeforeCursor.lastIndexOf("/");
+      if (slashIndex >= 0) {
+        const query = textBeforeCursor.slice(slashIndex + 1);
+        if (!query.includes(" ") && !query.includes("\n")) {
+          if (slashIndex === 0 || /\s/.test(textBeforeCursor[slashIndex - 1])) {
+            setCommandState({ query, startPos: slashIndex });
+            setCommandIndex(0);
+            setMentionState(null);
+            return;
+          }
+        }
+      }
+
       setMentionState(null);
+      setCommandState(null);
     },
     [sendTyping],
   );
@@ -430,6 +466,18 @@ function ChatView({
       textareaRef.current?.focus();
     },
     [input, mentionState],
+  );
+
+  const handleCommandSelect = useCallback(
+    (skill: Skill) => {
+      if (!commandState) return;
+      const before = input.slice(0, commandState.startPos);
+      const after = input.slice(commandState.startPos + 1 + commandState.query.length);
+      setInput(`${before}/${skill.name} ${after}`);
+      setCommandState(null);
+      textareaRef.current?.focus();
+    },
+    [input, commandState],
   );
 
   const handleSend = useCallback(() => {
@@ -481,6 +529,7 @@ function ChatView({
     setInput("");
     setReplyTo(null);
     setMentionState(null);
+    setCommandState(null);
     if (isPaused && workloadHasSession) {
       setResuming(true);
     }
@@ -490,6 +539,30 @@ function ChatView({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // When command dropdown is open, intercept navigation keys
+      if (commandState && filteredCommands.length > 0) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setCommandIndex((i) => Math.min(i + 1, filteredCommands.length - 1));
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setCommandIndex((i) => Math.max(i - 1, 0));
+          return;
+        }
+        if (e.key === "Enter" || e.key === "Tab") {
+          e.preventDefault();
+          handleCommandSelect(filteredCommands[commandIndex]);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setCommandState(null);
+          return;
+        }
+      }
+
       // When mention dropdown is open, intercept navigation keys
       if (mentionState && filteredMentionMembers.length > 0) {
         if (e.key === "ArrowDown") {
@@ -527,7 +600,7 @@ function ChatView({
         }
       }
     },
-    [handleSend, isRunning, onInterrupt, input, mentionState, filteredMentionMembers, mentionIndex, handleMentionSelect],
+    [handleSend, isRunning, onInterrupt, input, mentionState, filteredMentionMembers, mentionIndex, handleMentionSelect, commandState, filteredCommands, commandIndex, handleCommandSelect],
   );
 
   const scrollToMessage = useCallback((messageId: string) => {
@@ -715,6 +788,14 @@ function ChatView({
                 onSelect={handleMentionSelect}
               />
             )}
+            {commandState && filteredCommands.length > 0 && (
+              <SlashCommandDropdown
+                skills={filteredCommands}
+                query={commandState.query}
+                selectedIndex={commandIndex}
+                onSelect={handleCommandSelect}
+              />
+            )}
           </AnimatePresence>
           <textarea
             ref={textareaRef}
@@ -752,7 +833,7 @@ function ChatView({
 /* ── ChatTab: dockview panel with dynamic internal tabs ── */
 
 export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
-  const { roomId, room, memberId, members } = params;
+  const { roomId, room, memberId, members, projectId } = params;
   const [workloads, setWorkloads] = useState<WorkloadChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>(room.primary_chat_id);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -895,6 +976,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
           chatId={activeChatId}
           memberId={memberId}
           members={members}
+          projectId={projectId}
           placeholder={`Message ${room.name}...`}
           onAiMessage={activeChatId === room.primary_chat_id ? refreshWorkloads : undefined}
           onRoomEvent={handleRoomEvent}

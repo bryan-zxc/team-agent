@@ -114,3 +114,9 @@ export type TodoItem = {
   activeForm?: string;
   status: "pending" | "in_progress" | "completed";
 };
+
+export type Skill = {
+  name: string;
+  description: string;
+  path: string;
+};
