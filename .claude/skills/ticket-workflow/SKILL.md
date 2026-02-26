@@ -1,11 +1,11 @@
 ---
 name: ticket-workflow
-description: End-to-end workflow for picking up and delivering a ticket. Use when the user says "pick up ticket", "work on ticket N", "start ticket", "grab the next ticket", or similar. Covers the full lifecycle from reading the ticket through to commit, push, and closing the issue.
+description: End-to-end workflow for picking up and delivering a ticket. Use when the user says "pick up ticket", "work on ticket N", "start ticket", "grab the next ticket", or similar. Covers the full lifecycle from reading the ticket through to commit, push, and completing the ticket on the board.
 ---
 
 # Ticket Workflow
 
-Use `/github-board` for all ticket operations (status transitions, closing, editing descriptions).
+Use `/github-board` for all ticket operations (status transitions, completing, editing descriptions).
 
 ## Workflow
 
@@ -55,11 +55,11 @@ Every ticket must be tested before completion.
 
 1. Commit and push to the current branch
 2. Update the ticket description to reflect what was delivered
-3. Transition to **Done** and close the issue
+3. Transition board status to **Done** via `/github-board`
 
 ### 7. Check for epic completion
 
-After closing the ticket, check whether it belongs to a parent epic and whether that epic is now fully delivered.
+After completing the ticket, check whether it belongs to a parent epic and whether that epic is now fully delivered.
 
 **Find the parent epic:**
 
@@ -69,7 +69,7 @@ PARENT=$(gh api repos/bryan-zxc/team-agent/issues/<TICKET_NUMBER> --jq '.parent.
 
 If `PARENT` is empty, there is no parent epic — stop here.
 
-**Check if all sub-issues of the epic are closed:**
+**Check if all sub-issues of the epic are Done on the board:**
 
 ```bash
 gh api graphql -f query='
@@ -77,11 +77,23 @@ gh api graphql -f query='
     repository(owner: "bryan-zxc", name: "team-agent") {
       issue(number: <EPIC_NUMBER>) {
         subIssues(first: 50) {
-          nodes { number title state }
+          nodes {
+            number
+            title
+            projectItems(first: 5) {
+              nodes {
+                fieldValueByName(name: "Status") {
+                  ... on ProjectV2ItemFieldSingleSelectValue {
+                    name
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
-  }' --jq '.data.repository.issue.subIssues.nodes[] | select(.state == "OPEN") | .number'
+  }' --jq '.data.repository.issue.subIssues.nodes[] | select(.projectItems.nodes[0].fieldValueByName.name != "Done") | .number'
 ```
 
-If the output is empty (no open sub-issues), close the epic and trigger a release with `/release`.
+If the output is empty (all sub-issues have board status "Done"), transition the epic to **Done** via `/github-board` and trigger a release with `/release`.

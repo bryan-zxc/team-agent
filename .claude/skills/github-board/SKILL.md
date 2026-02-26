@@ -1,6 +1,6 @@
 ---
 name: github-board
-description: Manage GitHub project board tickets for the teamagent project. Use whenever creating issues — epics, stories, or bugs — transitioning ticket status, closing tickets, or any project board management. Triggers on requests to create tickets, track work, manage the backlog, or update issue status.
+description: Manage GitHub project board tickets for the teamagent project. Use whenever creating issues — epics, stories, or bugs — transitioning ticket status, completing tickets, or any project board management. Triggers on requests to create tickets, track work, manage the backlog, or update issue status.
 ---
 
 # GitHub Board Management
@@ -109,20 +109,33 @@ gh project item-edit \
 
 Use the status option IDs from the table above.
 
-## Closing a Ticket
+## Completing a Ticket
+
+To complete a ticket, transition its board status to **Done**. Look up the item ID first, then set the status:
 
 ```bash
-gh issue close <issue-number> --repo bryan-zxc/team-agent
+# Get the item ID for the issue on the project board
+ITEM_ID=$(gh project item-list 3 --owner @me --format json --jq ".items[] | select(.content.number == <issue-number>) | .id")
+
+# Transition to Done
+gh project item-edit \
+  --project-id PVT_kwHOCz6Fr84BOi15 \
+  --id "$ITEM_ID" \
+  --field-id PVTSSF_lAHOCz6Fr84BOi15zg9N0x0 \
+  --single-select-option-id 98236657
 ```
+
+**Never use `gh issue close`** — issue state (open/closed) is not the same as board status. Always use board status transitions.
 
 ## Ticket Workflow
 
-- When picking up a ticket: transition status to **In progress**
-- When done with a ticket: transition status to **Done** and close the issue
+- When picking up a ticket: transition board status to **In progress**
+- When done with a ticket: transition board status to **Done**
 - If a ticket needs to change, edit the description to the correct version — describe clearly what is eventually done, not what changed from before. Never add comments to tickets.
 
 ## Rules
 
+- **Never use `gh issue close` or `gh issue reopen`** — manage completion exclusively through board status transitions. Issue state (open/closed) and board status (Backlog/Ready/In progress/In review/Done) are separate concepts; we only use board status.
 - Always assign `@me` — this dynamically resolves to whoever is running the command
 - Always add issues to project board 3 after creation
 - Always use the `epic`, `story`, or `bug` label as appropriate
