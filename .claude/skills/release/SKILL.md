@@ -126,3 +126,4 @@ Print:
 - Always use `--ff-only` for the merge — if it fails, stop and explain
 - Always return to the develop branch after the release
 - If any step fails, stop immediately and report the error
+- Production deploys from **main only** — the CI/CD pipeline triggers on push to main, builds from main, and the Mac Mini checks out and runs main. Never deploy from develop.

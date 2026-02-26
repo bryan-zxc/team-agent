@@ -123,7 +123,7 @@ jobs:
           # for Docker Desktop's credential helper in non-interactive sessions.
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
             "${SSH_USER}@${SSH_HOST}" \
-            "export PATH=/usr/local/bin:\$PATH KEYCHAIN_PASSWORD='${KEYCHAIN_PW}' && cd ~/git/team-agent && git pull && ./deploy.sh --skip-certs --build"
+            "export PATH=/usr/local/bin:\$PATH KEYCHAIN_PASSWORD='${KEYCHAIN_PW}' && cd ~/git/team-agent && git checkout main && git pull origin main && ./deploy.sh --skip-certs --build"
 
       - name: Clean up SSH key
         if: always()
