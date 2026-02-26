@@ -1,12 +1,6 @@
 ---
 name: html-dashboard
-description: >
-  Build standalone, shareable HTML dashboards with charts, tables, KPI cards, and
-  interactive features. Uses the shared design system (Soft Contemporary aesthetic,
-  Outfit font, Indigo accent palette) with Chart.js for visualisations. Data lives
-  in JSON; the template is a rendering engine. Triggers on: "create a dashboard",
-  "build a dashboard", "HTML dashboard", "dashboard for X", "data dashboard".
-  Do NOT use for slide presentations — use html-slides instead.
+description: Build standalone, shareable HTML dashboards with charts, tables, KPI cards, and interactive features. Uses the shared design system (Soft Contemporary aesthetic, Outfit font, Indigo accent palette) with Chart.js for visualisations. Data lives in JSON; the template is a rendering engine. Triggers on: "create a dashboard", "build a dashboard", "HTML dashboard", "dashboard for X", "data dashboard". Do NOT use for slide presentations — use html-slides instead.
 ---
 
 # HTML Dashboards

@@ -15,16 +15,41 @@ _FIELD_RE = re.compile(r"^(\w+):\s*(.+)", re.MULTILINE)
 
 
 def _parse_frontmatter(text: str) -> dict[str, str]:
-    """Extract YAML frontmatter fields using regex (no pyyaml dependency)."""
+    """Extract YAML frontmatter fields using regex (no pyyaml dependency).
+
+    Handles single-line values and YAML folded scalars (> or |) where the
+    value continues on indented lines below the key.
+    """
     match = _FRONTMATTER_RE.match(text)
     if not match:
         return {}
     body = match.group(1)
-    fields = {}
-    for field_match in _FIELD_RE.finditer(body):
-        key = field_match.group(1)
-        value = field_match.group(2).strip().strip("\"'")
-        fields[key] = value
+    lines = body.split("\n")
+    fields: dict[str, str] = {}
+    current_key: str | None = None
+    current_parts: list[str] = []
+
+    for line in lines:
+        field_match = _FIELD_RE.match(line)
+        if field_match:
+            # Flush previous key
+            if current_key is not None:
+                fields[current_key] = " ".join(current_parts).strip().strip("\"'")
+            current_key = field_match.group(1)
+            value = field_match.group(2).strip().strip("\"'")
+            # If value is a YAML block scalar indicator, start collecting lines
+            if value in (">", "|", ">-", "|-"):
+                current_parts = []
+            else:
+                current_parts = [value]
+        elif current_key is not None and line.startswith("  "):
+            # Indented continuation line
+            current_parts.append(line.strip())
+
+    # Flush last key
+    if current_key is not None:
+        fields[current_key] = " ".join(current_parts).strip().strip("\"'")
+
     return fields
 
 

@@ -1,14 +1,16 @@
-"""Seed: users + popmart project with Zimomo agent.
+"""Seed: users + popmart project with Zimomo + two worker agents.
 
 Drops/recreates all tables. Inserts users, a fully-formed project with:
 - Real git clone of https://github.com/bryan-zxc/popmart.git
 - Zimomo coordinator agent (profile written to {clone_path}/.team-agent/agents/zimomo.md)
+- Molly worker agent — presentations and visual storytelling
+- Pucky worker agent — data analysis and visualisation
 - Manifest file written to {clone_path}/.team-agent/manifest.json
 - Alice and Bob as human members
 - No rooms — rooms are created through the UI
-- Initial commit with manifest + Zimomo profile (not pushed — local dev only)
+- Initial commit with manifest + agent profiles (not pushed — local dev only)
 
-No LLM calls — the agent profile is written directly by the seed.
+No LLM calls — all agent profiles are written directly by the seed.
 
 Usage: docker compose exec api .venv/bin/python db/seeds/with_project.py
 """
@@ -35,6 +37,36 @@ Authoritative, calm, and composed. He acts as a protective patriarch who prefers
 
 ## Specialisation
 analysis and reporting
+
+## Work Done
+"""
+
+MOLLY_PROFILE = """\
+# Molly
+
+## Pronoun
+she/her
+
+## Personality
+Creative, expressive, and detail-oriented. She approaches every task with an artist's eye, transforming raw information into polished visual narratives. She communicates with warm enthusiasm but never sacrifices precision for flair — every design choice serves the message.
+
+## Specialisation
+presentations and visual storytelling
+
+## Work Done
+"""
+
+PUCKY_PROFILE = """\
+# Pucky
+
+## Pronoun
+he/him
+
+## Personality
+Curious, methodical, and quietly confident. He digs into data with genuine fascination, surfacing patterns others miss. He communicates findings with clarity and restraint, letting the numbers speak rather than dressing them up — but knows exactly when a well-placed chart makes the difference.
+
+## Specialisation
+data analysis and visualisation
 
 ## Work Done
 """
@@ -102,9 +134,10 @@ async def seed():
         )
         print("Wrote manifest.json")
 
-        profile_path = agents_dir / "zimomo.md"
-        profile_path.write_text(ZIMOMO_PROFILE)
-        print(f"Wrote Zimomo profile to {profile_path}")
+        (agents_dir / "zimomo.md").write_text(ZIMOMO_PROFILE)
+        (agents_dir / "molly.md").write_text(MOLLY_PROFILE)
+        (agents_dir / "pucky.md").write_text(PUCKY_PROFILE)
+        print("Wrote agent profiles (Zimomo, Molly, Pucky)")
 
         # --- Initial commit (local only — don't push to upstream in dev seed) ---
         async def _run_git(*args: str) -> None:
@@ -122,7 +155,7 @@ async def seed():
         await _run_git(
             "-c", "user.name=seed",
             "-c", "user.email=seed@team-agent",
-            "commit", "-m", "Initial seed: manifest + Zimomo profile",
+            "commit", "-m", "Initial seed: manifest + agent profiles",
         )
         print("Committed .team-agent/ to local repo")
 
@@ -147,7 +180,21 @@ async def seed():
             "VALUES ($1, $2, NULL, $3, $4, $5)",
             zimomo_member_id, project_id, "Zimomo", "coordinator", now,
         )
-        print("Inserted 3 members (Alice, Bob, Zimomo)")
+
+        molly_member_id = uuid.uuid4()
+        await conn.execute(
+            "INSERT INTO project_members (id, project_id, user_id, display_name, type, created_at) "
+            "VALUES ($1, $2, NULL, $3, $4, $5)",
+            molly_member_id, project_id, "Molly", "ai", now,
+        )
+
+        pucky_member_id = uuid.uuid4()
+        await conn.execute(
+            "INSERT INTO project_members (id, project_id, user_id, display_name, type, created_at) "
+            "VALUES ($1, $2, NULL, $3, $4, $5)",
+            pucky_member_id, project_id, "Pucky", "ai", now,
+        )
+        print("Inserted 5 members (Alice, Bob, Zimomo, Molly, Pucky)")
 
         print("Seed complete — popmart project ready")
     finally:

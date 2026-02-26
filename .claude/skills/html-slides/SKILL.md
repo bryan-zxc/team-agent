@@ -1,11 +1,6 @@
 ---
 name: html-slides
-description: >
-  Build standalone, shareable HTML slide presentations with a confirmed design system
-  (Soft Contemporary aesthetic, Outfit font, Indigo accent palette). Use when the user asks
-  to create a presentation, slide deck, slide pack, or report as HTML. Triggers on: "create a
-  presentation", "build slides", "make a deck", "HTML slides", "presentation about X",
-  "slide pack for Y". Do NOT use for .pptx — only for HTML output.
+description: Build standalone, shareable HTML slide presentations with a confirmed design system (Soft Contemporary aesthetic, Outfit font, Indigo accent palette). Use when the user asks to create a presentation, slide deck, slide pack, or report as HTML. Triggers on: "create a presentation", "build slides", "make a deck", "HTML slides", "presentation about X", "slide pack for Y". Do NOT use for .pptx — only for HTML output.
 ---
 
 # HTML Slide Presentations
