@@ -114,12 +114,44 @@ This triggers the GitHub Actions deploy workflow automatically.
 git checkout develop
 ```
 
-### 9. Report result
+### 9. Monitor deployment
+
+Poll the workflow run until it completes:
+
+```bash
+# Get the latest run triggered by the push
+RUN_ID=$(gh run list --repo bryan-zxc/team-agent --branch main --limit 1 --json databaseId --jq '.[0].databaseId')
+
+# Poll until complete (check every 30s)
+gh run watch "$RUN_ID" --repo bryan-zxc/team-agent
+```
+
+If the run **succeeds**, report the result and finish.
+
+If the run **fails**:
+
+1. Fetch the logs to identify the failure:
+   ```bash
+   gh run view "$RUN_ID" --repo bryan-zxc/team-agent --log-failed
+   ```
+2. Diagnose the root cause from the logs
+3. Fix the issue on develop, commit and push
+4. Re-merge develop into main and push (no new tag — reuse the existing one):
+   ```bash
+   git checkout main && git pull origin main
+   git merge develop --ff-only
+   git push origin main
+   git checkout develop
+   ```
+5. This triggers a new workflow run — go back to the polling step
+6. Repeat until deployment succeeds
+
+### 10. Report result
 
 Print:
 - The version released (e.g. `v0.2.0`)
-- Link to GitHub Actions: `https://github.com/bryan-zxc/team-agent/actions`
-- Remind the user to check the Actions tab for deployment progress
+- Link to the successful run
+- Confirm deployment is live
 
 ## Rules
 
