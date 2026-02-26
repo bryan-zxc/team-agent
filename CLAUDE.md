@@ -25,5 +25,8 @@ Use the `release` skill (`/release`) to deploy to production. Prefer rapid, smal
 - **Patch bump** — existing things work better or are fixed. Bug fixes, refactors, infra changes, config tweaks, performance improvements, dependency updates.
 - The test: "Can users do something new?" If yes, minor. If no, patch.
 
+## Playwright
+Never use `--no-sandbox` when running Playwright. Always use the `PLAYWRIGHT_MCP_SANDBOX=false` environment variable instead when sandbox restrictions need to be lifted (e.g. headed mode, file:// URLs).
+
 ## Tickets
 Always use the `github-board` skill (`/github-board`) for any ticket operations — creating, updating, transitioning status, or closing. If a ticket needs to change, edit the description to the correct version — describe clearly what is eventually done, not what changed from before. Never add comments to tickets.

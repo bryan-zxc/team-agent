@@ -794,3 +794,157 @@
 .agentMeta {
   color: var(--text-muted);
 }
+
+/* ── Task panel ── */
+
+.taskPanel {
+  border-bottom: 1px solid var(--border-light);
+  background: var(--surface);
+}
+
+.taskPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 16px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: var(--font-body);
+  transition: background 0.15s ease;
+}
+
+.taskPanelHeader:hover {
+  background: var(--surface-hover);
+}
+
+.taskPanelHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.taskPanelLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.taskPanelCount {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.taskPanelProgress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progressBar {
+  width: 60px;
+  height: 4px;
+  background: var(--border-light);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.chevron {
+  color: var(--text-muted);
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.taskList {
+  padding: 0 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.taskItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.taskItem:hover {
+  background: var(--surface-hover);
+}
+
+.taskIcon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.taskIcon_pending::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  box-sizing: border-box;
+}
+
+.taskIcon_in_progress::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  background: var(--accent-light);
+  box-sizing: border-box;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.taskIcon_completed::before {
+  content: "✓";
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.taskContent {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.taskContentCompleted {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.taskContentActive {
+  font-weight: 500;
+}
+
+.taskActiveForm {
+  font-size: 11px;
+  color: var(--accent);
+  font-style: italic;
+  margin-left: auto;
+  flex-shrink: 0;
+}

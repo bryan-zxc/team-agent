@@ -108,3 +108,9 @@ export type AgentActivityEvent = {
   phase: string;
   tokens: number;
 };
+
+export type TodoItem = {
+  content: string;
+  activeForm?: string;
+  status: "pending" | "in_progress" | "completed";
+};

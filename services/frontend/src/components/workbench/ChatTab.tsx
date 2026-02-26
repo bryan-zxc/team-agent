@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import { AnimatePresence } from "motion/react";
 import { useWebSocket, type TypingEvent } from "@/hooks/useWebSocket";
 import type { IDockviewPanelProps } from "dockview";
-import type { AgentActivityEvent, Member, Message, Room, ToolApprovalBlock, WorkloadChat, WorkloadStatusEvent } from "@/types";
+import type { AgentActivityEvent, Member, Message, Room, TodoItem, ToolApprovalBlock, WorkloadChat, WorkloadStatusEvent } from "@/types";
 import { apiFetch } from "@/lib/api";
 import { ToolApprovalCard } from "./ToolApprovalCard";
 import { WorkloadPanel } from "./WorkloadPanel";
@@ -123,7 +123,11 @@ function toolUseSummary(name: string, input: Record<string, unknown>): string {
       return `Search web for '${input.query ?? ""}'`;
     case "WebFetch":
       return `Fetch ${truncate(String(input.url ?? ""), 50)}`;
-    case "TodoWrite":
+    case "TodoWrite": {
+      const todos = Array.isArray(input.todos) ? input.todos : [];
+      const done = todos.filter((t: { status: string }) => t.status === "completed").length;
+      return `Update tasks (${done} of ${todos.length} completed)`;
+    }
     case "TaskCreate":
       return `Create task: ${input.subject ?? ""}`;
     case "TaskUpdate":
@@ -208,6 +212,20 @@ function renderMsgContent(msg: Message): React.ReactNode {
     if (data?.blocks) return renderRichBlocks(data.blocks);
   } catch { /* legacy plain text */ }
   return msg.content;
+}
+
+function extractTodos(messages: Message[]): TodoItem[] {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    try {
+      const data = JSON.parse(messages[i].content);
+      for (const block of data?.blocks ?? []) {
+        if (block.type === "tool_use" && block.name === "TodoWrite" && Array.isArray(block.input?.todos)) {
+          return block.input.todos;
+        }
+      }
+    } catch { /* skip */ }
+  }
+  return [];
 }
 
 /* ── ChatView: reusable messages + input for any chat ── */
@@ -346,6 +364,10 @@ function ChatView({
     }, 1000);
     return () => clearInterval(interval);
   }, [isAgentActive]);
+
+  const todos = useMemo(() => extractTodos(messages), [messages]);
+  const [taskPanelOpen, setTaskPanelOpen] = useState(true);
+  const completedCount = todos.filter((t) => t.status === "completed").length;
 
   const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
 
@@ -524,6 +546,37 @@ function ChatView({
 
   return (
     <div className={styles.chatView}>
+      {workloadStatus !== undefined && todos.length > 0 && (
+        <div className={styles.taskPanel}>
+          <button className={styles.taskPanelHeader} onClick={() => setTaskPanelOpen((p) => !p)}>
+            <div className={styles.taskPanelHeaderLeft}>
+              <span className={styles.taskPanelLabel}>Tasks</span>
+              <span className={styles.taskPanelCount}>{completedCount} of {todos.length}</span>
+            </div>
+            <div className={styles.taskPanelProgress}>
+              <div className={styles.progressBar}>
+                <div className={styles.progressFill} style={{ width: `${(completedCount / todos.length) * 100}%` }} />
+              </div>
+              <span className={clsx(styles.chevron, taskPanelOpen && styles.chevronOpen)}>&#x25BC;</span>
+            </div>
+          </button>
+          {taskPanelOpen && (
+            <div className={styles.taskList}>
+              {todos.map((todo, i) => (
+                <div key={i} className={styles.taskItem}>
+                  <span className={clsx(styles.taskIcon, styles[`taskIcon_${todo.status}` as keyof typeof styles])} />
+                  <span className={clsx(styles.taskContent, todo.status === "completed" && styles.taskContentCompleted, todo.status === "in_progress" && styles.taskContentActive)}>
+                    {todo.content}
+                  </span>
+                  {todo.status === "in_progress" && todo.activeForm && (
+                    <span className={styles.taskActiveForm}>{todo.activeForm}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div className={styles.messages}>
         {messages.map((msg) => {
           // Tool approval request — detect from content (type may be "ai" when loaded from API)
