@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useTheme } from "@/hooks/useTheme";
 import { getLanguage } from "@/lib/fileIcons";
 import { apiFetch } from "@/lib/api";
@@ -59,9 +61,11 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
 
   const fileName = filePath.split("/").pop() ?? "";
   const language = getLanguage(fileName);
+  const isMarkdown = language === "markdown";
   const monacoTheme = theme === "dark" ? "team-agent-dark" : "team-agent-light";
+  const [previewMode, setPreviewMode] = useState(isMarkdown);
   const [wordWrap, setWordWrap] = useState<"on" | "off">(
-    fileName.toLowerCase().endsWith(".md") ? "on" : "off",
+    isMarkdown ? "on" : "off",
   );
 
   useEffect(() => {
@@ -96,6 +100,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
       if (!res.ok) throw new Error("Failed to save");
       setContent(editContent);
       setEditing(false);
+      if (isMarkdown) setPreviewMode(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -133,63 +138,118 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
       <div className={styles.toolbar}>
         <span className={styles.filePath}>{filePath}</span>
         <div className={styles.toolbarActions}>
-          <button
-            className={`${styles.toolbarBtn} ${wordWrap === "on" ? styles.toolbarBtnActive : ""}`}
-            onClick={() => setWordWrap((w) => (w === "on" ? "off" : "on"))}
-            title={wordWrap === "on" ? "Disable word wrap" : "Enable word wrap"}
-          >
-            Wrap
-          </button>
-          {editing ? (
+          {isMarkdown ? (
             <>
-              <button
-                className={styles.toolbarBtn}
-                onClick={() => {
-                  setEditContent(content);
-                  setEditing(false);
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className={styles.toolbarBtnPrimary}
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
+              <div className={styles.toggleGroup}>
+                <button
+                  className={`${styles.toggleBtn} ${previewMode ? styles.toggleBtnActive : ""}`}
+                  onClick={() => { setEditing(false); setPreviewMode(true); }}
+                >
+                  Preview
+                </button>
+                <button
+                  className={`${styles.toggleBtn} ${!previewMode ? styles.toggleBtnActive : ""}`}
+                  onClick={() => { setPreviewMode(false); setEditing(true); }}
+                >
+                  Edit
+                </button>
+              </div>
+              {editing && (
+                <>
+                  <button
+                    className={`${styles.toolbarBtn} ${wordWrap === "on" ? styles.toolbarBtnActive : ""}`}
+                    onClick={() => setWordWrap((w) => (w === "on" ? "off" : "on"))}
+                    title={wordWrap === "on" ? "Disable word wrap" : "Enable word wrap"}
+                  >
+                    Wrap
+                  </button>
+                  <button
+                    className={styles.toolbarBtn}
+                    onClick={() => {
+                      setEditContent(content);
+                      setEditing(false);
+                      setPreviewMode(true);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className={styles.toolbarBtnPrimary}
+                    onClick={handleSave}
+                    disabled={saving}
+                  >
+                    {saving ? "Saving..." : "Save"}
+                  </button>
+                </>
+              )}
             </>
           ) : (
-            <button className={styles.toolbarBtn} onClick={() => setEditing(true)}>
-              Edit
-            </button>
+            <>
+              <button
+                className={`${styles.toolbarBtn} ${wordWrap === "on" ? styles.toolbarBtnActive : ""}`}
+                onClick={() => setWordWrap((w) => (w === "on" ? "off" : "on"))}
+                title={wordWrap === "on" ? "Disable word wrap" : "Enable word wrap"}
+              >
+                Wrap
+              </button>
+              {editing ? (
+                <>
+                  <button
+                    className={styles.toolbarBtn}
+                    onClick={() => {
+                      setEditContent(content);
+                      setEditing(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className={styles.toolbarBtnPrimary}
+                    onClick={handleSave}
+                    disabled={saving}
+                  >
+                    {saving ? "Saving..." : "Save"}
+                  </button>
+                </>
+              ) : (
+                <button className={styles.toolbarBtn} onClick={() => setEditing(true)}>
+                  Edit
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
-      <div className={styles.editorWrapper}>
-        <Editor
-          language={language}
-          value={editing ? editContent : content}
-          theme={monacoTheme}
-          onChange={(value) => setEditContent(value ?? "")}
-          beforeMount={handleBeforeMount}
-          options={{
-            readOnly: !editing,
-            minimap: { enabled: false },
-            fontSize: 13,
-            fontFamily: "var(--font-mono)",
-            lineNumbers: "on",
-            scrollBeyondLastLine: false,
-            renderLineHighlight: "line",
-            wordWrap,
-            padding: { top: 12 },
-            scrollbar: {
-              verticalScrollbarSize: 6,
-              horizontalScrollbarSize: 6,
-            },
-          }}
-        />
-      </div>
+      {isMarkdown && previewMode ? (
+        <div className={styles.markdownPreview}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+        </div>
+      ) : (
+        <div className={styles.editorWrapper}>
+          <Editor
+            language={language}
+            value={editing ? editContent : content}
+            theme={monacoTheme}
+            onChange={(value) => setEditContent(value ?? "")}
+            beforeMount={handleBeforeMount}
+            options={{
+              readOnly: !editing,
+              minimap: { enabled: false },
+              fontSize: 13,
+              fontFamily: "var(--font-mono)",
+              lineNumbers: "on",
+              scrollBeyondLastLine: false,
+              renderLineHighlight: "line",
+              wordWrap,
+              padding: { top: 12 },
+              scrollbar: {
+                verticalScrollbarSize: 6,
+                horizontalScrollbarSize: 6,
+              },
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

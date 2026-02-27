@@ -28,10 +28,17 @@ Present findings to the user in conversation form:
 For any ticket that changes the UI, create an HTML mockup **before** proceeding:
 
 1. Write the mockup to `.mockups/<ticket-number>-<slug>.html` (self-contained, inline CSS)
-2. Open with `/playwright-cli`: `playwright-cli open file://<absolute-path>`
-3. Take a screenshot for the user: `playwright-cli screenshot`
-4. Share the screenshot and discuss — iterate until the user is happy
-5. When approved, delete the mockup file and close the browser
+2. Start a local HTTP server in the `.mockups/` directory:
+   ```bash
+   cd <repo-root>/.mockups && python3 -m http.server 8765 &>/dev/null &
+   ```
+3. Open in **headed** Playwright so the user can see it:
+   ```bash
+   PLAYWRIGHT_MCP_SANDBOX=false playwright-cli open http://localhost:8765/<filename>.html --headed
+   ```
+4. Take a screenshot for the user: `playwright-cli screenshot`
+5. Share the screenshot and discuss — iterate until the user is happy
+6. When approved, delete the mockup file, close the browser, and kill the HTTP server
 
 Only proceed once the user approves the mockup.
 
