@@ -8,6 +8,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { getLanguage } from "@/lib/fileIcons";
 import { API_URL, apiFetch } from "@/lib/api";
 import { JsonTreeView } from "./JsonTreeView";
+import { CsvTableView } from "./CsvTableView";
 import type { IDockviewPanelProps } from "dockview";
 import styles from "./FileTab.module.css";
 
@@ -66,8 +67,9 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   const isHtml = language === "html";
   const isJson = language === "json";
   const isSvg = fileName.endsWith(".svg");
-  const hasPreview = isMarkdown || isHtml || isJson || isSvg;
-  const previewLabel = isJson ? "Tree" : "Preview";
+  const isCsv = fileName.endsWith(".csv") || fileName.endsWith(".tsv");
+  const hasPreview = isMarkdown || isHtml || isJson || isSvg || isCsv;
+  const previewLabel = isJson ? "Tree" : isCsv ? "Table" : "Preview";
   const monacoTheme = theme === "dark" ? "team-agent-dark" : "team-agent-light";
   const [previewMode, setPreviewMode] = useState(hasPreview);
   const [wordWrap, setWordWrap] = useState<"on" | "off">(
@@ -233,6 +235,8 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
           </div>
         ) : isJson ? (
           <JsonTreeView data={content} />
+        ) : isCsv ? (
+          <CsvTableView content={content} fileName={fileName} />
         ) : isSvg ? (
           <div className={styles.svgPreview}>
             <img
