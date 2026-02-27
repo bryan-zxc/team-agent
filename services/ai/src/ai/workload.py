@@ -226,6 +226,7 @@ def _make_stop_hook(
     clone_path: str,
     worktree_path: Path,
     branch_name: str,
+    display_name: str,
 ) -> tuple:
     """Create a Stop hook that merges the workload branch into main.
 
@@ -267,7 +268,8 @@ def _make_stop_hook(
         status_rc, status_out, _ = await _run_git("status", "--porcelain", cwd=str(worktree_path))
         if status_rc == 0 and status_out.strip():
             commit_rc, _, commit_err = await _run_git(
-                "-c", "user.name=team-agent", "-c", "user.email=noreply@team-agent",
+                "-c", f"user.name={display_name}",
+                "-c", f"user.email={display_name.lower()}@team-agent",
                 "commit", "-m", f"Workload {workload_id[:8]}: auto-commit changes",
                 cwd=str(worktree_path),
             )
@@ -655,6 +657,7 @@ async def start_workload_session(
         clone_path=clone_path,
         worktree_path=worktree_path,
         branch_name=branch_name,
+        display_name=workload_data["display_name"],
     )
 
     # 5. Build SDK options
@@ -688,6 +691,14 @@ async def start_workload_session(
     # - Set PLAYWRIGHT_MCP_SANDBOX=false so playwright-cli can run headless in Docker
     cli_env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     cli_env["PLAYWRIGHT_MCP_SANDBOX"] = "false"
+
+    # Per-agent git identity — env vars override all config levels
+    agent_name = workload_data["display_name"]
+    agent_email = f"{agent_name.lower()}@team-agent"
+    cli_env["GIT_AUTHOR_NAME"] = agent_name
+    cli_env["GIT_COMMITTER_NAME"] = agent_name
+    cli_env["GIT_AUTHOR_EMAIL"] = agent_email
+    cli_env["GIT_COMMITTER_EMAIL"] = agent_email
 
     options = ClaudeAgentOptions(
         cwd=str(worktree_path),
