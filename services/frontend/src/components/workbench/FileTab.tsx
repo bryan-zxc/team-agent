@@ -68,6 +68,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   const isJson = language === "json";
   const isSvg = fileName.endsWith(".svg");
   const isCsv = fileName.endsWith(".csv") || fileName.endsWith(".tsv");
+  const isImage = /\.(png|jpg|jpeg|gif|webp)$/i.test(fileName);
   const hasPreview = isMarkdown || isHtml || isJson || isSvg || isCsv;
   const previewLabel = isJson ? "Tree" : isCsv ? "Table" : "Preview";
   const monacoTheme = theme === "dark" ? "team-agent-dark" : "team-agent-light";
@@ -77,6 +78,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   );
 
   useEffect(() => {
+    if (isImage) return;
     apiFetch(`/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`)
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load file");
@@ -87,7 +89,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
         setEditContent(data.content);
       })
       .catch((err) => setError(err.message));
-  }, [filePath, projectId]);
+  }, [filePath, projectId, isImage]);
 
   useEffect(() => {
     if (monacoRef.current) {
@@ -120,6 +122,22 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
     monacoRef.current = monaco;
     defineThemes(monaco);
   }, []);
+
+  if (isImage) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.toolbar}>
+          <span className={styles.filePath}>{filePath}</span>
+        </div>
+        <div className={styles.imagePreview}>
+          <img
+            src={`${API_URL}/projects/${projectId}/raw/${filePath}`}
+            alt={fileName}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (
