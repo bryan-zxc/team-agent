@@ -111,18 +111,28 @@ Use the status option IDs from the table above.
 
 ## Looking Up Item IDs
 
-**Always use `--limit 100`** when querying the project board — the default limit is 30, which silently omits items beyond that.
+**Always use `--limit 500`** when querying the project board — the default limit is 30, which silently omits items beyond that. **Always guard against empty results** before passing the ID to `gh project item-edit`.
 
 ```bash
-ITEM_ID=$(gh project item-list 3 --owner @me --limit 100 --format json --jq ".items[] | select(.content.number == <issue-number>) | .id")
+ITEM_ID=$(gh project item-list 3 --owner @me --limit 500 --format json --jq ".items[] | select(.content.number == <issue-number>) | .id")
+
+if [ -z "$ITEM_ID" ]; then
+  echo "ERROR: Could not find issue <issue-number> on the project board"
+  exit 1
+fi
 ```
 
 ## Completing a Ticket
 
-To complete a ticket, transition its board status to **Done**. Look up the item ID first, then set the status:
+To complete a ticket, transition its board status to **Done**. Look up the item ID first, guard against empty, then set the status:
 
 ```bash
-ITEM_ID=$(gh project item-list 3 --owner @me --limit 100 --format json --jq ".items[] | select(.content.number == <issue-number>) | .id")
+ITEM_ID=$(gh project item-list 3 --owner @me --limit 500 --format json --jq ".items[] | select(.content.number == <issue-number>) | .id")
+
+if [ -z "$ITEM_ID" ]; then
+  echo "ERROR: Could not find issue <issue-number> on the project board"
+  exit 1
+fi
 
 gh project item-edit \
   --project-id PVT_kwHOCz6Fr84BOi15 \

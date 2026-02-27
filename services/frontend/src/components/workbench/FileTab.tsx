@@ -118,6 +118,18 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
     }
   }, [editContent, filePath, projectId]);
 
+  useEffect(() => {
+    if (!editing) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [editing, handleSave]);
+
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     monacoRef.current = monaco;
     defineThemes(monaco);
