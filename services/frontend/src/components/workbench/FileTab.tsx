@@ -65,7 +65,8 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   const isMarkdown = language === "markdown";
   const isHtml = language === "html";
   const isJson = language === "json";
-  const hasPreview = isMarkdown || isHtml || isJson;
+  const isSvg = fileName.endsWith(".svg");
+  const hasPreview = isMarkdown || isHtml || isJson || isSvg;
   const previewLabel = isJson ? "Tree" : "Preview";
   const monacoTheme = theme === "dark" ? "team-agent-dark" : "team-agent-light";
   const [previewMode, setPreviewMode] = useState(hasPreview);
@@ -232,6 +233,13 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
           </div>
         ) : isJson ? (
           <JsonTreeView data={content} />
+        ) : isSvg ? (
+          <div className={styles.svgPreview}>
+            <img
+              src={`${API_URL}/projects/${projectId}/raw/${filePath}`}
+              alt={fileName}
+            />
+          </div>
         ) : (
           <div className={styles.htmlPreview}>
             <iframe

@@ -231,6 +231,28 @@
   height: auto;
 }
 
+/* ── SVG preview ── */
+
+.svgPreview {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: 24px;
+  background-image: repeating-conic-gradient(
+    var(--surface) 0% 25%,
+    var(--bg) 0% 50%
+  );
+  background-size: 16px 16px;
+}
+
+.svgPreview img {
+  max-width: 100%;
+  max-height: 100%;
+}
+
 /* ── HTML preview ── */
 
 .htmlPreview {
