@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import { useTheme } from "@/hooks/useTheme";
 import { getLanguage } from "@/lib/fileIcons";
 import { API_URL, apiFetch } from "@/lib/api";
+import { JsonTreeView } from "./JsonTreeView";
 import type { IDockviewPanelProps } from "dockview";
 import styles from "./FileTab.module.css";
 
@@ -63,7 +64,9 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   const language = getLanguage(fileName);
   const isMarkdown = language === "markdown";
   const isHtml = language === "html";
-  const hasPreview = isMarkdown || isHtml;
+  const isJson = language === "json";
+  const hasPreview = isMarkdown || isHtml || isJson;
+  const previewLabel = isJson ? "Tree" : "Preview";
   const monacoTheme = theme === "dark" ? "team-agent-dark" : "team-agent-light";
   const [previewMode, setPreviewMode] = useState(hasPreview);
   const [wordWrap, setWordWrap] = useState<"on" | "off">(
@@ -147,7 +150,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
                   className={`${styles.toggleBtn} ${previewMode ? styles.toggleBtnActive : ""}`}
                   onClick={() => { setEditing(false); setPreviewMode(true); }}
                 >
-                  Preview
+                  {previewLabel}
                 </button>
                 <button
                   className={`${styles.toggleBtn} ${!previewMode ? styles.toggleBtnActive : ""}`}
@@ -227,6 +230,8 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
           <div className={styles.markdownPreview}>
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
           </div>
+        ) : isJson ? (
+          <JsonTreeView data={content} />
         ) : (
           <div className={styles.htmlPreview}>
             <iframe
