@@ -14,6 +14,7 @@ type CreateProjectModalProps = {
 export function CreateProjectModal({ open, onClose, onCreated }: CreateProjectModalProps) {
   const [name, setName] = useState("");
   const [gitRepoUrl, setGitRepoUrl] = useState("");
+  const [branch, setBranch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +30,7 @@ export function CreateProjectModal({ open, onClose, onCreated }: CreateProjectMo
         body: JSON.stringify({
           name: name.trim(),
           git_repo_url: gitRepoUrl.trim(),
+          ...(branch.trim() && { default_branch: branch.trim() }),
         }),
       });
 
@@ -41,6 +43,7 @@ export function CreateProjectModal({ open, onClose, onCreated }: CreateProjectMo
       const project = await res.json();
       setName("");
       setGitRepoUrl("");
+      setBranch("");
       onCreated(project);
       onClose();
     } catch {
@@ -95,6 +98,18 @@ export function CreateProjectModal({ open, onClose, onCreated }: CreateProjectMo
                 onChange={(e) => setGitRepoUrl(e.target.value)}
                 disabled={loading}
               />
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label}>Branch</label>
+              <input
+                className={styles.input}
+                placeholder="main"
+                value={branch}
+                onChange={(e) => setBranch(e.target.value)}
+                disabled={loading}
+              />
+              <span className={styles.hint}>Leave empty to use the repository&apos;s default branch</span>
             </div>
 
             <button

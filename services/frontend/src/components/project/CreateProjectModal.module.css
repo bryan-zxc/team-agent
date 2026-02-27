@@ -135,6 +135,11 @@
   to { transform: rotate(360deg); }
 }
 
+.hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .error {
   color: var(--error);
   font-size: 13px;

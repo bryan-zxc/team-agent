@@ -1,0 +1,131 @@
+.topBar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  font-family: var(--font-body);
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+.projectName {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.separator {
+  color: var(--text-muted);
+}
+
+.branchControl {
+  position: relative;
+}
+
+.branchBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--accent-light);
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.branchBtn:hover {
+  background: rgba(143, 179, 154, 0.2);
+}
+
+.branchBtn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.branchIcon {
+  flex-shrink: 0;
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  z-index: 60;
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+}
+
+.dropdownItem:hover {
+  background: var(--surface-hover);
+}
+
+.dropdownItemActive {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.checkMark {
+  width: 14px;
+  font-size: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.dropdownLoading {
+  padding: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.backLink {
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font-family: var(--font-body);
+  transition: color 0.15s ease;
+}
+
+.backLink:hover {
+  color: var(--text-secondary);
+}

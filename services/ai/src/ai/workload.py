@@ -227,13 +227,14 @@ def _make_stop_hook(
     worktree_path: Path,
     branch_name: str,
     display_name: str,
+    target_branch: str,
 ) -> tuple:
-    """Create a Stop hook that merges the workload branch into main.
+    """Create a Stop hook that merges the workload branch into the project's default branch.
 
     Returns (hook_callback, merge_state_dict).
     The merge_state dict is shared with the relay handler to report merge outcome.
     """
-    merge_state: dict = {"succeeded": None, "retries": 0}
+    merge_state: dict = {"succeeded": None, "retries": 0, "target_branch": target_branch}
 
     async def stop_hook(
         input_data: HookInput,
@@ -312,10 +313,10 @@ def _make_stop_hook(
         return {
             "continue_": True,
             "reason": (
-                f"Your branch '{branch_name}' has merge conflicts with main "
+                f"Your branch '{branch_name}' has merge conflicts with {target_branch} "
                 f"(attempt {retries + 1} of {_MAX_MERGE_RETRIES}). "
-                f"Please rebase onto main and resolve the conflicts:\n\n"
-                f"1. Run: git rebase main\n"
+                f"Please rebase onto {target_branch} and resolve the conflicts:\n\n"
+                f"1. Run: git rebase {target_branch}\n"
                 f"2. Resolve any conflicts in the affected files\n"
                 f"3. Run: git rebase --continue\n"
                 f"4. Then finish your task as normal."
@@ -503,9 +504,10 @@ async def _relay_messages(
                 merge_succeeded = session.get("merge_state", {}).get("succeeded")
 
                 if merge_succeeded is True:
+                    merged_to = session.get("merge_state", {}).get("target_branch", "main")
                     summary = (
                         f"Workload **{workload_data['title']}** has finished "
-                        f"and its changes have been merged to main."
+                        f"and its changes have been merged to {merged_to}."
                     )
                 elif merge_succeeded is False:
                     branch = session.get("branch_name", "unknown")
@@ -651,16 +653,23 @@ async def start_workload_session(
     profile_path = Path(clone_path) / ".team-agent" / "agents" / f"{workload_data['display_name'].lower()}.md"
     agent_profile = profile_path.read_text() if profile_path.exists() else ""
 
-    # 4. Create Stop hook for auto-merge
+    # 4. Read target branch from clone (whatever is checked out)
+    _, target_branch_out, _ = await _run_git(
+        "symbolic-ref", "--short", "HEAD", cwd=clone_path,
+    )
+    target_branch = target_branch_out.strip() if target_branch_out.strip() else "main"
+
+    # 5. Create Stop hook for auto-merge
     stop_hook, merge_state = _make_stop_hook(
         workload_id=workload_id,
         clone_path=clone_path,
         worktree_path=worktree_path,
         branch_name=branch_name,
         display_name=workload_data["display_name"],
+        target_branch=target_branch,
     )
 
-    # 5. Build SDK options
+    # 6. Build SDK options
     is_resume = bool(workload_data.get("session_id"))
 
     # Pre-register session so tool_approval can access it via _sessions

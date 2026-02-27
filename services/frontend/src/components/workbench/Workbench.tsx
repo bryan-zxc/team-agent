@@ -13,6 +13,7 @@ import { ChatTab } from "./ChatTab";
 import { FileTab } from "./FileTab";
 import { MemberProfileTab } from "./MemberProfileTab";
 import { TerminalTab } from "./TerminalTab";
+import { ProjectTopBar } from "./ProjectTopBar";
 import { AddMemberModal } from "@/components/members/AddMemberModal";
 import { useAuth } from "@/hooks/useAuth";
 import { apiFetch } from "@/lib/api";
@@ -189,6 +190,14 @@ export function Workbench({ projectId }: WorkbenchProps) {
 
   return (
     <div className={styles.workbench}>
+      {project && (
+        <ProjectTopBar
+          project={project}
+          projectId={projectId}
+          onBranchChange={setProject}
+        />
+      )}
+
       {isLocked && (
         <div className={styles.lockdownBanner}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

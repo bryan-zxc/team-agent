@@ -2,6 +2,7 @@ export type Project = {
   id: string;
   name: string;
   git_repo_url: string | null;
+  default_branch: string | null;
   member_count: number;
   room_count: number;
   is_locked: boolean;

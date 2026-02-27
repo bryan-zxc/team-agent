@@ -33,6 +33,11 @@ CLONE_BASE = Path("/data/projects")
 class CreateProjectRequest(BaseModel):
     name: str
     git_repo_url: str
+    default_branch: str | None = None
+
+
+class UpdateProjectRequest(BaseModel):
+    default_branch: str
 
 
 @router.get("/projects")
@@ -62,6 +67,7 @@ async def list_projects():
                 "id": str(p.id),
                 "name": p.name,
                 "git_repo_url": p.git_repo_url,
+                "default_branch": p.default_branch,
                 "member_count": member_count,
                 "room_count": room_count,
                 "is_locked": p.is_locked,
@@ -83,6 +89,7 @@ async def get_project(project_id: uuid.UUID):
             "name": project.name,
             "git_repo_url": project.git_repo_url,
             "clone_path": project.clone_path,
+            "default_branch": project.default_branch,
             "is_locked": project.is_locked,
             "lock_reason": project.lock_reason,
             "created_at": project.created_at.isoformat(),
@@ -111,8 +118,13 @@ async def create_project(req: CreateProjectRequest, creator: User = Depends(get_
         clone_path = str(CLONE_BASE / str(project.id) / "repo")
         Path(clone_path).parent.mkdir(parents=True, exist_ok=True)
 
+        clone_args = ["git", "clone"]
+        if req.default_branch:
+            clone_args += ["--branch", req.default_branch]
+        clone_args += [req.git_repo_url, clone_path]
+
         proc = await asyncio.create_subprocess_exec(
-            "git", "clone", req.git_repo_url, clone_path,
+            *clone_args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -124,7 +136,19 @@ async def create_project(req: CreateProjectRequest, creator: User = Depends(get_
             )
 
         project.clone_path = clone_path
-        logger.info("Cloned %s to %s", req.git_repo_url, clone_path)
+
+        # Read the actual checked-out branch and store it
+        branch_proc = await asyncio.create_subprocess_exec(
+            "git", "symbolic-ref", "--short", "HEAD",
+            cwd=clone_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        branch_out, _ = await branch_proc.communicate()
+        if branch_proc.returncode == 0:
+            project.default_branch = branch_out.decode().strip()
+
+        logger.info("Cloned %s to %s (branch: %s)", req.git_repo_url, clone_path, project.default_branch)
 
         # Check if repo is already claimed by another project
         claim_check = check_unclaimed(clone_path)
@@ -185,12 +209,135 @@ async def create_project(req: CreateProjectRequest, creator: User = Depends(get_
         "name": project.name,
         "git_repo_url": project.git_repo_url,
         "clone_path": project.clone_path,
+        "default_branch": project.default_branch,
         "is_locked": False,
         "lock_reason": None,
         "created_at": project.created_at.isoformat(),
         "creator_member_id": str(creator_member.id),
         "zimomo": zimomo_member,
     }
+
+
+@router.patch("/projects/{project_id}")
+async def update_project(project_id: uuid.UUID, req: UpdateProjectRequest):
+    async with async_session() as session:
+        project = await session.get(Project, project_id)
+        if not project or not project.clone_path:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        clone_path = project.clone_path
+
+        # Fetch latest refs from remote
+        fetch_proc = await asyncio.create_subprocess_exec(
+            "git", "fetch", "origin",
+            cwd=clone_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await fetch_proc.communicate()
+
+        # Validate branch exists on remote
+        check_proc = await asyncio.create_subprocess_exec(
+            "git", "branch", "-r", "--list", f"origin/{req.default_branch}",
+            cwd=clone_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        check_out, _ = await check_proc.communicate()
+        if not check_out.decode().strip():
+            raise HTTPException(
+                status_code=422,
+                detail=f"Branch '{req.default_branch}' does not exist on remote",
+            )
+
+        # Checkout the branch
+        checkout_proc = await asyncio.create_subprocess_exec(
+            "git", "checkout", req.default_branch,
+            cwd=clone_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, checkout_err = await checkout_proc.communicate()
+        if checkout_proc.returncode != 0:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Failed to switch branch: {checkout_err.decode().strip()}",
+            )
+
+        # Pull latest changes for the branch
+        pull_proc = await asyncio.create_subprocess_exec(
+            "git", "pull", "origin", req.default_branch,
+            cwd=clone_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await pull_proc.communicate()
+
+        project.default_branch = req.default_branch
+        await session.commit()
+        await session.refresh(project)
+
+        logger.info("Switched project %s to branch %s", project.name, req.default_branch)
+
+        return {
+            "id": str(project.id),
+            "name": project.name,
+            "git_repo_url": project.git_repo_url,
+            "clone_path": project.clone_path,
+            "default_branch": project.default_branch,
+            "is_locked": project.is_locked,
+            "lock_reason": project.lock_reason,
+            "created_at": project.created_at.isoformat(),
+        }
+
+
+@router.get("/projects/{project_id}/branches")
+async def list_branches(project_id: uuid.UUID):
+    async with async_session() as session:
+        project = await session.get(Project, project_id)
+        if not project or not project.clone_path:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        clone_path = project.clone_path
+
+        # Fetch latest refs
+        fetch_proc = await asyncio.create_subprocess_exec(
+            "git", "fetch", "origin",
+            cwd=clone_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await fetch_proc.communicate()
+
+        # List remote branches
+        proc = await asyncio.create_subprocess_exec(
+            "git", "branch", "-r", "--format=%(refname:short)",
+            cwd=clone_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+
+        branches = []
+        for line in stdout.decode().strip().splitlines():
+            line = line.strip()
+            if line.startswith("origin/") and line != "origin/HEAD":
+                branches.append(line.removeprefix("origin/"))
+
+        # Current branch
+        head_proc = await asyncio.create_subprocess_exec(
+            "git", "symbolic-ref", "--short", "HEAD",
+            cwd=clone_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        head_out, _ = await head_proc.communicate()
+        current = head_out.decode().strip() if head_proc.returncode == 0 else None
+
+        return {
+            "branches": sorted(branches),
+            "current": current,
+        }
 
 
 @router.post("/projects/{project_id}/check-manifest")
