@@ -9,9 +9,10 @@ type Panel = "chat" | "files" | "members";
 type ActivityBarProps = {
   activePanel: Panel;
   onPanelChange: (panel: Panel) => void;
+  onOpenTerminal?: () => void;
 };
 
-export function ActivityBar({ activePanel, onPanelChange }: ActivityBarProps) {
+export function ActivityBar({ activePanel, onPanelChange, onOpenTerminal }: ActivityBarProps) {
   const { theme, toggle } = useTheme();
 
   return (
@@ -59,6 +60,19 @@ export function ActivityBar({ activePanel, onPanelChange }: ActivityBarProps) {
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
         </button>
+        {onOpenTerminal && (
+          <button
+            className={styles.icon}
+            onClick={onOpenTerminal}
+            aria-label="Terminal"
+            title="Open terminal"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="4 17 10 11 4 5" />
+              <line x1="12" y1="19" x2="20" y2="19" />
+            </svg>
+          </button>
+        )}
       </div>
       <div className={styles.bottomIcons}>
         <button

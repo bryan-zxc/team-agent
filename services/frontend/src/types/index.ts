@@ -120,3 +120,8 @@ export type Skill = {
   description: string;
   path: string;
 };
+
+export type TerminalSession = {
+  session_id: string;
+  project_id: string | null;
+};

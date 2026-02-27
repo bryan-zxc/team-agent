@@ -12,6 +12,7 @@ import { MembersSidePanel } from "./MembersSidePanel";
 import { ChatTab } from "./ChatTab";
 import { FileTab } from "./FileTab";
 import { MemberProfileTab } from "./MemberProfileTab";
+import { TerminalTab } from "./TerminalTab";
 import { AddMemberModal } from "@/components/members/AddMemberModal";
 import { useAuth } from "@/hooks/useAuth";
 import { apiFetch } from "@/lib/api";
@@ -36,6 +37,7 @@ const components: Record<string, React.FunctionComponent<IDockviewPanelProps<any
   chatTab: ChatTab,
   fileTab: FileTab,
   memberTab: MemberProfileTab,
+  terminalTab: TerminalTab,
 };
 
 export function Workbench({ projectId }: WorkbenchProps) {
@@ -160,6 +162,19 @@ export function Workbench({ projectId }: WorkbenchProps) {
     [projectId],
   );
 
+  const openTerminal = useCallback(() => {
+    const api = apiRef.current;
+    if (!api) return;
+
+    const panelId = `terminal-${Date.now()}`;
+    api.addPanel({
+      id: panelId,
+      component: "terminalTab",
+      title: "Terminal",
+      params: { projectId },
+    });
+  }, [projectId]);
+
   const handleReady = useCallback((event: DockviewReadyEvent) => {
     apiRef.current = event.api;
 
@@ -187,7 +202,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
         </div>
       )}
 
-      <ActivityBar activePanel={activePanel} onPanelChange={setActivePanel} />
+      <ActivityBar activePanel={activePanel} onPanelChange={setActivePanel} onOpenTerminal={openTerminal} />
 
       <aside className={styles.sidePanel}>
         {activePanel === "chat" ? (

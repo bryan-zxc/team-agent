@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { apiFetch } from "@/lib/api";
 import { CreateProjectModal } from "@/components/project/CreateProjectModal";
+import { LandingTerminal } from "@/components/terminal/LandingTerminal";
 import type { Project } from "@/types";
 import styles from "./page.module.css";
 
@@ -16,6 +17,7 @@ export default function LandingPage() {
   const { user, isLoading, devUsers, login, devLogin, logout } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -109,6 +111,13 @@ export default function LandingPage() {
         </div>
 
         <div className={styles.topBarActions}>
+          <button className={styles.terminalBtn} onClick={() => setTerminalOpen(!terminalOpen)} aria-label="Toggle terminal" title="Terminal">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="4 17 10 11 4 5" />
+              <line x1="12" y1="19" x2="20" y2="19" />
+            </svg>
+          </button>
+
           <button className={styles.themeToggle} onClick={toggle} aria-label="Toggle theme">
             {theme === "light" ? "\u263D" : "\u2600"}
           </button>
@@ -131,7 +140,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <main className={styles.main}>
+      <main className={clsx(styles.main, terminalOpen && styles.mainWithTerminal)}>
         <div className={styles.projectsHeader}>
           <h2 className={styles.sectionTitle}>Projects</h2>
           <button
@@ -204,6 +213,8 @@ export default function LandingPage() {
         onClose={() => setShowCreateModal(false)}
         onCreated={handleProjectCreated}
       />
+
+      <LandingTerminal open={terminalOpen} onClose={() => setTerminalOpen(false)} />
     </div>
   );
 }

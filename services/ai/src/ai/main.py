@@ -11,6 +11,8 @@ from .agents import generate_agent_profile
 from .config import settings, setup_logging
 from .cost import init_cost_tracker
 from .listener import listen, listen_tool_approvals, listen_workload_messages
+from .terminal import create_terminal_session, destroy_terminal_session, shutdown_all_terminal_sessions
+from .terminal_listener import listen_terminal_input
 from .workload import shutdown_all_sessions, stop_workload_session
 
 setup_logging()
@@ -21,6 +23,10 @@ class GenerateAgentRequest(BaseModel):
     project_name: str
     name: Optional[str] = None
     member_type: str = "ai"
+
+
+class CreateTerminalRequest(BaseModel):
+    cwd: str
 
 
 @asynccontextmanager
@@ -40,13 +46,16 @@ async def lifespan(app: FastAPI):
     listener_task = asyncio.create_task(listen(client))
     workload_listener_task = asyncio.create_task(listen_workload_messages(client))
     tool_approval_task = asyncio.create_task(listen_tool_approvals(client))
+    terminal_input_task = asyncio.create_task(listen_terminal_input(client))
 
     yield
 
     await shutdown_all_sessions()
+    await shutdown_all_terminal_sessions()
     listener_task.cancel()
     workload_listener_task.cancel()
     tool_approval_task.cancel()
+    terminal_input_task.cancel()
     await client.aclose()
     logger.info("AI service shut down")
 
@@ -100,3 +109,19 @@ async def generate_agent(req: GenerateAgentRequest):
         "display_name": result["display_name"],
         "type": "ai",
     }
+
+
+@app.post("/terminals")
+async def create_terminal(req: CreateTerminalRequest):
+    """Create a terminal session with a PTY."""
+    session_id = await create_terminal_session(cwd=req.cwd, redis_client=app.state.redis)
+    return {"session_id": session_id}
+
+
+@app.delete("/terminals/{session_id}")
+async def delete_terminal(session_id: str):
+    """Destroy a terminal session."""
+    found = await destroy_terminal_session(session_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="Terminal session not found")
+    return {"status": "destroyed"}

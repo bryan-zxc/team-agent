@@ -4,6 +4,7 @@ Active design decisions for the team-agent project. Newest first. When a decisio
 
 | # | Date | Title | Description | Link |
 |---|------|-------|-------------|------|
+| 0011 | 2026-02-27 | Subscription-only Claude authentication | All Claude Code usage authenticates via Max subscription credentials in the claude_auth volume — never API keys | [ADR-0011](0011-subscription-only-claude-authentication.md) |
 | 0010 | 2026-02-25 | GitHub Actions deployment via Tailscale SSH | GitHub-hosted runners build multi-platform Docker images and deploy to the Mac Mini via ephemeral Tailscale SSH, reusing the existing deploy.sh script | [ADR-0010](0010-github-actions-deployment-via-tailscale-ssh.md) |
 | 0009 | 2026-02-25 | Session cookie authentication | HTTP-only session cookies with a PostgreSQL sessions table for instant revocation and XSS-immune auth, chosen over stateless JWTs | [ADR-0009](0009-session-cookie-authentication.md) |
 | 0008 | 2026-02-23 | Repo ownership via manifest file | Projects claim git repo ownership through .team-agent/manifest.json with environment-differentiated enforcement and lockdown on mismatch | [ADR-0008](0008-repo-ownership-via-manifest-file.md) |
