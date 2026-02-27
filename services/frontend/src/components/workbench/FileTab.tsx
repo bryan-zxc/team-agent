@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTheme } from "@/hooks/useTheme";
 import { getLanguage } from "@/lib/fileIcons";
-import { apiFetch } from "@/lib/api";
+import { API_URL, apiFetch } from "@/lib/api";
 import type { IDockviewPanelProps } from "dockview";
 import styles from "./FileTab.module.css";
 
@@ -62,8 +62,10 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   const fileName = filePath.split("/").pop() ?? "";
   const language = getLanguage(fileName);
   const isMarkdown = language === "markdown";
+  const isHtml = language === "html";
+  const hasPreview = isMarkdown || isHtml;
   const monacoTheme = theme === "dark" ? "team-agent-dark" : "team-agent-light";
-  const [previewMode, setPreviewMode] = useState(isMarkdown);
+  const [previewMode, setPreviewMode] = useState(hasPreview);
   const [wordWrap, setWordWrap] = useState<"on" | "off">(
     isMarkdown ? "on" : "off",
   );
@@ -100,7 +102,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
       if (!res.ok) throw new Error("Failed to save");
       setContent(editContent);
       setEditing(false);
-      if (isMarkdown) setPreviewMode(true);
+      if (hasPreview) setPreviewMode(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -138,7 +140,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
       <div className={styles.toolbar}>
         <span className={styles.filePath}>{filePath}</span>
         <div className={styles.toolbarActions}>
-          {isMarkdown ? (
+          {hasPreview ? (
             <>
               <div className={styles.toggleGroup}>
                 <button
@@ -220,10 +222,20 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
           )}
         </div>
       </div>
-      {isMarkdown && previewMode ? (
-        <div className={styles.markdownPreview}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-        </div>
+      {hasPreview && previewMode ? (
+        isMarkdown ? (
+          <div className={styles.markdownPreview}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          </div>
+        ) : (
+          <div className={styles.htmlPreview}>
+            <iframe
+              src={`${API_URL}/projects/${projectId}/raw/${filePath}`}
+              sandbox="allow-scripts allow-same-origin"
+              title={fileName}
+            />
+          </div>
+        )
       ) : (
         <div className={styles.editorWrapper}>
           <Editor

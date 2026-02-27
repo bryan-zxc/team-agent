@@ -1,7 +1,9 @@
+import mimetypes
 import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -210,3 +212,24 @@ async def rename_file(
         raise HTTPException(status_code=400, detail=str(e))
 
     return {"ok": True, "path": str(new_path.relative_to(clone_path))}
+
+
+@router.get("/projects/{project_id}/raw/{file_path:path}")
+async def serve_raw(project_id: uuid.UUID, file_path: str):
+    """Serve a project file with its actual MIME type for iframe previews."""
+    clone_path = await _get_clone_path(project_id)
+    target = _validate_path(clone_path, file_path)
+
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        content = target.read_bytes()
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    mime_type, _ = mimetypes.guess_type(target.name)
+    if mime_type is None:
+        mime_type = "application/octet-stream"
+
+    return Response(content=content, media_type=mime_type)
