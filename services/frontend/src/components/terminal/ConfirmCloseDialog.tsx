@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import styles from "./ConfirmCloseDialog.module.css";
 
 type ConfirmCloseDialogProps = {
@@ -18,7 +19,7 @@ export function ConfirmCloseDialog({ onConfirm, onCancel }: ConfirmCloseDialogPr
     onConfirm();
   };
 
-  return (
+  return createPortal(
     <div className={styles.overlay} onClick={onCancel}>
       <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
         <p className={styles.message}>
@@ -41,6 +42,7 @@ export function ConfirmCloseDialog({ onConfirm, onCancel }: ConfirmCloseDialogPr
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

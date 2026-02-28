@@ -75,7 +75,8 @@
       "Bash(pgrep:*)",
       "Bash(brew services:*)",
       "Bash(pg_ctl stop:*)",
-      "Bash(/Library/PostgreSQL/17/bin/pg_ctl stop:*)"
+      "Bash(/Library/PostgreSQL/17/bin/pg_ctl stop:*)",
+      "Bash(PLAYWRIGHT_MCP_SANDBOX=false playwright-cli eval:*)"
     ],
     "deny": [
       "AskUserQuestion"
