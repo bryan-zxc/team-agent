@@ -29,6 +29,7 @@ from claude_agent_sdk import (
     ToolUseBlock,
     UserMessage,
 )
+from claude_agent_sdk.types import StreamEvent
 
 from .config import settings
 from .tool_approval import make_can_use_tool
@@ -363,7 +364,7 @@ async def _relay_messages(
     main_chat_id = workload_data["main_chat_id"]
 
     # Periodic heartbeat for activity indicator
-    turn_count = 0
+    total_tokens = 0
 
     async def _heartbeat():
         """Send periodic agent_activity events while the SDK is generating."""
@@ -375,7 +376,7 @@ async def _relay_messages(
                     "chat_id": chat_id,
                     "workload_id": workload_id,
                     "phase": "processing",
-                    "tokens": turn_count,
+                    "tokens": total_tokens,
                 }))
         except asyncio.CancelledError:
             pass
@@ -429,11 +430,22 @@ async def _relay_messages(
         _start_heartbeat()
 
         async for msg in client.receive_messages():
+            if isinstance(msg, StreamEvent):
+                # Accumulate token usage from raw Anthropic API stream events
+                event = msg.event
+                event_type = event.get("type")
+                if event_type == "message_start":
+                    usage = event.get("message", {}).get("usage", {})
+                    total_tokens += usage.get("input_tokens", 0)
+                elif event_type == "message_delta":
+                    usage = event.get("usage", {})
+                    total_tokens += usage.get("output_tokens", 0)
+                continue
+
             if isinstance(msg, AssistantMessage):
                 # Stop heartbeat while processing a complete message
                 _stop_heartbeat()
 
-                turn_count += 1
                 blocks = _convert_blocks(msg.content)
 
                 # Detect playwright-cli open commands for live view
@@ -756,6 +768,7 @@ async def start_workload_session(
         hooks={"Stop": [HookMatcher(hooks=[stop_hook])]},
         setting_sources=["project"],
         env=cli_env,
+        include_partial_messages=True,
     )
 
     # 6. Connect
