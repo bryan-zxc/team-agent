@@ -7,9 +7,11 @@ import remarkGfm from "remark-gfm";
 import { AnimatePresence } from "motion/react";
 import { useWebSocket, type TypingEvent } from "@/hooks/useWebSocket";
 import type { IDockviewPanelProps } from "dockview";
-import type { AgentActivityEvent, Member, Message, Room, Skill, TodoItem, ToolApprovalBlock, WorkloadChat, WorkloadStatusEvent } from "@/types";
+import type { AgentActivityEvent, DispatchCardBlock, Member, Message, Room, Skill, TodoItem, ToolApprovalBlock, WorkloadChat, WorkloadStatusEvent } from "@/types";
 import { apiFetch } from "@/lib/api";
 import { ToolApprovalCard } from "./ToolApprovalCard";
+import { DispatchCard } from "./DispatchCard";
+import { ModeToggleStrip } from "./ModeToggleStrip";
 import { WorkloadPanel } from "./WorkloadPanel";
 import { MentionDropdown, filterMembers } from "./MentionDropdown";
 import { SlashCommandDropdown, filterSkills } from "./SlashCommandDropdown";
@@ -94,6 +96,16 @@ function getToolApprovalBlock(content: string): ToolApprovalBlock | null {
     /* not a tool approval */
   }
   return null;
+}
+
+function getDispatchCardBlock(content: string): DispatchCardBlock | null {
+  try {
+    const data = JSON.parse(content);
+    const block = data?.blocks?.find((b: { type: string }) => b.type === "dispatch_card");
+    return block ? (block as DispatchCardBlock) : null;
+  } catch {
+    return null;
+  }
 }
 
 /* ── Rich content block helpers ── */
@@ -250,8 +262,11 @@ type ChatViewProps = {
   placeholder: string;
   onAiMessage?: () => void;
   onRoomEvent?: (event: Record<string, unknown>) => void;
+  workloadId?: string;
   workloadStatus?: string;
   workloadHasSession?: boolean;
+  permissionMode?: "default" | "acceptEdits";
+  hasWorkloads?: boolean;
   onInterrupt?: () => void;
 };
 
@@ -263,8 +278,11 @@ function ChatView({
   placeholder,
   onAiMessage,
   onRoomEvent,
+  workloadId,
   workloadStatus,
   workloadHasSession,
+  permissionMode,
+  hasWorkloads,
   onInterrupt,
 }: ChatViewProps) {
   const [resuming, setResuming] = useState(false);
@@ -602,6 +620,31 @@ function ChatView({
             );
           }
 
+          // Dispatch card — interactive workload dispatch UI
+          const dispatchBlock = getDispatchCardBlock(msg.content);
+          if (dispatchBlock) {
+            return (
+              <div key={msg.id}>
+                <div className={clsx(styles.messageGroup, styles.ai)}>
+                  <div className={clsx(styles.msgAvatar, styles.avatarAi)}>
+                    {msg.display_name[0]}
+                  </div>
+                  <div className={styles.msgBody}>
+                    <div className={styles.msgHeader}>
+                      <span className={styles.msgAuthor}>{msg.display_name}</span>
+                      <span className={styles.aiBadge}>AI</span>
+                      <span className={styles.msgTime}>{formatTime(msg.created_at)}</span>
+                    </div>
+                    <div className={styles.msgBubble}>{renderMsgContent(msg)}</div>
+                  </div>
+                </div>
+                <div className={styles.approvalRow}>
+                  <DispatchCard block={dispatchBlock} hasWorkloads={hasWorkloads} onDispatched={onAiMessage} />
+                </div>
+              </div>
+            );
+          }
+
           const isSelf = msg.member_id === memberId;
           const isAi = msg.type !== "human";
           const replyParent = msg.reply_to_id
@@ -696,8 +739,15 @@ function ChatView({
       )}
 
       <div className={styles.inputArea}>
+        {workloadId && permissionMode && (
+          <ModeToggleStrip
+            workloadId={workloadId}
+            permissionMode={permissionMode}
+            disabled={!isRunning && !isPaused}
+          />
+        )}
         {replyTo && (
-          <div className={styles.replyPreview}>
+          <div className={clsx(styles.replyPreview, workloadId && permissionMode && styles.replyPreviewNoTopRadius)}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="9 14 4 9 9 4" />
               <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
@@ -718,7 +768,7 @@ function ChatView({
             </button>
           </div>
         )}
-        <div className={styles.inputWrapper}>
+        <div className={clsx(styles.inputWrapper, workloadId && permissionMode && !replyTo && styles.inputWrapperNoTopRadius)}>
           <AnimatePresence>
             {mentionState && filteredMentionMembers.length > 0 && (
               <MentionDropdown
@@ -807,7 +857,12 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
             return prev;
           }
           const updated = [...prev];
-          updated[idx] = { ...updated[idx], status: e.status, updated_at: e.updated_at };
+          updated[idx] = {
+            ...updated[idx],
+            status: e.status,
+            updated_at: e.updated_at,
+            ...(e.permission_mode ? { permission_mode: e.permission_mode } : {}),
+          };
           return updated;
         });
       }
@@ -926,8 +981,11 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
           placeholder={`Message ${room.name}...`}
           onAiMessage={activeChatId === room.primary_chat_id ? refreshWorkloads : undefined}
           onRoomEvent={handleRoomEvent}
+          workloadId={activeWorkload?.workload_id}
           workloadStatus={activeWorkload?.status}
           workloadHasSession={activeWorkload?.has_session}
+          permissionMode={activeWorkload?.permission_mode}
+          hasWorkloads={hasWorkloads}
           onInterrupt={
             activeWorkload
               ? () => handleInterrupt(activeWorkload.workload_id)

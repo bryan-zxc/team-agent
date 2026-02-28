@@ -1,0 +1,190 @@
+/* ── Mode toggle strip (above input in workload tabs) ── */
+
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 14px 14px 0 0;
+  font-size: 12px;
+}
+
+.stripVibe {
+  border-color: rgba(192, 132, 252, 0.2);
+}
+
+.stripDisabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.zapIcon {
+  color: var(--vibe, #C084FC);
+  flex-shrink: 0;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.labelVibe {
+  color: var(--vibe, #C084FC);
+}
+
+.desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.descVibe {
+  color: var(--vibe, #C084FC);
+}
+
+/* ── Toggle switch ── */
+
+.toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  background: var(--border);
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.2s ease;
+}
+
+.toggleOn {
+  background: var(--vibe, #C084FC);
+}
+
+.toggleOn::after {
+  left: 18px;
+}
+
+.toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ── Confirmation dialog overlay ── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 24px;
+  max-width: 380px;
+  width: 90%;
+  box-shadow: var(--shadow-lg);
+}
+
+.dialogTitle {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.dialogDesc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--warm-light);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--warm);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.warningIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btnCancel {
+  padding: 7px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+}
+
+.btnCancel:hover {
+  background: var(--surface-hover);
+}
+
+.btnConfirm {
+  padding: 7px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  font-family: var(--font-body);
+}
+
+.btnVibe {
+  background: var(--vibe, #C084FC);
+  color: #fff;
+}
+
+.btnVibe:hover {
+  filter: brightness(1.1);
+}
+
+.btnStandard {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.btnStandard:hover {
+  background: var(--accent-hover);
+}

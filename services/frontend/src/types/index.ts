@@ -68,6 +68,7 @@ export type WorkloadChat = {
   title: string;
   description: string;
   status: string;
+  permission_mode: "default" | "acceptEdits";
   has_session: boolean;
   owner_name: string | null;
   owner_id: string | null;
@@ -79,8 +80,25 @@ export type WorkloadStatusEvent = {
   _event: "workload_status";
   workload_id: string;
   status: string;
+  permission_mode?: "default" | "acceptEdits";
   room_id: string;
   updated_at: string;
+};
+
+export type DispatchWorkloadItem = {
+  owner: string;
+  title: string;
+  description: string;
+  background_context: string;
+  problem: string | null;
+  permission_mode: "default" | "acceptEdits";
+};
+
+export type DispatchCardBlock = {
+  type: "dispatch_card";
+  dispatch_id: string;
+  chat_id: string;
+  workloads: DispatchWorkloadItem[];
 };
 
 export type ThinkingBlock = {

@@ -203,7 +203,15 @@ async def _persist_workloads(
 
         results = []
         for w in workloads:
-            member_id = await _resolve_member(conn, project_name, w.owner)
+            # Support both Pydantic models (legacy) and dicts (dispatch flow)
+            owner = w["owner"] if isinstance(w, dict) else w.owner
+            title = w["title"] if isinstance(w, dict) else w.title
+            description = w["description"] if isinstance(w, dict) else w.description
+            bg_context = w.get("background_context") if isinstance(w, dict) else w.background_context
+            problem = w.get("problem") if isinstance(w, dict) else getattr(w, "problem", None)
+            perm_mode = w.get("permission_mode", "default") if isinstance(w, dict) else "default"
+
+            member_id = await _resolve_member(conn, project_name, owner)
 
             workload_id = uuid.uuid4()
             chat_id = uuid.uuid4()
@@ -211,17 +219,17 @@ async def _persist_workloads(
 
             await conn.execute(
                 "INSERT INTO workloads "
-                "(id, main_chat_id, member_id, title, description, status, created_at, updated_at) "
-                "VALUES ($1, $2, $3, $4, $5, 'assigned', $6, $6)",
+                "(id, main_chat_id, member_id, title, description, status, permission_mode, created_at, updated_at) "
+                "VALUES ($1, $2, $3, $4, $5, 'assigned', $6, $7, $7)",
                 workload_id, uuid.UUID(main_chat_id), member_id,
-                w.title, w.description, now,
+                title, description, perm_mode, now,
             )
 
             await conn.execute(
                 "INSERT INTO chats "
                 "(id, room_id, type, title, owner_id, workload_id, created_at) "
                 "VALUES ($1, $2, 'workload', $3, $4, $5, $6)",
-                chat_id, room_id, w.title, member_id, workload_id, now,
+                chat_id, room_id, title, member_id, workload_id, now,
             )
 
             results.append({
@@ -231,11 +239,12 @@ async def _persist_workloads(
                 "main_chat_id": main_chat_id,
                 "chat_id": str(chat_id),
                 "member_id": str(member_id),
-                "display_name": w.owner,
-                "title": w.title,
-                "description": w.description,
-                "background_context": w.background_context,
-                "problem": w.problem,
+                "display_name": owner,
+                "title": title,
+                "description": description,
+                "background_context": bg_context,
+                "problem": problem,
+                "permission_mode": perm_mode,
                 "status": "assigned",
                 "worktree_branch": None,
                 "session_id": None,
@@ -291,30 +300,36 @@ async def listen(redis_client: aioredis.Redis):
         logger.info("Agent returned %d chars", len(content))
 
         if agent_response.workloads:
-            persisted = await _persist_workloads(
-                agent_response.workloads, chat_id, project_name,
-            )
-            logger.info(
-                "Persisted %d workloads: %s",
-                len(persisted),
-                ", ".join(f"{w['display_name']}: {w['title']}" for w in persisted),
-            )
-            assignment_lines = [
-                f"- {w['display_name']}: {w['title']}" for w in persisted
+            dispatch_items = [
+                {
+                    "owner": w.owner,
+                    "title": w.title,
+                    "description": w.description,
+                    "background_context": w.background_context,
+                    "problem": w.problem,
+                }
+                for w in agent_response.workloads
             ]
-            content += "\n\nWorkloads assigned:\n" + "\n".join(assignment_lines)
-
-            # Start workload sessions (non-blocking)
-            clone_path = await _get_clone_path(project_name)
-            for wd in persisted:
-                asyncio.create_task(
-                    start_workload_session(wd, clone_path, redis_client),
-                    name=f"workload-start-{wd['id'][:8]}",
-                )
+            blocks = [
+                {"type": "text", "value": content},
+                {
+                    "type": "dispatch_card",
+                    "dispatch_id": str(uuid.uuid4()),
+                    "chat_id": chat_id,
+                    "workloads": dispatch_items,
+                },
+            ]
+            logger.info(
+                "Dispatch card with %d workloads: %s",
+                len(dispatch_items),
+                ", ".join(f"{w['owner']}: {w['title']}" for w in dispatch_items),
+            )
+        else:
+            blocks = [{"type": "text", "value": content}]
 
         # Wrap response in structured format for consistency
         structured_content = json.dumps({
-            "blocks": [{"type": "text", "value": content}],
+            "blocks": blocks,
             "mentions": [],
         })
 
@@ -446,4 +461,34 @@ async def listen_tool_approvals(redis_client: aioredis.Redis):
             logger.warning(
                 "Failed to resolve tool approval %s (workload %s)",
                 approval_request_id[:8], workload_id[:8],
+            )
+
+
+async def listen_dispatch_confirmations(redis_client: aioredis.Redis):
+    """Subscribe to dispatch:confirmed and start workload sessions.
+
+    The API service publishes to this channel when a user confirms a dispatch
+    card. Each message contains persisted workload data and the clone_path.
+    """
+    pubsub = redis_client.pubsub()
+    await pubsub.subscribe("dispatch:confirmed")
+    logger.info("Subscribed to dispatch:confirmed")
+
+    async for raw in pubsub.listen():
+        if raw["type"] != "message":
+            continue
+
+        msg = json.loads(raw["data"])
+        clone_path = msg["clone_path"]
+        workloads = msg["workloads"]
+
+        logger.info(
+            "Dispatch confirmed — starting %d workload(s)",
+            len(workloads),
+        )
+
+        for wd in workloads:
+            asyncio.create_task(
+                start_workload_session(wd, clone_path, redis_client),
+                name=f"workload-start-{wd['id'][:8]}",
             )

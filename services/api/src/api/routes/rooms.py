@@ -147,6 +147,7 @@ async def list_workloads(room_id: uuid.UUID):
                 "title": workload.title,
                 "description": workload.description,
                 "status": workload.status,
+                "permission_mode": workload.permission_mode,
                 "has_session": workload.session_id is not None,
                 "owner_name": display_name,
                 "owner_id": str(workload.member_id),

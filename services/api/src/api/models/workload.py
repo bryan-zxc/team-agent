@@ -23,6 +23,7 @@ class Workload(UUIDPrimaryKey, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String, nullable=False, default="assigned", server_default="assigned")
     worktree_branch: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     session_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    permission_mode: Mapped[str] = mapped_column(String, nullable=False, default="default", server_default="default")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

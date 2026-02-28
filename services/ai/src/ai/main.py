@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from .agents import generate_agent_profile
 from .config import settings, setup_logging
 from .cost import init_cost_tracker
-from .listener import listen, listen_tool_approvals, listen_workload_messages
+from .listener import listen, listen_dispatch_confirmations, listen_tool_approvals, listen_workload_messages
 from .screencast import shutdown_all_screencasts
 from .terminal import create_terminal_session, destroy_terminal_session, shutdown_all_terminal_sessions
 from .terminal_listener import listen_terminal_input
@@ -47,6 +47,7 @@ async def lifespan(app: FastAPI):
     listener_task = asyncio.create_task(listen(client))
     workload_listener_task = asyncio.create_task(listen_workload_messages(client))
     tool_approval_task = asyncio.create_task(listen_tool_approvals(client))
+    dispatch_task = asyncio.create_task(listen_dispatch_confirmations(client))
     terminal_input_task = asyncio.create_task(listen_terminal_input(client))
 
     yield
@@ -57,6 +58,7 @@ async def lifespan(app: FastAPI):
     listener_task.cancel()
     workload_listener_task.cancel()
     tool_approval_task.cancel()
+    dispatch_task.cancel()
     terminal_input_task.cancel()
     await client.aclose()
     logger.info("AI service shut down")

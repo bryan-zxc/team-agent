@@ -51,7 +51,7 @@ async def fetch_workload_data_for_resume(workload_id: str) -> dict | None:
     try:
         row = await conn.fetchrow(
             "SELECT w.id, w.title, w.description, w.status, w.session_id, "
-            "w.member_id, w.main_chat_id, "
+            "w.member_id, w.main_chat_id, w.permission_mode, "
             "c.id AS chat_id, c.room_id, "
             "pm.display_name, "
             "p.clone_path "
@@ -78,6 +78,7 @@ async def fetch_workload_data_for_resume(workload_id: str) -> dict | None:
             "room_id": str(row["room_id"]),
             "main_chat_id": str(row["main_chat_id"]),
             "clone_path": row["clone_path"],
+            "permission_mode": row["permission_mode"],
             # Not needed for resume (initial prompt is skipped)
             "background_context": None,
             "problem": None,
@@ -750,7 +751,7 @@ async def start_workload_session(
         cwd=str(worktree_path),
         resume=workload_data.get("session_id") if is_resume else None,
         system_prompt=_build_system_prompt(agent_profile, workload_data),
-        permission_mode="default",
+        permission_mode=workload_data.get("permission_mode", "default"),
         can_use_tool=can_use_tool,
         hooks={"Stop": [HookMatcher(hooks=[stop_hook])]},
         setting_sources=["project"],

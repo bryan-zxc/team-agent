@@ -460,6 +460,17 @@
   border-top-right-radius: 0;
 }
 
+.inputWrapperNoTopRadius {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.replyPreviewNoTopRadius {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top: none;
+}
+
 .replyPreviewAuthor {
   font-weight: 600;
   color: var(--accent);
