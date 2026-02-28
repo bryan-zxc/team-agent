@@ -28,18 +28,31 @@ export function useScreencastWebSocket({
     const ws = new WebSocket(`${WS_URL}/ws/screencast/${workloadId}`);
     wsRef.current = ws;
 
+    let wasConnected = false;
+    let receivedStopped = false;
+
+    ws.onopen = () => {
+      wasConnected = true;
+    };
+
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
 
       if (msg.type === "frame") {
         onFrameRef.current(msg.data);
       } else if (msg.type === "stopped") {
+        receivedStopped = true;
         onStoppedRef.current();
       }
     };
 
     ws.onclose = () => {
-      // Screencast sessions are not auto-reconnected
+      // Only treat as "stopped" if the WS was actually connected.
+      // Ignore close events from WebSockets that never established
+      // (e.g. React StrictMode cleanup during double-render).
+      if (!receivedStopped && wasConnected) {
+        onStoppedRef.current();
+      }
     };
   }, [workloadId]);
 

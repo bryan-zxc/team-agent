@@ -437,14 +437,8 @@ async def _relay_messages(
 
                 # Detect playwright-cli open commands for live view
                 for block in msg.content:
-                    if isinstance(block, ToolUseBlock):
-                        logger.info(
-                            "ToolUseBlock for workload %s: name=%s",
-                            workload_id[:8], block.name,
-                        )
-                        cmd = ""
-                        if block.name == "Bash":
-                            cmd = block.input.get("command", "") if isinstance(block.input, dict) else ""
+                    if isinstance(block, ToolUseBlock) and block.name == "Bash":
+                        cmd = block.input.get("command", "") if isinstance(block.input, dict) else ""
                         if "playwright-cli open" in cmd:
                             logger.info(
                                 "Detected playwright-cli open for workload %s: %s",
@@ -480,24 +474,7 @@ async def _relay_messages(
                 # Relay tool results (user-role messages containing ToolResultBlock)
                 if isinstance(msg.content, list):
                     # Check if a playwright-cli open just completed — start screencast
-                    logger.info(
-                        "UserMessage for workload %s: %d blocks, pending_opens=%s",
-                        workload_id[:8], len(msg.content),
-                        pending_playwright_opens,
-                    )
                     for block in msg.content:
-                        logger.info(
-                            "  UserMessage block type=%s, isinstance(ToolResultBlock)=%s",
-                            type(block).__name__,
-                            isinstance(block, ToolResultBlock),
-                        )
-                        if isinstance(block, ToolResultBlock):
-                            logger.info(
-                                "  ToolResultBlock tool_use_id=%s, is_error=%s, in_pending=%s",
-                                block.tool_use_id,
-                                block.is_error,
-                                block.tool_use_id in pending_playwright_opens,
-                            )
                         if (
                             isinstance(block, ToolResultBlock)
                             and block.tool_use_id in pending_playwright_opens
@@ -511,6 +488,7 @@ async def _relay_messages(
                                 )
                                 screencast.launch_screencast(
                                     workload_id, room_id, redis_client,
+                                    owner_name=workload_data.get("display_name", ""),
                                 )
 
                     blocks = _convert_blocks(msg.content)

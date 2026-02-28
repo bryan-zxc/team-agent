@@ -22,7 +22,7 @@ type ChatTabParams = {
   memberId: string | null;
   members: Member[];
   projectId: string;
-  onScreencastStarted?: (workloadId: string) => void;
+  onScreencastStarted?: (workloadId: string, title: string) => void;
 };
 
 function getMessageText(content: string): string {
@@ -791,7 +791,10 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
   const handleRoomEvent = useCallback(
     (event: Record<string, unknown>) => {
       if (event._event === "workload_status" && event.screencast_started) {
-        onScreencastStarted?.(event.workload_id as string);
+        const wid = event.workload_id as string;
+        const name = event.owner_name as string | undefined;
+        const title = name ? `Live View — ${name}` : "Live View";
+        onScreencastStarted?.(wid, title);
         return;
       }
       if (event._event === "workload_status") {

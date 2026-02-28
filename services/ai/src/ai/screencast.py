@@ -1,6 +1,7 @@
 """CDP Screencast — stream live browser frames to Redis for frontend consumption."""
 
 import asyncio
+import glob as globmod
 import json
 import logging
 import re
@@ -24,12 +25,43 @@ def _cdp_id() -> int:
     return _next_cdp_id
 
 
+def _read_cdp_port_from_session_file() -> int | None:
+    """Read the CDP port from the playwright-cli daemon session file.
+
+    The daemon stores session config (including cdpPort) in:
+    ~/.cache/ms-playwright/daemon/{workspaceDirHash}/default.session
+    """
+    pattern = "/home/agent/.cache/ms-playwright/daemon/*/default.session"
+    for path in globmod.glob(pattern):
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            port = (
+                data.get("resolvedConfig", {})
+                .get("browser", {})
+                .get("launchOptions", {})
+                .get("cdpPort")
+            )
+            if port:
+                logger.info("Read CDP port %d from session file %s", port, path)
+                return int(port)
+        except Exception:
+            logger.debug("Failed to read session file %s", path, exc_info=True)
+    return None
+
+
 async def _discover_cdp_port() -> int | None:
-    """Find the Chromium --remote-debugging-port from the running process.
+    """Find the Chromium CDP port, trying session file first then process list.
 
     Retries up to 10 times with 1s delay to allow the browser to finish launching.
     """
     for attempt in range(10):
+        # Method 1: Read from playwright-cli daemon session file (most reliable)
+        port = _read_cdp_port_from_session_file()
+        if port:
+            return port
+
+        # Method 2: Fall back to scanning process list
         try:
             proc = await asyncio.create_subprocess_exec(
                 "ps", "aux",
@@ -44,12 +76,13 @@ async def _discover_cdp_port() -> int | None:
                     match = re.search(r"--remote-debugging-port=(\d+)", line)
                     if match:
                         port = int(match.group(1))
-                        logger.info("Discovered CDP port %d (attempt %d)", port, attempt + 1)
+                        logger.info("Discovered CDP port %d from ps (attempt %d)", port, attempt + 1)
                         return port
         except Exception:
             logger.debug("Port discovery attempt %d failed", attempt + 1, exc_info=True)
 
         if attempt < 9:
+            logger.debug("CDP port not found (attempt %d/10), retrying...", attempt + 1)
             await asyncio.sleep(1)
 
     logger.warning("Could not discover CDP port after 10 attempts")
@@ -75,15 +108,18 @@ async def start_screencast(
     workload_id: str,
     room_id: str,
     redis_client: aioredis.Redis,
+    owner_name: str = "",
 ) -> None:
     """Connect to CDP, start Page.startScreencast, and stream frames to Redis.
 
     Publishes a screencast_started notification via workload:status (room-scoped),
     then streams frames to screencast:frames:{workload_id}.
     """
-    if workload_id in _screencast_sessions:
-        logger.debug("Screencast already active for workload %s", workload_id[:8])
-        return
+    logger.info("start_screencast entered for workload %s, room %s", workload_id[:8], room_id[:8])
+
+    # NOTE: duplicate-launch guard lives in launch_screencast() which registers
+    # the session BEFORE this coroutine runs. Do NOT check _screencast_sessions
+    # here — it would always be True and cause an immediate return.
 
     frames_channel = f"screencast:frames:{workload_id}"
     ws = None
@@ -123,6 +159,7 @@ async def start_screencast(
             "workload_id": workload_id,
             "room_id": room_id,
             "screencast_started": True,
+            "owner_name": owner_name,
         }))
 
         # 6. Frame receive loop
@@ -157,7 +194,7 @@ async def start_screencast(
 
     except asyncio.CancelledError:
         # Graceful shutdown — send stop command if still connected
-        if ws and not ws.closed:
+        if ws:
             try:
                 await ws.send(json.dumps({
                     "id": _cdp_id(),
@@ -172,7 +209,7 @@ async def start_screencast(
         logger.exception("Screencast error for workload %s", workload_id[:8])
     finally:
         # Close WebSocket
-        if ws and not ws.closed:
+        if ws:
             try:
                 await ws.close()
             except Exception:
@@ -216,17 +253,26 @@ async def shutdown_all_screencasts() -> None:
     logger.info("All screencasts shut down (%d)", len(workload_ids))
 
 
+def _on_screencast_task_done(task: asyncio.Task) -> None:
+    """Log exceptions from fire-and-forget screencast tasks."""
+    exc = task.exception() if not task.cancelled() else None
+    if exc:
+        logger.error("Screencast task %s failed: %s", task.get_name(), exc, exc_info=exc)
+
+
 def launch_screencast(
     workload_id: str,
     room_id: str,
     redis_client: aioredis.Redis,
+    owner_name: str = "",
 ) -> None:
     """Launch a screencast as a background task and register it in the session registry."""
     if workload_id in _screencast_sessions:
         return
 
     task = asyncio.create_task(
-        start_screencast(workload_id, room_id, redis_client),
+        start_screencast(workload_id, room_id, redis_client, owner_name),
         name=f"screencast-{workload_id[:8]}",
     )
+    task.add_done_callback(_on_screencast_task_done)
     _screencast_sessions[workload_id] = {"task": task}

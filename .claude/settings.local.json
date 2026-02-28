@@ -63,7 +63,19 @@
       "Bash(env:*)",
       "Bash(docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml exec -T ai-service bash -c 'cat > /home/agent/.claude/.credentials.json && chmod 600 /home/agent/.claude/.credentials.json')",
       "Bash(PLAYWRIGHT_MCP_SANDBOX=false playwright-cli open:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "WebFetch(domain:playwright.dev)",
+      "Bash(npx:*)",
+      "Bash(python:*)",
+      "Bash(./node_modules/.bin/tsc:*)",
+      "Bash(node_modules/.bin/tsc:*)",
+      "Bash(lsof:*)",
+      "Bash(docker ps:*)",
+      "Bash(sudo lsof:*)",
+      "Bash(pgrep:*)",
+      "Bash(brew services:*)",
+      "Bash(pg_ctl stop:*)",
+      "Bash(/Library/PostgreSQL/17/bin/pg_ctl stop:*)"
     ],
     "deny": [
       "AskUserQuestion"

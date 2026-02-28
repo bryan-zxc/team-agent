@@ -165,7 +165,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
     [projectId],
   );
 
-  const openLiveView = useCallback((workloadId: string) => {
+  const openLiveView = useCallback((workloadId: string, title = "Live View") => {
     const api = apiRef.current;
     if (!api) return;
 
@@ -176,11 +176,18 @@ export function Workbench({ projectId }: WorkbenchProps) {
       return;
     }
 
+    const closeLiveView = () => {
+      const dockApi = apiRef.current;
+      if (!dockApi) return;
+      const panel = dockApi.panels.find((p) => p.id === panelId);
+      if (panel) dockApi.removePanel(panel);
+    };
+
     api.addPanel({
       id: panelId,
       component: "liveViewTab",
-      title: "Live View",
-      params: { workloadId },
+      title,
+      params: { workloadId, onClose: closeLiveView },
     });
   }, []);
 

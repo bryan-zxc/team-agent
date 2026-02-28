@@ -7,10 +7,11 @@ import styles from "./LiveViewTab.module.css";
 
 type LiveViewTabParams = {
   workloadId: string;
+  onClose?: () => void;
 };
 
 export function LiveViewTab({ params }: IDockviewPanelProps<LiveViewTabParams>) {
-  const { workloadId } = params;
+  const { workloadId, onClose } = params;
   const imgRef = useRef<HTMLImageElement>(null);
   const [status, setStatus] = useState<"connecting" | "streaming" | "stopped">("connecting");
 
@@ -23,7 +24,10 @@ export function LiveViewTab({ params }: IDockviewPanelProps<LiveViewTabParams>) 
 
   const onStopped = useCallback(() => {
     setStatus("stopped");
-  }, []);
+    if (onClose) {
+      setTimeout(onClose, 1500);
+    }
+  }, [onClose]);
 
   useScreencastWebSocket({ workloadId, onFrame, onStopped });
 
@@ -37,7 +41,7 @@ export function LiveViewTab({ params }: IDockviewPanelProps<LiveViewTabParams>) 
         {status === "connecting" && (
           <div className={styles.loading}>Connecting to browser...</div>
         )}
-        <img ref={imgRef} className={styles.frame} src="" alt="Browser live view" />
+        <img ref={imgRef} className={styles.frame} alt="Browser live view" />
         {status === "stopped" && (
           <div className={styles.overlay}>Browser session ended</div>
         )}
