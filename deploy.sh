@@ -109,15 +109,19 @@ if [[ $ELAPSED -ge $MAX_WAIT ]]; then
     echo "Warning: timed out waiting for postgres/redis health checks"
 fi
 
-# Give application services a moment to start after DB is ready
-sleep 5
-
 # ---------- Verify endpoints ----------
 echo "==> Verifying endpoints..."
 FAILURES=0
 
-# API health
-API_STATUS=$(curl -sf "https://${SITE_ADDRESS}/api/health" 2>/dev/null | jq -r '.status' 2>/dev/null || echo "unreachable")
+# API health (retry up to 30s — the API may need time for migrations)
+API_STATUS="unreachable"
+for i in $(seq 1 6); do
+    API_STATUS=$(curl -sf "https://${SITE_ADDRESS}/api/health" 2>/dev/null | jq -r '.status' 2>/dev/null || echo "unreachable")
+    if [[ "$API_STATUS" == "ok" || "$API_STATUS" == "degraded" ]]; then
+        break
+    fi
+    sleep 5
+done
 if [[ "$API_STATUS" == "ok" || "$API_STATUS" == "degraded" ]]; then
     echo "    API health: $API_STATUS"
 else
