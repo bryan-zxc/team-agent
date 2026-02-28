@@ -6,6 +6,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 
 from datetime import datetime, timezone
 
+from sqlalchemy import select
+
 from ..database import async_session
 from ..models.chat import Chat
 from ..models.message import Message
@@ -34,12 +36,24 @@ async def _notify_ai_if_mentioned(mentions: list[str], chat_id: str):
                 continue
 
             if member and member.type in ("ai", "coordinator"):
-                # Typing indicator so users see immediate feedback
-                await manager.broadcast(uuid.UUID(chat_id), {
-                    "_event": "typing",
-                    "member_id": mid,
-                    "display_name": member.display_name,
-                })
+                # Look up the coordinator — always the actual responder
+                chat = await session.get(Chat, uuid.UUID(chat_id))
+                if chat:
+                    room = await session.get(Room, chat.room_id)
+                    if room:
+                        stmt = select(ProjectMember).where(
+                            ProjectMember.project_id == room.project_id,
+                            ProjectMember.type == "coordinator",
+                        )
+                        coordinator = (await session.execute(stmt)).scalar_one_or_none()
+                        if coordinator:
+                            # Typing indicator with coordinator identity
+                            await manager.broadcast(uuid.UUID(chat_id), {
+                                "_event": "typing",
+                                "member_id": str(coordinator.id),
+                                "display_name": coordinator.display_name,
+                            })
+
                 await _get_redis().publish(
                     "ai:respond", json.dumps({"chat_id": chat_id})
                 )
