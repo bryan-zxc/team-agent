@@ -22,6 +22,7 @@ type ChatTabParams = {
   memberId: string | null;
   members: Member[];
   projectId: string;
+  onScreencastStarted?: (workloadId: string) => void;
 };
 
 function getMessageText(content: string): string {
@@ -771,7 +772,7 @@ function ChatView({
 /* ── ChatTab: dockview panel with dynamic internal tabs ── */
 
 export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
-  const { roomId, room, memberId, members, projectId } = params;
+  const { roomId, room, memberId, members, projectId, onScreencastStarted } = params;
   const [workloads, setWorkloads] = useState<WorkloadChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>(room.primary_chat_id);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -789,6 +790,10 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
 
   const handleRoomEvent = useCallback(
     (event: Record<string, unknown>) => {
+      if (event._event === "workload_status" && event.screencast_started) {
+        onScreencastStarted?.(event.workload_id as string);
+        return;
+      }
       if (event._event === "workload_status") {
         const e = event as unknown as WorkloadStatusEvent;
         setWorkloads((prev) => {
@@ -804,7 +809,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
         });
       }
     },
-    [refreshWorkloads],
+    [refreshWorkloads, onScreencastStarted],
   );
 
   const handleCancel = useCallback(

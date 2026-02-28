@@ -13,6 +13,7 @@ import asyncpg
 import httpx
 import redis.asyncio as aioredis
 
+from . import screencast
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
@@ -419,6 +420,9 @@ async def _relay_messages(
     # Expose restart callback so tool_approval can resume the heartbeat
     session_state["restart_heartbeat"] = _start_heartbeat
 
+    # Track tool_use_ids of playwright-cli open commands for screencast triggering
+    pending_playwright_opens: set[str] = set()
+
     try:
         # Start heartbeat before the message loop
         _start_heartbeat()
@@ -430,6 +434,24 @@ async def _relay_messages(
 
                 turn_count += 1
                 blocks = _convert_blocks(msg.content)
+
+                # Detect playwright-cli open commands for live view
+                for block in msg.content:
+                    if isinstance(block, ToolUseBlock):
+                        logger.info(
+                            "ToolUseBlock for workload %s: name=%s",
+                            workload_id[:8], block.name,
+                        )
+                        cmd = ""
+                        if block.name == "Bash":
+                            cmd = block.input.get("command", "") if isinstance(block.input, dict) else ""
+                        if "playwright-cli open" in cmd:
+                            logger.info(
+                                "Detected playwright-cli open for workload %s: %s",
+                                workload_id[:8], cmd[:100],
+                            )
+                            pending_playwright_opens.add(block.id)
+
                 if not blocks:
                     # Restart heartbeat for the next turn
                     _start_heartbeat()
@@ -457,6 +479,40 @@ async def _relay_messages(
             elif isinstance(msg, UserMessage):
                 # Relay tool results (user-role messages containing ToolResultBlock)
                 if isinstance(msg.content, list):
+                    # Check if a playwright-cli open just completed — start screencast
+                    logger.info(
+                        "UserMessage for workload %s: %d blocks, pending_opens=%s",
+                        workload_id[:8], len(msg.content),
+                        pending_playwright_opens,
+                    )
+                    for block in msg.content:
+                        logger.info(
+                            "  UserMessage block type=%s, isinstance(ToolResultBlock)=%s",
+                            type(block).__name__,
+                            isinstance(block, ToolResultBlock),
+                        )
+                        if isinstance(block, ToolResultBlock):
+                            logger.info(
+                                "  ToolResultBlock tool_use_id=%s, is_error=%s, in_pending=%s",
+                                block.tool_use_id,
+                                block.is_error,
+                                block.tool_use_id in pending_playwright_opens,
+                            )
+                        if (
+                            isinstance(block, ToolResultBlock)
+                            and block.tool_use_id in pending_playwright_opens
+                        ):
+                            pending_playwright_opens.discard(block.tool_use_id)
+                            if not block.is_error:
+                                room_id = workload_data.get("room_id", "")
+                                logger.info(
+                                    "Launching screencast for workload %s, room_id=%s",
+                                    workload_id[:8], room_id,
+                                )
+                                screencast.launch_screencast(
+                                    workload_id, room_id, redis_client,
+                                )
+
                     blocks = _convert_blocks(msg.content)
                     result_blocks = [b for b in blocks if b["type"] == "tool_result"]
                     if result_blocks:
@@ -568,6 +624,7 @@ async def _relay_messages(
                             workload_id[:8], exc_info=True,
                         )
 
+                await screencast.stop_screencast(workload_id)
                 _sessions.pop(workload_id, None)
                 return
 
@@ -575,11 +632,13 @@ async def _relay_messages(
         logger.info("Relay task cancelled for workload %s", workload_id[:8])
         if heartbeat_task and not heartbeat_task.done():
             heartbeat_task.cancel()
+        await screencast.stop_screencast(workload_id)
         _sessions.pop(workload_id, None)
     except Exception:
         logger.exception("Relay task error for workload %s", workload_id[:8])
         if heartbeat_task and not heartbeat_task.done():
             heartbeat_task.cancel()
+        await screencast.stop_screencast(workload_id)
         try:
             conn = await asyncpg.connect(_dsn)
             try:

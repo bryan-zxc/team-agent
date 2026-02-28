@@ -13,6 +13,7 @@ import { ChatTab } from "./ChatTab";
 import { FileTab } from "./FileTab";
 import { MemberProfileTab } from "./MemberProfileTab";
 import { TerminalTab } from "./TerminalTab";
+import { LiveViewTab } from "./LiveViewTab";
 import { ProjectTopBar } from "./ProjectTopBar";
 import { AddMemberModal } from "@/components/members/AddMemberModal";
 import { useAuth } from "@/hooks/useAuth";
@@ -39,6 +40,7 @@ const components: Record<string, React.FunctionComponent<IDockviewPanelProps<any
   fileTab: FileTab,
   memberTab: MemberProfileTab,
   terminalTab: TerminalTab,
+  liveViewTab: LiveViewTab,
 };
 
 export function Workbench({ projectId }: WorkbenchProps) {
@@ -99,7 +101,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
         id: panelId,
         component: "chatTab",
         title: room.name,
-        params: { roomId, room, memberId, members, projectId },
+        params: { roomId, room, memberId, members, projectId, onScreencastStarted: openLiveView },
       });
       setActiveRoomId(roomId);
     },
@@ -162,6 +164,25 @@ export function Workbench({ projectId }: WorkbenchProps) {
     },
     [projectId],
   );
+
+  const openLiveView = useCallback((workloadId: string) => {
+    const api = apiRef.current;
+    if (!api) return;
+
+    const panelId = `liveview-${workloadId}`;
+    const existing = api.panels.find((p) => p.id === panelId);
+    if (existing) {
+      existing.api.setActive();
+      return;
+    }
+
+    api.addPanel({
+      id: panelId,
+      component: "liveViewTab",
+      title: "Live View",
+      params: { workloadId },
+    });
+  }, []);
 
   const openTerminal = useCallback(() => {
     const api = apiRef.current;

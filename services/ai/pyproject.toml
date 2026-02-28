@@ -3,6 +3,7 @@ name = "team-agent-ai"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
+    "aiohttp>=3.13.3",
     "asyncpg>=0.31.0",
     "claude-agent-sdk>=0.1.36",
     "fastapi>=0.129.0",
@@ -13,4 +14,5 @@ dependencies = [
     "python-json-logger>=4.0.0",
     "redis>=7.1.1",
     "uvicorn>=0.40.0",
+    "websockets>=15.0.1",
 ]

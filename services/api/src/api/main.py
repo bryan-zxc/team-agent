@@ -23,6 +23,7 @@ from .routes.skills import router as skills_router
 from .routes.terminals import router as terminals_router
 from .routes.workloads import router as workloads_router
 from .websocket.handler import router as ws_router
+from .websocket.screencast_handler import router as screencast_ws_router
 from .websocket.terminal_handler import router as terminal_ws_router
 from .websocket.manager import manager
 
@@ -185,6 +186,7 @@ app.include_router(terminals_router)
 app.include_router(workloads_router)
 app.include_router(ws_router)
 app.include_router(terminal_ws_router)
+app.include_router(screencast_ws_router)
 
 
 @app.get("/health")

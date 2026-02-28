@@ -1133,6 +1133,7 @@ name = "team-agent-ai"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "aiohttp" },
     { name = "asyncpg" },
     { name = "claude-agent-sdk" },
     { name = "fastapi" },
@@ -1143,10 +1144,12 @@ dependencies = [
     { name = "python-json-logger" },
     { name = "redis" },
     { name = "uvicorn" },
+    { name = "websockets" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp", specifier = ">=3.13.3" },
     { name = "asyncpg", specifier = ">=0.31.0" },
     { name = "claude-agent-sdk", specifier = ">=0.1.36" },
     { name = "fastapi", specifier = ">=0.129.0" },
@@ -1157,6 +1160,7 @@ requires-dist = [
     { name = "python-json-logger", specifier = ">=4.0.0" },
     { name = "redis", specifier = ">=7.1.1" },
     { name = "uvicorn", specifier = ">=0.40.0" },
+    { name = "websockets", specifier = ">=15.0.1" },
 ]
 
 [[package]]

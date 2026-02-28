@@ -11,6 +11,7 @@ from .agents import generate_agent_profile
 from .config import settings, setup_logging
 from .cost import init_cost_tracker
 from .listener import listen, listen_tool_approvals, listen_workload_messages
+from .screencast import shutdown_all_screencasts
 from .terminal import create_terminal_session, destroy_terminal_session, shutdown_all_terminal_sessions
 from .terminal_listener import listen_terminal_input
 from .workload import shutdown_all_sessions, stop_workload_session
@@ -51,6 +52,7 @@ async def lifespan(app: FastAPI):
     yield
 
     await shutdown_all_sessions()
+    await shutdown_all_screencasts()
     await shutdown_all_terminal_sessions()
     listener_task.cancel()
     workload_listener_task.cancel()
