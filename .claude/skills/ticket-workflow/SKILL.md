@@ -68,10 +68,17 @@ Every ticket must be tested before completion.
 
 After completing the ticket, check whether it belongs to a parent epic and whether that epic is now fully delivered.
 
-**Find the parent epic:**
+**Find the parent epic (must use GraphQL — REST API does not expose the parent field):**
 
 ```bash
-PARENT=$(gh api repos/bryan-zxc/team-agent/issues/<TICKET_NUMBER> --jq '.parent.number // empty')
+PARENT=$(gh api graphql -f query='
+  query {
+    repository(owner: "bryan-zxc", name: "team-agent") {
+      issue(number: <TICKET_NUMBER>) {
+        parent { number }
+      }
+    }
+  }' --jq '.data.repository.issue.parent.number // empty')
 ```
 
 If `PARENT` is empty, there is no parent epic — stop here.
