@@ -28,5 +28,8 @@ Use the `release` skill (`/release`) to deploy to production. Prefer rapid, smal
 ## Playwright
 Never use `--no-sandbox` when running Playwright. Always use the `PLAYWRIGHT_MCP_SANDBOX=false` environment variable instead when sandbox restrictions need to be lifted (e.g. headed mode, file:// URLs).
 
+## Errors
+If you discover an error — console errors, hydration warnings, type errors, lint failures, runtime exceptions — fix it immediately regardless of what task you are currently working on. Errors are never acceptable to leave behind. This applies even if the error is unrelated to your current ticket or was pre-existing.
+
 ## Tickets
 Always use the `github-board` skill (`/github-board`) for any ticket operations — creating, updating, transitioning status, or closing. If a ticket needs to change, edit the description to the correct version — describe clearly what is eventually done, not what changed from before. Never add comments to tickets.

@@ -97,16 +97,44 @@ async def interrupt_session(chat_id: str):
 
 @router.post("/chats/{chat_id}/cancel")
 async def cancel_session(chat_id: str):
-    """Cancel a session — proxy to AI service."""
+    """Cancel a session — proxy to AI service, fall back to direct DB update."""
     async with httpx.AsyncClient(timeout=10.0) as http:
         resp = await http.post(
             f"{settings.ai_service_url}/chats/{chat_id}/cancel",
         )
-    if resp.status_code == 404:
-        raise HTTPException(status_code=404, detail="Session not found")
-    if resp.status_code >= 400:
-        raise HTTPException(status_code=resp.status_code, detail=resp.text)
-    return resp.json()
+    if resp.status_code < 400:
+        return resp.json()
+
+    # AI service has no active session — update DB directly
+    room_id = None
+    chat_type = None
+    updated_at = None
+    async with async_session() as session:
+        chat = await session.get(Chat, uuid.UUID(chat_id))
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found")
+        if chat.status == "cancelled":
+            return {"status": "cancelled"}
+        chat.status = "cancelled"
+        chat.updated_at = datetime.now(timezone.utc)
+        updated_at = chat.updated_at
+        room_id = str(chat.room_id)
+        chat_type = chat.type
+        await session.commit()
+
+    if room_id:
+        await _get_redis().publish(
+            "chat:status",
+            json.dumps({
+                "chat_id": chat_id,
+                "status": "cancelled",
+                "room_id": room_id,
+                "chat_type": chat_type,
+                "updated_at": updated_at.isoformat(),
+            }),
+        )
+
+    return {"status": "cancelled"}
 
 
 @router.patch("/chats/{chat_id}")
@@ -206,6 +234,7 @@ async def dispatch_workloads(req: DispatchRequest):
                 member_id=member.id,
                 title=w.title,
                 description=w.description,
+                dispatch_id=req.dispatch_id,
                 permission_mode=w.permission_mode,
             )
             session.add(workload)

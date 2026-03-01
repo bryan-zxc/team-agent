@@ -144,6 +144,7 @@ async def list_workloads(room_id: uuid.UUID):
             {
                 "id": str(chat.id),
                 "workload_id": str(workload.id),
+                "dispatch_id": workload.dispatch_id,
                 "title": workload.title,
                 "description": workload.description,
                 "status": chat.status,

@@ -142,7 +142,6 @@ def create_heartbeat(
                 await asyncio.sleep(1)
                 await redis_client.publish("chat:responses", json.dumps({
                     "_event": "agent_activity",
-                    "chat_id": chat_id,
                     "chat_id": session_key,
                     "phase": "processing",
                     "tokens": get_tokens(),
@@ -228,27 +227,45 @@ async def stop_session(
     """Stop any session (workload or admin) and transition to the given status.
 
     Unregisters from the session registry, cancels the relay task,
-    disconnects the SDK client, updates the DB, and publishes status.
+    gracefully interrupts the SDK client to capture session_id for resume,
+    updates the DB, and publishes status.
     Returns True if a session was found and stopped.
     """
     session = unregister_session(chat_id)
-    room_id = ""
-
-    if session:
-        room_id = session.get("room_id", "")
-        task = session.get("task")
-        if task and not task.done():
-            task.cancel()
-        client = session.get("client")
-        if client:
-            try:
-                await client.disconnect()
-            except Exception:
-                logger.exception("Error disconnecting session %s", chat_id[:8])
-    else:
+    if not session:
         return False
 
-    await update_chat_status(chat_id, target_status)
+    room_id = session.get("room_id", "")
+    task = session.get("task")
+    client = session.get("client")
+    session_id = None
+
+    # 1. Cancel relay task so it doesn't compete for messages
+    if task and not task.done():
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    # 2. Graceful interrupt + drain to capture session_id for resume
+    if client:
+        try:
+            await client.interrupt()
+            async with asyncio.timeout(5):
+                async for msg in client.receive_messages():
+                    if isinstance(msg, ResultMessage):
+                        session_id = msg.session_id
+                        break
+        except Exception:
+            pass
+
+        try:
+            await client.disconnect()
+        except Exception:
+            logger.debug("Expected disconnect error for session %s (cross-task scope)", chat_id[:8])
+
+    await update_chat_status(chat_id, target_status, session_id=session_id)
 
     if room_id:
         await publish_status_event(
@@ -256,7 +273,10 @@ async def stop_session(
             chat_type=session.get("session_type"),
         )
 
-    logger.info("Stopped session %s → %s", chat_id[:8], target_status)
+    logger.info(
+        "Stopped session %s → %s (session_id: %s)",
+        chat_id[:8], target_status, session_id or "none",
+    )
     return True
 
 

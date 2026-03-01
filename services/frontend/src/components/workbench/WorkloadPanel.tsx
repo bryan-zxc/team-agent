@@ -139,13 +139,21 @@ export function WorkloadPanel({
             {isExpanded && (
               <div className={styles.cards}>
                 {items.map((w) => (
-                  <button
+                  <div
                     key={w.id}
+                    role="button"
+                    tabIndex={0}
                     className={clsx(
                       styles.card,
                       activeChatId === w.id && styles.cardActive,
                     )}
                     onClick={() => onSelectWorkload(w.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onSelectWorkload(w.id);
+                      }
+                    }}
                   >
                     <div className={styles.cardTitle}>{w.title}</div>
                     <div className={styles.cardMeta}>
@@ -185,7 +193,7 @@ export function WorkloadPanel({
                         </button>
                       )}
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             )}

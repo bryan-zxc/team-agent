@@ -65,6 +65,7 @@ export type MemberProfile = {
 export type WorkloadChat = {
   id: string;
   workload_id: string;
+  dispatch_id: string | null;
   title: string;
   description: string;
   status: string;

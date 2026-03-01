@@ -265,7 +265,7 @@ type ChatViewProps = {
   workloadStatus?: string;
   workloadHasSession?: boolean;
   permissionMode?: "default" | "acceptEdits";
-  hasWorkloads?: boolean;
+  dispatchedIds?: Set<string>;
   onInterrupt?: () => void;
 };
 
@@ -280,7 +280,7 @@ function ChatView({
   workloadStatus,
   workloadHasSession,
   permissionMode,
-  hasWorkloads,
+  dispatchedIds,
   onInterrupt,
 }: ChatViewProps) {
   const [resuming, setResuming] = useState(false);
@@ -637,7 +637,7 @@ function ChatView({
                   </div>
                 </div>
                 <div className={styles.approvalRow}>
-                  <DispatchCard block={dispatchBlock} hasWorkloads={hasWorkloads} onDispatched={onAiMessage} />
+                  <DispatchCard block={dispatchBlock} isDispatched={dispatchedIds?.has(dispatchBlock.dispatch_id)} onDispatched={onAiMessage} />
                 </div>
               </div>
             );
@@ -937,7 +937,10 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
   // Find workload for the active chat (if viewing a workload chat)
   const activeWorkload = workloads.find((w) => w.id === activeChatId);
 
-  const hasWorkloads = workloads.length > 0;
+  const dispatchedIds = useMemo(
+    () => new Set(workloads.map((w) => w.dispatch_id).filter(Boolean) as string[]),
+    [workloads],
+  );
 
   return (
     <div className={styles.container}>
@@ -982,7 +985,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
           workloadStatus={activeWorkload?.status}
           workloadHasSession={activeWorkload?.has_session}
           permissionMode={activeWorkload?.permission_mode}
-          hasWorkloads={hasWorkloads}
+          dispatchedIds={dispatchedIds}
           onInterrupt={
             activeWorkload
               ? () => handleInterrupt(activeWorkload.id)

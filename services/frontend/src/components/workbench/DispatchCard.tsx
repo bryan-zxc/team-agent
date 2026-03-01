@@ -11,25 +11,25 @@ type CardState = "pending" | "dispatched" | "cancelled";
 
 type Props = {
   block: DispatchCardBlock;
-  hasWorkloads?: boolean;
+  isDispatched?: boolean;
   onDispatched?: () => void;
 };
 
-export function DispatchCard({ block, hasWorkloads, onDispatched }: Props) {
+export function DispatchCard({ block, isDispatched, onDispatched }: Props) {
   const [state, setState] = useState<CardState>(
-    hasWorkloads ? "dispatched" : "pending",
+    isDispatched ? "dispatched" : "pending",
   );
   const [items, setItems] = useState<ItemState[]>(() =>
     block.workloads.map((w) => ({ ...w, permission_mode: w.permission_mode ?? "default", removed: false })),
   );
   const [submitting, setSubmitting] = useState(false);
 
-  // If workloads appear after dispatch, mark card as dispatched
+  // If this specific dispatch gets fulfilled, mark card as dispatched
   useEffect(() => {
-    if (hasWorkloads && state === "pending") {
+    if (isDispatched && state === "pending") {
       setState("dispatched");
     }
-  }, [hasWorkloads, state]);
+  }, [isDispatched, state]);
 
   const toggleMode = useCallback((index: number) => {
     setItems((prev) =>
