@@ -6,12 +6,12 @@ import { apiFetch } from "@/lib/api";
 import styles from "./ModeToggleStrip.module.css";
 
 type Props = {
-  workloadId: string;
+  chatId: string;
   permissionMode: "default" | "acceptEdits";
   disabled?: boolean;
 };
 
-export function ModeToggleStrip({ workloadId, permissionMode, disabled }: Props) {
+export function ModeToggleStrip({ chatId, permissionMode, disabled }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [switching, setSwitching] = useState(false);
 
@@ -31,14 +31,14 @@ export function ModeToggleStrip({ workloadId, permissionMode, disabled }: Props)
     setSwitching(true);
     setConfirming(false);
     try {
-      await apiFetch(`/workloads/${workloadId}/switch-mode`, {
+      await apiFetch(`/chats/${chatId}/switch-mode`, {
         method: "POST",
         body: JSON.stringify({ permission_mode: targetMode }),
       });
     } finally {
       setSwitching(false);
     }
-  }, [workloadId, targetMode]);
+  }, [chatId, targetMode]);
 
   return (
     <>

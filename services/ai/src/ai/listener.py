@@ -7,18 +7,20 @@ from datetime import datetime, timezone
 import asyncpg
 import redis.asyncio as aioredis
 
+from .admin import fetch_admin_chat_data, start_admin_session
 from .agents import generate_agent_profile
 from .config import settings
 from .runner import run_agent
+from .session import route_message
 from .tool_approval import resolve_tool_approval
-from .workload import fetch_workload_data_for_resume, route_message, start_workload_session
+from .workload import fetch_workload_data_for_resume, start_workload_session
 
 logger = logging.getLogger(__name__)
 
 # asyncpg uses postgresql:// not postgresql+asyncpg://
 _dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
 
-# Guard against concurrent resume attempts for the same workload
+# Guard against concurrent resume attempts for the same chat
 _resuming: set[str] = set()
 
 
@@ -219,16 +221,16 @@ async def _persist_workloads(
 
             await conn.execute(
                 "INSERT INTO workloads "
-                "(id, main_chat_id, member_id, title, description, status, permission_mode, created_at, updated_at) "
-                "VALUES ($1, $2, $3, $4, $5, 'assigned', $6, $7, $7)",
+                "(id, main_chat_id, member_id, title, description, permission_mode, created_at) "
+                "VALUES ($1, $2, $3, $4, $5, $6, $7)",
                 workload_id, uuid.UUID(main_chat_id), member_id,
                 title, description, perm_mode, now,
             )
 
             await conn.execute(
                 "INSERT INTO chats "
-                "(id, room_id, type, title, owner_id, workload_id, created_at) "
-                "VALUES ($1, $2, 'workload', $3, $4, $5, $6)",
+                "(id, room_id, type, title, owner_id, workload_id, status, updated_at, created_at) "
+                "VALUES ($1, $2, 'workload', $3, $4, $5, 'assigned', $6, $6)",
                 chat_id, room_id, title, member_id, workload_id, now,
             )
 
@@ -349,86 +351,81 @@ async def listen(redis_client: aioredis.Redis):
 
 
 async def _resume_and_deliver(
-    workload_id: str,
-    workload_data: dict,
+    chat_id: str,
     content: str,
     redis_client: aioredis.Redis,
 ) -> None:
-    """Resume a workload session and deliver the pending human message."""
-    _resuming.add(workload_id)
+    """Resume a session (workload or admin) and deliver the pending message."""
+    _resuming.add(chat_id)
     try:
-        clone_path = workload_data.pop("clone_path")
-        await start_workload_session(workload_data, clone_path, redis_client)
-
-        delivered = await route_message(workload_id, content)
-        if delivered:
-            logger.info("Resumed and delivered message to workload %s", workload_id[:8])
+        # Try workload first
+        workload_data = await fetch_workload_data_for_resume(chat_id)
+        if workload_data:
+            clone_path = workload_data.pop("clone_path")
+            await start_workload_session(workload_data, clone_path, redis_client)
         else:
-            logger.warning("Resume succeeded but delivery failed for workload %s", workload_id[:8])
+            # Try admin
+            admin_data = await fetch_admin_chat_data(chat_id)
+            if admin_data:
+                await start_admin_session(admin_data, redis_client)
+            else:
+                logger.warning("Cannot resume chat %s — not found or no session_id", chat_id[:8])
+                return
+
+        delivered = await route_message(chat_id, content)
+        if delivered:
+            logger.info("Resumed and delivered message to chat %s", chat_id[:8])
+        else:
+            logger.warning("Resume succeeded but delivery failed for chat %s", chat_id[:8])
     except Exception:
-        logger.exception("Resume failed for workload %s", workload_id[:8])
+        logger.exception("Resume failed for chat %s", chat_id[:8])
     finally:
-        _resuming.discard(workload_id)
+        _resuming.discard(chat_id)
 
 
-async def _retry_route(workload_id: str, content: str, retries: int = 3, delay: float = 2.0) -> None:
-    """Retry routing a message to a workload session that is being resumed."""
+async def _retry_route(chat_id: str, content: str, retries: int = 3, delay: float = 2.0) -> None:
+    """Retry routing a message to a session that is being resumed."""
     for attempt in range(retries):
         await asyncio.sleep(delay)
-        delivered = await route_message(workload_id, content)
+        delivered = await route_message(chat_id, content)
         if delivered:
-            logger.info("Retry-routed message to workload %s (attempt %d)", workload_id[:8], attempt + 1)
+            logger.info("Retry-routed message to chat %s (attempt %d)", chat_id[:8], attempt + 1)
             return
-    logger.warning("Failed to route message to workload %s after %d retries", workload_id[:8], retries)
+    logger.warning("Failed to route message to chat %s after %d retries", chat_id[:8], retries)
 
 
-async def listen_workload_messages(redis_client: aioredis.Redis):
-    """Subscribe to workload:messages and route follow-ups to active sessions."""
+async def listen_chat_messages(redis_client: aioredis.Redis):
+    """Subscribe to chat:messages and route to active workload or admin sessions."""
     pubsub = redis_client.pubsub()
-    await pubsub.subscribe("workload:messages")
-    logger.info("Subscribed to workload:messages")
+    await pubsub.subscribe("chat:messages")
+    logger.info("Subscribed to chat:messages")
 
     async for raw in pubsub.listen():
         if raw["type"] != "message":
             continue
 
         msg = json.loads(raw["data"])
-        workload_id = msg["workload_id"]
+        chat_id = msg["chat_id"]
         content = msg["content"]
 
-        delivered = await route_message(workload_id, content)
+        delivered = await route_message(chat_id, content)
         if delivered:
-            logger.info("Routed follow-up to workload %s", workload_id[:8])
+            logger.info("Routed follow-up to chat %s", chat_id[:8])
             continue
 
         # No active session — attempt to resume
-        if workload_id in _resuming:
-            # Resume already in progress — retry delivery after a delay
-            logger.info("Resume in progress for workload %s, scheduling retry", workload_id[:8])
+        if chat_id in _resuming:
+            logger.info("Resume in progress for chat %s, scheduling retry", chat_id[:8])
             asyncio.create_task(
-                _retry_route(workload_id, content),
-                name=f"workload-retry-{workload_id[:8]}",
+                _retry_route(chat_id, content),
+                name=f"chat-retry-{chat_id[:8]}",
             )
             continue
 
-        workload_data = await fetch_workload_data_for_resume(workload_id)
-        if not workload_data:
-            logger.warning(
-                "Cannot resume workload %s — not found or no session_id", workload_id[:8],
-            )
-            continue
-
-        if workload_data["status"] not in ("needs_attention", "completed"):
-            logger.warning(
-                "Cannot resume workload %s — status is '%s'",
-                workload_id[:8], workload_data["status"],
-            )
-            continue
-
-        logger.info("No active session for workload %s, starting resume", workload_id[:8])
+        logger.info("No active session for chat %s, starting resume", chat_id[:8])
         asyncio.create_task(
-            _resume_and_deliver(workload_id, workload_data, content, redis_client),
-            name=f"workload-resume-{workload_id[:8]}",
+            _resume_and_deliver(chat_id, content, redis_client),
+            name=f"chat-resume-{chat_id[:8]}",
         )
 
 
@@ -443,7 +440,7 @@ async def listen_tool_approvals(redis_client: aioredis.Redis):
             continue
 
         msg = json.loads(raw["data"])
-        workload_id = msg["workload_id"]
+        session_key = msg["chat_id"]
         approval_request_id = msg["approval_request_id"]
         decision = {
             "decision": msg["decision"],
@@ -451,16 +448,16 @@ async def listen_tool_approvals(redis_client: aioredis.Redis):
             "reason": msg.get("reason"),
         }
 
-        resolved = resolve_tool_approval(workload_id, approval_request_id, decision)
+        resolved = resolve_tool_approval(session_key, approval_request_id, decision)
         if resolved:
             logger.info(
-                "Resolved tool approval %s → %s (workload %s)",
-                approval_request_id[:8], msg["decision"], workload_id[:8],
+                "Resolved tool approval %s → %s (session %s)",
+                approval_request_id[:8], msg["decision"], session_key[:8],
             )
         else:
             logger.warning(
-                "Failed to resolve tool approval %s (workload %s)",
-                approval_request_id[:8], workload_id[:8],
+                "Failed to resolve tool approval %s (session %s)",
+                approval_request_id[:8], session_key[:8],
             )
 
 
@@ -490,5 +487,5 @@ async def listen_dispatch_confirmations(redis_client: aioredis.Redis):
         for wd in workloads:
             asyncio.create_task(
                 start_workload_session(wd, clone_path, redis_client),
-                name=f"workload-start-{wd['id'][:8]}",
+                name=f"workload-start-{wd['chat_id'][:8]}",
             )

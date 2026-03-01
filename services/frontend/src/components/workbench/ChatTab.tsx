@@ -24,7 +24,7 @@ type ChatTabParams = {
   memberId: string | null;
   members: Member[];
   projectId: string;
-  onScreencastStarted?: (workloadId: string, title: string) => void;
+  onScreencastStarted?: (chatId: string, title: string) => void;
 };
 
 function getMessageText(content: string): string {
@@ -262,7 +262,6 @@ type ChatViewProps = {
   placeholder: string;
   onAiMessage?: () => void;
   onRoomEvent?: (event: Record<string, unknown>) => void;
-  workloadId?: string;
   workloadStatus?: string;
   workloadHasSession?: boolean;
   permissionMode?: "default" | "acceptEdits";
@@ -278,7 +277,6 @@ function ChatView({
   placeholder,
   onAiMessage,
   onRoomEvent,
-  workloadId,
   workloadStatus,
   workloadHasSession,
   permissionMode,
@@ -739,15 +737,15 @@ function ChatView({
       )}
 
       <div className={styles.inputArea}>
-        {workloadId && permissionMode && (
+        {chatId && permissionMode && (
           <ModeToggleStrip
-            workloadId={workloadId}
+            chatId={chatId}
             permissionMode={permissionMode}
             disabled={!isRunning && !isPaused}
           />
         )}
         {replyTo && (
-          <div className={clsx(styles.replyPreview, workloadId && permissionMode && styles.replyPreviewNoTopRadius)}>
+          <div className={clsx(styles.replyPreview, chatId && permissionMode && styles.replyPreviewNoTopRadius)}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="9 14 4 9 9 4" />
               <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
@@ -768,7 +766,7 @@ function ChatView({
             </button>
           </div>
         )}
-        <div className={clsx(styles.inputWrapper, workloadId && permissionMode && !replyTo && styles.inputWrapperNoTopRadius)}>
+        <div className={clsx(styles.inputWrapper, chatId && permissionMode && !replyTo && styles.inputWrapperNoTopRadius)}>
           <AnimatePresence>
             {mentionState && filteredMentionMembers.length > 0 && (
               <MentionDropdown
@@ -841,16 +839,16 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
   const handleRoomEvent = useCallback(
     (event: Record<string, unknown>) => {
       if (event._event === "workload_status" && event.screencast_started) {
-        const wid = event.workload_id as string;
+        const cid = event.chat_id as string;
         const name = event.owner_name as string | undefined;
         const title = name ? `Live View — ${name}` : "Live View";
-        onScreencastStarted?.(wid, title);
+        onScreencastStarted?.(cid, title);
         return;
       }
       if (event._event === "workload_status") {
         const e = event as unknown as WorkloadStatusEvent;
         setWorkloads((prev) => {
-          const idx = prev.findIndex((w) => w.workload_id === e.workload_id);
+          const idx = prev.findIndex((w) => w.id === e.chat_id);
           if (idx === -1) {
             // New workload — re-fetch to get full data
             refreshWorkloads();
@@ -871,17 +869,17 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
   );
 
   const handleCancel = useCallback(
-    async (workloadId: string) => {
+    async (chatId: string) => {
       // Optimistic update
       setWorkloads((prev) =>
         prev.map((w) =>
-          w.workload_id === workloadId
+          w.id === chatId
             ? { ...w, status: "cancelled", updated_at: new Date().toISOString() }
             : w,
         ),
       );
       try {
-        const resp = await apiFetch(`/workloads/${workloadId}/cancel`, {
+        const resp = await apiFetch(`/chats/${chatId}/cancel`, {
           method: "POST",
         });
         if (!resp.ok) refreshWorkloads();
@@ -893,17 +891,17 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
   );
 
   const handleComplete = useCallback(
-    async (workloadId: string) => {
+    async (chatId: string) => {
       // Optimistic update
       setWorkloads((prev) =>
         prev.map((w) =>
-          w.workload_id === workloadId
+          w.id === chatId
             ? { ...w, status: "completed", updated_at: new Date().toISOString() }
             : w,
         ),
       );
       try {
-        const resp = await apiFetch(`/workloads/${workloadId}`, {
+        const resp = await apiFetch(`/chats/${chatId}`, {
           method: "PATCH",
           body: JSON.stringify({ status: "completed" }),
         });
@@ -916,16 +914,16 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
   );
 
   const handleInterrupt = useCallback(
-    async (workloadId: string) => {
+    async (chatId: string) => {
       setWorkloads((prev) =>
         prev.map((w) =>
-          w.workload_id === workloadId
+          w.id === chatId
             ? { ...w, status: "needs_attention", updated_at: new Date().toISOString() }
             : w,
         ),
       );
       try {
-        const resp = await apiFetch(`/workloads/${workloadId}/interrupt`, {
+        const resp = await apiFetch(`/chats/${chatId}/interrupt`, {
           method: "POST",
         });
         if (!resp.ok) refreshWorkloads();
@@ -981,14 +979,13 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
           placeholder={`Message ${room.name}...`}
           onAiMessage={activeChatId === room.primary_chat_id ? refreshWorkloads : undefined}
           onRoomEvent={handleRoomEvent}
-          workloadId={activeWorkload?.workload_id}
           workloadStatus={activeWorkload?.status}
           workloadHasSession={activeWorkload?.has_session}
           permissionMode={activeWorkload?.permission_mode}
           hasWorkloads={hasWorkloads}
           onInterrupt={
             activeWorkload
-              ? () => handleInterrupt(activeWorkload.workload_id)
+              ? () => handleInterrupt(activeWorkload.id)
               : undefined
           }
         />

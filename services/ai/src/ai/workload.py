@@ -1,4 +1,4 @@
-"""Workload session management — worktree creation, SDK client lifecycle, and message relay."""
+"""Workload session management — worktree creation, SDK client lifecycle."""
 
 import asyncio
 import json
@@ -10,59 +10,56 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import asyncpg
-import httpx
 import redis.asyncio as aioredis
 
-from . import screencast
 from claude_agent_sdk import (
-    AssistantMessage,
     ClaudeAgentOptions,
     ClaudeSDKClient,
     HookContext,
     HookInput,
     HookJSONOutput,
     HookMatcher,
-    ResultMessage,
-    TextBlock,
-    ThinkingBlock,
-    ToolResultBlock,
-    ToolUseBlock,
-    UserMessage,
 )
-from claude_agent_sdk.types import StreamEvent
 
 from .config import settings
+from .session import (
+    _sessions,
+    publish_status_event,
+    register_session,
+    relay_messages,
+    run_git,
+    stop_session,
+    unregister_session,
+    update_chat_status,
+)
 from .tool_approval import make_can_use_tool
 
 logger = logging.getLogger(__name__)
 
 _dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
 
-# Session registry: workload_id → {client, task, workload_data}
-_sessions: dict[str, dict] = {}
 
-
-async def fetch_workload_data_for_resume(workload_id: str) -> dict | None:
+async def fetch_workload_data_for_resume(chat_id: str) -> dict | None:
     """Fetch full workload data from DB for session resume.
 
-    Returns the workload_data dict compatible with start_workload_session(),
-    or None if the workload is not found or has no session_id.
+    Looks up by chat_id (the universal session key). Returns the workload_data
+    dict compatible with start_workload_session(), or None if not found or no session_id.
     """
     conn = await asyncpg.connect(_dsn)
     try:
         row = await conn.fetchrow(
-            "SELECT w.id, w.title, w.description, w.status, w.session_id, "
-            "w.member_id, w.main_chat_id, w.permission_mode, "
-            "c.id AS chat_id, c.room_id, "
+            "SELECT w.id, w.title, w.description, w.permission_mode, "
+            "w.member_id, w.main_chat_id, "
+            "c.id AS chat_id, c.room_id, c.status, c.session_id, "
             "pm.display_name, "
-            "p.clone_path "
-            "FROM workloads w "
-            "JOIN chats c ON c.workload_id = w.id AND c.type = 'workload' "
+            "p.clone_path, p.id AS project_id "
+            "FROM chats c "
+            "JOIN workloads w ON c.workload_id = w.id "
             "JOIN project_members pm ON pm.id = w.member_id "
             "JOIN rooms r ON r.id = c.room_id "
             "JOIN projects p ON p.id = r.project_id "
-            "WHERE w.id = $1",
-            uuid.UUID(workload_id),
+            "WHERE c.id = $1 AND c.type = 'workload'",
+            uuid.UUID(chat_id),
         )
         if not row or not row["session_id"]:
             return None
@@ -79,6 +76,7 @@ async def fetch_workload_data_for_resume(workload_id: str) -> dict | None:
             "room_id": str(row["room_id"]),
             "main_chat_id": str(row["main_chat_id"]),
             "clone_path": row["clone_path"],
+            "project_id": str(row["project_id"]),
             "permission_mode": row["permission_mode"],
             # Not needed for resume (initial prompt is skipped)
             "background_context": None,
@@ -86,24 +84,6 @@ async def fetch_workload_data_for_resume(workload_id: str) -> dict | None:
         }
     finally:
         await conn.close()
-
-
-async def _publish_status(
-    redis_client: aioredis.Redis,
-    workload_id: str,
-    status: str,
-    room_id: str,
-) -> None:
-    """Broadcast a workload status change to the workload:status Redis channel."""
-    await redis_client.publish(
-        "workload:status",
-        json.dumps({
-            "workload_id": workload_id,
-            "status": status,
-            "room_id": room_id,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }),
-    )
 
 
 def _slugify(title: str, workload_id: str) -> str:
@@ -209,18 +189,6 @@ def _build_initial_prompt(workload_data: dict) -> str:
     return "\n".join(parts)
 
 
-async def _run_git(*args: str, cwd: str) -> tuple[int, str, str]:
-    """Run a git command and return (returncode, stdout, stderr)."""
-    proc = await asyncio.create_subprocess_exec(
-        "git", *args,
-        cwd=cwd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-    return proc.returncode, stdout.decode().strip(), stderr.decode().strip()
-
-
 _MAX_MERGE_RETRIES = 2
 
 
@@ -267,11 +235,10 @@ def _make_stop_hook(
             }
 
         # Auto-commit any uncommitted changes in the worktree
-        # (the agent runs with acceptEdits — it can write files but not git commit)
-        await _run_git("add", "-A", cwd=str(worktree_path))
-        status_rc, status_out, _ = await _run_git("status", "--porcelain", cwd=str(worktree_path))
+        await run_git("add", "-A", cwd=str(worktree_path))
+        status_rc, status_out, _ = await run_git("status", "--porcelain", cwd=str(worktree_path))
         if status_rc == 0 and status_out.strip():
-            commit_rc, _, commit_err = await _run_git(
+            commit_rc, _, commit_err = await run_git(
                 "-c", f"user.name={display_name}",
                 "-c", f"user.email={display_name.lower()}@team-agent",
                 "commit", "-m", f"Workload {workload_id[:8]}: auto-commit changes",
@@ -283,7 +250,7 @@ def _make_stop_hook(
                 logger.warning("Workload %s: auto-commit failed: %s", workload_id[:8], commit_err)
 
         # Attempt merge into main
-        rc, stdout, stderr = await _run_git(
+        rc, stdout, stderr = await run_git(
             "merge", branch_name, "--no-edit",
             cwd=clone_path,
         )
@@ -292,11 +259,11 @@ def _make_stop_hook(
             logger.info("Workload %s: merge succeeded on attempt %d", workload_id[:8], retries + 1)
 
             # Clean up worktree and branch
-            await _run_git("worktree", "remove", str(worktree_path), "--force", cwd=clone_path)
-            await _run_git("branch", "-d", branch_name, cwd=clone_path)
+            await run_git("worktree", "remove", str(worktree_path), "--force", cwd=clone_path)
+            await run_git("branch", "-d", branch_name, cwd=clone_path)
 
             # Push merged changes to remote
-            push_rc, _, push_err = await _run_git("push", cwd=clone_path)
+            push_rc, _, push_err = await run_git("push", cwd=clone_path)
             if push_rc != 0:
                 logger.warning("Workload %s: post-merge push failed: %s", workload_id[:8], push_err)
             else:
@@ -310,7 +277,7 @@ def _make_stop_hook(
             "Workload %s: merge conflict on attempt %d: %s",
             workload_id[:8], retries + 1, stderr,
         )
-        await _run_git("merge", "--abort", cwd=clone_path)
+        await run_git("merge", "--abort", cwd=clone_path)
         merge_state["retries"] = retries + 1
 
         return {
@@ -329,325 +296,6 @@ def _make_stop_hook(
     return stop_hook, merge_state
 
 
-async def _get_coordinator_for_chat(chat_id: str) -> dict:
-    """Look up the coordinator member for the project owning a chat."""
-    conn = await asyncpg.connect(_dsn)
-    try:
-        row = await conn.fetchrow(
-            "SELECT pm.id, pm.display_name "
-            "FROM chats c "
-            "JOIN rooms r ON r.id = c.room_id "
-            "JOIN project_members pm ON pm.project_id = r.project_id "
-            "WHERE c.id = $1 AND pm.type = 'coordinator'",
-            uuid.UUID(chat_id),
-        )
-        if not row:
-            raise ValueError(f"No coordinator found for chat {chat_id}")
-        return {"id": str(row["id"]), "display_name": row["display_name"]}
-    finally:
-        await conn.close()
-
-
-async def _relay_messages(
-    workload_id: str,
-    client: ClaudeSDKClient,
-    workload_data: dict,
-    redis_client: aioredis.Redis,
-) -> None:
-    """Relay messages from ClaudeSDKClient to Redis chat:responses.
-
-    Runs as a background task for the lifetime of the workload session.
-    """
-    chat_id = workload_data["chat_id"]
-    member_id = workload_data["member_id"]
-    display_name = workload_data["display_name"]
-    main_chat_id = workload_data["main_chat_id"]
-
-    # Periodic heartbeat for activity indicator
-    total_tokens = 0
-
-    async def _heartbeat():
-        """Send periodic agent_activity events while the SDK is generating."""
-        try:
-            while True:
-                await asyncio.sleep(1)
-                await redis_client.publish("chat:responses", json.dumps({
-                    "_event": "agent_activity",
-                    "chat_id": chat_id,
-                    "workload_id": workload_id,
-                    "phase": "processing",
-                    "tokens": total_tokens,
-                }))
-        except asyncio.CancelledError:
-            pass
-
-    heartbeat_task: asyncio.Task | None = None
-    session_state = _sessions.get(workload_id, {})
-
-    def _convert_blocks(content_blocks: list) -> list[dict]:
-        """Convert SDK content blocks to serialisable dicts."""
-        blocks: list[dict] = []
-        for block in content_blocks:
-            if isinstance(block, TextBlock):
-                blocks.append({"type": "text", "value": block.text})
-            elif isinstance(block, ThinkingBlock):
-                blocks.append({"type": "thinking", "thinking": block.thinking})
-            elif isinstance(block, ToolUseBlock):
-                blocks.append({
-                    "type": "tool_use",
-                    "tool_use_id": block.id,
-                    "name": block.name,
-                    "input": block.input,
-                })
-            elif isinstance(block, ToolResultBlock):
-                blocks.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.tool_use_id,
-                    "content": block.content,
-                    "is_error": block.is_error,
-                })
-        return blocks
-
-    def _start_heartbeat():
-        nonlocal heartbeat_task
-        heartbeat_task = asyncio.create_task(_heartbeat())
-        session_state["heartbeat_task"] = heartbeat_task
-
-    def _stop_heartbeat():
-        nonlocal heartbeat_task
-        if heartbeat_task and not heartbeat_task.done():
-            heartbeat_task.cancel()
-        session_state["heartbeat_task"] = None
-
-    # Expose restart callback so tool_approval can resume the heartbeat
-    session_state["restart_heartbeat"] = _start_heartbeat
-
-    # Track tool_use_ids of playwright-cli open commands for screencast triggering
-    pending_playwright_opens: set[str] = set()
-
-    try:
-        # Start heartbeat before the message loop
-        _start_heartbeat()
-
-        async for msg in client.receive_messages():
-            if isinstance(msg, StreamEvent):
-                # Accumulate token usage from raw Anthropic API stream events
-                event = msg.event
-                event_type = event.get("type")
-                if event_type == "message_start":
-                    usage = event.get("message", {}).get("usage", {})
-                    total_tokens += usage.get("input_tokens", 0)
-                elif event_type == "message_delta":
-                    usage = event.get("usage", {})
-                    total_tokens += usage.get("output_tokens", 0)
-                continue
-
-            if isinstance(msg, AssistantMessage):
-                # Stop heartbeat while processing a complete message
-                _stop_heartbeat()
-
-                blocks = _convert_blocks(msg.content)
-
-                # Detect playwright-cli open commands for live view
-                for block in msg.content:
-                    if isinstance(block, ToolUseBlock) and block.name == "Bash":
-                        cmd = block.input.get("command", "") if isinstance(block.input, dict) else ""
-                        if "playwright-cli open" in cmd:
-                            logger.info(
-                                "Detected playwright-cli open for workload %s: %s",
-                                workload_id[:8], cmd[:100],
-                            )
-                            pending_playwright_opens.add(block.id)
-
-                if not blocks:
-                    # Restart heartbeat for the next turn
-                    _start_heartbeat()
-                    continue
-
-                structured_content = json.dumps({
-                    "blocks": blocks,
-                    "mentions": [],
-                })
-
-                response = {
-                    "id": str(uuid.uuid4()),
-                    "chat_id": chat_id,
-                    "member_id": member_id,
-                    "display_name": display_name,
-                    "type": "ai",
-                    "content": structured_content,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }
-                await redis_client.publish("chat:responses", json.dumps(response))
-
-                # Restart heartbeat for the next turn
-                _start_heartbeat()
-
-            elif isinstance(msg, UserMessage):
-                # Relay tool results (user-role messages containing ToolResultBlock)
-                if isinstance(msg.content, list):
-                    # Check if a playwright-cli open just completed — start screencast
-                    for block in msg.content:
-                        if (
-                            isinstance(block, ToolResultBlock)
-                            and block.tool_use_id in pending_playwright_opens
-                        ):
-                            pending_playwright_opens.discard(block.tool_use_id)
-                            if not block.is_error:
-                                room_id = workload_data.get("room_id", "")
-                                logger.info(
-                                    "Launching screencast for workload %s, room_id=%s",
-                                    workload_id[:8], room_id,
-                                )
-                                screencast.launch_screencast(
-                                    workload_id, room_id, redis_client,
-                                    owner_name=workload_data.get("display_name", ""),
-                                )
-
-                    blocks = _convert_blocks(msg.content)
-                    result_blocks = [b for b in blocks if b["type"] == "tool_result"]
-                    if result_blocks:
-                        structured_content = json.dumps({
-                            "blocks": result_blocks,
-                            "mentions": [],
-                        })
-                        response = {
-                            "id": str(uuid.uuid4()),
-                            "chat_id": chat_id,
-                            "member_id": member_id,
-                            "display_name": display_name,
-                            "type": "ai",
-                            "content": structured_content,
-                            "created_at": datetime.now(timezone.utc).isoformat(),
-                        }
-                        await redis_client.publish("chat:responses", json.dumps(response))
-
-            elif isinstance(msg, ResultMessage):
-                _stop_heartbeat()
-
-                logger.info(
-                    "Workload %s completed (session: %s, error: %s, turns: %d)",
-                    workload_id[:8], msg.session_id, msg.is_error, msg.num_turns,
-                )
-
-                # Store session_id and update status
-                conn = await asyncpg.connect(_dsn)
-                try:
-                    await conn.execute(
-                        "UPDATE workloads SET status = 'needs_attention', session_id = $1, "
-                        "updated_at = $2 WHERE id = $3",
-                        msg.session_id, datetime.now(timezone.utc), uuid.UUID(workload_id),
-                    )
-                finally:
-                    await conn.close()
-
-                await _publish_status(
-                    redis_client, workload_id, "needs_attention",
-                    workload_data.get("room_id", ""),
-                )
-
-                # Publish merge-aware summary to main chat
-                session = _sessions.get(workload_id, {})
-                merge_succeeded = session.get("merge_state", {}).get("succeeded")
-
-                if merge_succeeded is True:
-                    merged_to = session.get("merge_state", {}).get("target_branch", "main")
-                    summary = (
-                        f"Workload **{workload_data['title']}** has finished "
-                        f"and its changes have been merged to {merged_to}."
-                    )
-                elif merge_succeeded is False:
-                    branch = session.get("branch_name", "unknown")
-                    summary = (
-                        f"Workload **{workload_data['title']}** has finished "
-                        f"but merge conflicts could not be resolved automatically. "
-                        f"Changes remain on branch `{branch}`."
-                    )
-                else:
-                    summary = (
-                        f"Workload **{workload_data['title']}** has finished "
-                        f"and needs attention."
-                    )
-
-                if msg.result:
-                    summary += f"\n\nSummary: {msg.result}"
-
-                coordinator = await _get_coordinator_for_chat(main_chat_id)
-                structured_summary = json.dumps({
-                    "blocks": [{"type": "text", "value": summary}],
-                    "mentions": [],
-                })
-
-                main_response = {
-                    "id": str(uuid.uuid4()),
-                    "chat_id": main_chat_id,
-                    "member_id": coordinator["id"],
-                    "display_name": coordinator["display_name"],
-                    "type": "coordinator",
-                    "content": structured_summary,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }
-                await redis_client.publish("chat:responses", json.dumps(main_response))
-
-                # Post-workload manifest check (no git pull — we just pushed)
-                if merge_succeeded and workload_data.get("project_id"):
-                    try:
-                        async with httpx.AsyncClient(timeout=10.0) as http:
-                            resp = await http.post(
-                                f"{settings.api_service_url}/projects/"
-                                f"{workload_data['project_id']}/check-manifest?pull=false",
-                            )
-                            if resp.status_code == 200:
-                                data = resp.json()
-                                if data.get("is_locked"):
-                                    logger.warning(
-                                        "Workload %s: manifest check triggered lockdown",
-                                        workload_id[:8],
-                                    )
-                            else:
-                                logger.warning(
-                                    "Workload %s: manifest check returned %d",
-                                    workload_id[:8], resp.status_code,
-                                )
-                    except Exception:
-                        logger.warning(
-                            "Workload %s: manifest check failed (non-blocking)",
-                            workload_id[:8], exc_info=True,
-                        )
-
-                await screencast.stop_screencast(workload_id)
-                _sessions.pop(workload_id, None)
-                return
-
-    except asyncio.CancelledError:
-        logger.info("Relay task cancelled for workload %s", workload_id[:8])
-        if heartbeat_task and not heartbeat_task.done():
-            heartbeat_task.cancel()
-        await screencast.stop_screencast(workload_id)
-        _sessions.pop(workload_id, None)
-    except Exception:
-        logger.exception("Relay task error for workload %s", workload_id[:8])
-        if heartbeat_task and not heartbeat_task.done():
-            heartbeat_task.cancel()
-        await screencast.stop_screencast(workload_id)
-        try:
-            conn = await asyncpg.connect(_dsn)
-            try:
-                await conn.execute(
-                    "UPDATE workloads SET status = 'needs_attention', updated_at = $1 WHERE id = $2",
-                    datetime.now(timezone.utc), uuid.UUID(workload_id),
-                )
-            finally:
-                await conn.close()
-            await _publish_status(
-                redis_client, workload_id, "needs_attention",
-                workload_data.get("room_id", ""),
-            )
-        except Exception:
-            logger.exception("Failed to update workload status to needs_attention")
-        _sessions.pop(workload_id, None)
-
-
 async def start_workload_session(
     workload_data: dict,
     clone_path: str,
@@ -659,9 +307,11 @@ async def start_workload_session(
     and launches the relay task as a background asyncio task.
     """
     workload_id = workload_data["id"]
+    chat_id = workload_data["chat_id"]
+    room_id = workload_data.get("room_id", "")
 
-    if workload_id in _sessions:
-        logger.warning("Session already active for workload %s, skipping", workload_id[:8])
+    if chat_id in _sessions:
+        logger.warning("Session already active for workload %s (chat %s), skipping", workload_id[:8], chat_id[:8])
         return
 
     slug = _slugify(workload_data["title"], workload_id)
@@ -671,18 +321,8 @@ async def start_workload_session(
         worktree_path = await _ensure_worktree(clone_path, slug)
     except RuntimeError:
         logger.exception("Failed to create worktree for workload %s", workload_id[:8])
-        conn = await asyncpg.connect(_dsn)
-        try:
-            await conn.execute(
-                "UPDATE workloads SET status = 'needs_attention', updated_at = $1 WHERE id = $2",
-                datetime.now(timezone.utc), uuid.UUID(workload_id),
-            )
-        finally:
-            await conn.close()
-        await _publish_status(
-            redis_client, workload_id, "needs_attention",
-            workload_data.get("room_id", ""),
-        )
+        await update_chat_status(chat_id, "needs_attention")
+        await publish_status_event(redis_client, chat_id, "needs_attention", room_id, chat_type="workload")
         return
 
     # 2. Update worktree_branch and status in DB
@@ -690,21 +330,21 @@ async def start_workload_session(
     conn = await asyncpg.connect(_dsn)
     try:
         await conn.execute(
-            "UPDATE workloads SET worktree_branch = $1, status = 'running', "
-            "updated_at = $2 WHERE id = $3",
-            branch_name, datetime.now(timezone.utc), uuid.UUID(workload_id),
+            "UPDATE workloads SET worktree_branch = $1 WHERE id = $2",
+            branch_name, uuid.UUID(workload_id),
         )
     finally:
         await conn.close()
 
-    await _publish_status(redis_client, workload_id, "running", workload_data.get("room_id", ""))
+    await update_chat_status(chat_id, "running")
+    await publish_status_event(redis_client, chat_id, "running", room_id, chat_type="workload")
 
     # 3. Load agent profile for system prompt
     profile_path = Path(clone_path) / ".team-agent" / "agents" / f"{workload_data['display_name'].lower()}.md"
     agent_profile = profile_path.read_text() if profile_path.exists() else ""
 
     # 4. Read target branch from clone (whatever is checked out)
-    _, target_branch_out, _ = await _run_git(
+    _, target_branch_out, _ = await run_git(
         "symbolic-ref", "--short", "HEAD", cwd=clone_path,
     )
     target_branch = target_branch_out.strip() if target_branch_out.strip() else "main"
@@ -719,39 +359,43 @@ async def start_workload_session(
         target_branch=target_branch,
     )
 
-    # 6. Build SDK options
+    # 6. Pre-register session so tool_approval can access it
     is_resume = bool(workload_data.get("session_id"))
 
-    # Pre-register session so tool_approval can access it via _sessions
-    _sessions[workload_id] = {
+    register_session(chat_id, {
+        "session_type": "workload",
         "client": None,
         "task": None,
-        "workload_data": workload_data,
+        "chat_id": chat_id,
+        "member_id": workload_data["member_id"],
+        "display_name": workload_data["display_name"],
+        "room_id": room_id,
+        "clone_path": clone_path,
+        "project_id": workload_data.get("project_id", ""),
         "merge_state": merge_state,
         "branch_name": branch_name,
-        "clone_path": clone_path,
+        "main_chat_id": workload_data.get("main_chat_id", ""),
+        "workload_data": workload_data,
         "session_approvals": set(),
         "pending_approvals": {},
-    }
+    })
 
     can_use_tool = make_can_use_tool(
-        workload_id=workload_id,
+        session_key=chat_id,
         clone_path=clone_path,
-        worktree_path=str(worktree_path),
-        session_state=_sessions[workload_id],
+        working_dir=str(worktree_path),
+        session_state=_sessions[chat_id],
         redis_client=redis_client,
-        chat_id=workload_data["chat_id"],
+        chat_id=chat_id,
         member_id=workload_data["member_id"],
         display_name=workload_data["display_name"],
     )
 
-    # Build a clean environment for the Claude CLI subprocess:
-    # - Strip ANTHROPIC_API_KEY so it uses the subscription OAuth token
-    # - Set PLAYWRIGHT_MCP_SANDBOX=false so playwright-cli can run headless in Docker
+    # Build a clean environment for the Claude CLI subprocess
     cli_env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     cli_env["PLAYWRIGHT_MCP_SANDBOX"] = "false"
 
-    # Per-agent git identity — env vars override all config levels
+    # Per-agent git identity
     agent_name = workload_data["display_name"]
     agent_email = f"{agent_name.lower()}@team-agent"
     cli_env["GIT_AUTHOR_NAME"] = agent_name
@@ -771,37 +415,27 @@ async def start_workload_session(
         include_partial_messages=True,
     )
 
-    # 6. Connect
+    # 7. Connect
     try:
         client = ClaudeSDKClient(options)
         await client.connect()
     except Exception:
         logger.exception("Failed to connect ClaudeSDKClient for workload %s", workload_id[:8])
-        _sessions.pop(workload_id, None)
-        conn = await asyncpg.connect(_dsn)
-        try:
-            await conn.execute(
-                "UPDATE workloads SET status = 'needs_attention', updated_at = $1 WHERE id = $2",
-                datetime.now(timezone.utc), uuid.UUID(workload_id),
-            )
-        finally:
-            await conn.close()
-        await _publish_status(
-            redis_client, workload_id, "needs_attention",
-            workload_data.get("room_id", ""),
-        )
+        unregister_session(chat_id)
+        await update_chat_status(chat_id, "needs_attention")
+        await publish_status_event(redis_client, chat_id, "needs_attention", room_id, chat_type="workload")
         return
 
-    # 7. Finish registration and start relay
-    _sessions[workload_id]["client"] = client
+    # 8. Finish registration and start relay
+    _sessions[chat_id]["client"] = client
 
     relay_task = asyncio.create_task(
-        _relay_messages(workload_id, client, workload_data, redis_client),
-        name=f"workload-relay-{workload_id[:8]}",
+        relay_messages(chat_id, client, redis_client, completion_status="needs_attention"),
+        name=f"workload-relay-{chat_id[:8]}",
     )
-    _sessions[workload_id]["task"] = relay_task
+    _sessions[chat_id]["task"] = relay_task
 
-    # 8. Send initial prompt (or skip if resuming)
+    # 9. Send initial prompt (or skip if resuming)
     if not is_resume:
         initial_prompt = _build_initial_prompt(workload_data)
         await client.query(initial_prompt)
@@ -813,88 +447,11 @@ async def start_workload_session(
         )
 
 
-async def route_message(workload_id: str, prompt: str) -> bool:
-    """Route a follow-up message to an active workload session.
-
-    Returns True if delivered, False if no active session.
-    """
-    session = _sessions.get(workload_id)
-    if not session:
-        logger.warning("No active session for workload %s", workload_id[:8])
-        return False
-
-    client = session["client"]
-    await client.query(prompt)
-    logger.info("Routed follow-up message to workload %s", workload_id[:8])
-    return True
-
-
-async def stop_workload_session(
-    workload_id: str,
-    target_status: str,
-    redis_client: aioredis.Redis,
-) -> bool:
-    """Stop a workload session and transition to the given status.
-
-    Aborts the SDK session if running, updates the DB, and publishes the
-    status change. Returns True if the workload was found and updated.
-    """
-    session = _sessions.pop(workload_id, None)
-    room_id = ""
-
-    if session:
-        room_id = session.get("workload_data", {}).get("room_id", "")
-        task = session.get("task")
-        if task and not task.done():
-            task.cancel()
-        client = session.get("client")
-        if client:
-            try:
-                await client.disconnect()
-            except Exception:
-                logger.exception("Error disconnecting workload %s during stop", workload_id[:8])
-
-    # Update DB status regardless of whether a session was active
-    conn = await asyncpg.connect(_dsn)
-    try:
-        result = await conn.execute(
-            "UPDATE workloads SET status = $1, updated_at = $2 WHERE id = $3",
-            target_status, datetime.now(timezone.utc), uuid.UUID(workload_id),
-        )
-        if result == "UPDATE 0":
-            return False
-
-        # If we didn't get room_id from session, look it up from DB
-        if not room_id:
-            row = await conn.fetchrow(
-                "SELECT c.room_id FROM workloads w "
-                "JOIN chats c ON c.workload_id = w.id "
-                "WHERE w.id = $1",
-                uuid.UUID(workload_id),
-            )
-            if row:
-                room_id = str(row["room_id"])
-    finally:
-        await conn.close()
-
-    if room_id:
-        await _publish_status(redis_client, workload_id, target_status, room_id)
-
-    logger.info("Stopped workload %s → %s", workload_id[:8], target_status)
-    return True
-
-
-async def shutdown_all_sessions() -> None:
-    """Gracefully disconnect all active workload sessions."""
-    for workload_id, session in list(_sessions.items()):
-        logger.info("Shutting down session for workload %s", workload_id[:8])
-        task = session.get("task")
-        if task and not task.done():
-            task.cancel()
-        client = session.get("client")
-        if client:
-            try:
-                await client.disconnect()
-            except Exception:
-                logger.exception("Error disconnecting workload %s", workload_id[:8])
-    _sessions.clear()
+async def shutdown_all_workload_sessions(redis_client: aioredis.Redis) -> None:
+    """Gracefully stop all active workload sessions."""
+    for session_key, session in list(_sessions.items()):
+        if session.get("session_type") != "workload":
+            continue
+        chat_id = session.get("chat_id", session_key)
+        logger.info("Shutting down workload session %s", chat_id[:8])
+        await stop_session(chat_id, "needs_attention", redis_client)

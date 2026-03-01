@@ -31,7 +31,7 @@ export type Message = {
 export type ToolApprovalBlock = {
   type: "tool_approval_request";
   approval_request_id: string;
-  workload_id: string;
+  chat_id: string;
   tool_name: string;
   tool_input: Record<string, unknown>;
   input_summary: string;
@@ -78,7 +78,7 @@ export type WorkloadChat = {
 
 export type WorkloadStatusEvent = {
   _event: "workload_status";
-  workload_id: string;
+  chat_id: string;
   status: string;
   permission_mode?: "default" | "acceptEdits";
   room_id: string;
@@ -123,7 +123,6 @@ export type ToolResultContentBlock = {
 export type AgentActivityEvent = {
   _event: "agent_activity";
   chat_id: string;
-  workload_id: string;
   phase: string;
   tokens: number;
 };

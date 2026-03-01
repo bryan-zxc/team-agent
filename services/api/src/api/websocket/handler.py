@@ -26,6 +26,45 @@ def _get_redis():
     return redis_client
 
 
+def _extract_plain_text(blocks: list[dict]) -> str:
+    """Extract plain text from structured message blocks."""
+    return " ".join(b["value"] for b in blocks if b.get("type") == "text")
+
+
+async def _enrich_with_reply_context(plain_text: str, reply_to_id: str | None) -> str:
+    """Prepend reply-to context if replying to a past message.
+
+    The enriched text is only sent to the AI — the DB record and frontend
+    display remain unchanged.
+    """
+    if not reply_to_id:
+        return plain_text
+
+    async with async_session() as session:
+        msg = await session.get(Message, uuid.UUID(reply_to_id))
+        if not msg:
+            return plain_text
+
+        member = await session.get(ProjectMember, msg.member_id)
+        author = member.display_name if member else "Unknown"
+
+        # Extract text from the original message content
+        try:
+            data = json.loads(msg.content)
+            if isinstance(data, dict) and "blocks" in data:
+                original_text = _extract_plain_text(data["blocks"])
+            else:
+                original_text = msg.content
+        except (json.JSONDecodeError, TypeError):
+            original_text = msg.content
+
+        # Truncate long originals
+        if len(original_text) > 500:
+            original_text = original_text[:500] + "..."
+
+        return f'[Replying to {author}: "{original_text}"]\n\n{plain_text}'
+
+
 async def _notify_ai_if_mentioned(mentions: list[str], chat_id: str):
     """Binary check: if any mentioned member is AI, publish one ai:respond event."""
     async with async_session() as session:
@@ -95,7 +134,6 @@ async def websocket_endpoint(
 
         chat = await session.get(Chat, chat_id)
         chat_type = chat.type if chat else "primary"
-        workload_id = str(chat.workload_id) if chat and chat.workload_id else None
 
         # Resolve project_id via chat → room for lockdown checks
         project_id = None
@@ -169,16 +207,15 @@ async def websocket_endpoint(
             # Broadcast to all connections in this chat
             await manager.broadcast(chat_id, msg_data)
 
-            # Route message: workload chats → workload:messages, primary chats → ai:respond
-            if chat_type == "workload" and workload_id:
-                plain_text = " ".join(
-                    b["value"] for b in blocks if b.get("type") == "text"
-                )
+            # Route message: workload/admin chats → chat:messages, primary chats → ai:respond
+            if chat_type in ("workload", "admin"):
+                plain_text = _extract_plain_text(blocks)
+                enriched = await _enrich_with_reply_context(plain_text, reply_to_id)
                 await _get_redis().publish(
-                    "workload:messages",
-                    json.dumps({"workload_id": workload_id, "content": plain_text}),
+                    "chat:messages",
+                    json.dumps({"chat_id": str(chat_id), "content": enriched}),
                 )
-                logger.info("Published workload message for %s", workload_id[:8])
+                logger.info("Published %s message for chat %s", chat_type, str(chat_id)[:8])
             elif mentions:
                 await _notify_ai_if_mentioned(mentions, str(chat_id))
 

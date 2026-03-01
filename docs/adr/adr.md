@@ -4,6 +4,7 @@ Active design decisions for the team-agent project. Newest first. When a decisio
 
 | # | Date | Title | Description | Link |
 |---|------|-------|-------------|------|
+| 0012 | 2026-03-01 | Unified chat_id as universal session key | Replace workload_id with chat_id as the single routing/registry key across all three services, eliminating duplicate code paths | [ADR-0012](0012-unified-chat-id-as-universal-session-key.md) |
 | 0011 | 2026-02-27 | Subscription-only Claude authentication | All Claude Code usage authenticates via Max subscription credentials in the claude_auth volume — never API keys | [ADR-0011](0011-subscription-only-claude-authentication.md) |
 | 0010 | 2026-02-25 | GitHub Actions deployment via Tailscale SSH | GitHub-hosted runners build multi-platform Docker images and deploy to the Mac Mini via ephemeral Tailscale SSH, reusing the existing deploy.sh script | [ADR-0010](0010-github-actions-deployment-via-tailscale-ssh.md) |
 | 0009 | 2026-02-25 | Session cookie authentication | HTTP-only session cookies with a PostgreSQL sessions table for instant revocation and XSS-immune auth, chosen over stateless JWTs | [ADR-0009](0009-session-cookie-authentication.md) |

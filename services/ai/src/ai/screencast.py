@@ -12,7 +12,7 @@ import websockets
 
 logger = logging.getLogger(__name__)
 
-# Session registry: workload_id → {"task": asyncio.Task}
+# Session registry: chat_id → {"task": asyncio.Task}
 _screencast_sessions: dict[str, dict] = {}
 
 # CDP command ID counter (per module, not per session — just needs to be unique)
@@ -105,23 +105,23 @@ async def _get_page_ws_url(port: int) -> str | None:
 
 
 async def start_screencast(
-    workload_id: str,
+    chat_id: str,
     room_id: str,
     redis_client: aioredis.Redis,
     owner_name: str = "",
 ) -> None:
     """Connect to CDP, start Page.startScreencast, and stream frames to Redis.
 
-    Publishes a screencast_started notification via workload:status (room-scoped),
-    then streams frames to screencast:frames:{workload_id}.
+    Publishes a screencast_started notification via chat:status (room-scoped),
+    then streams frames to screencast:frames:{chat_id}.
     """
-    logger.info("start_screencast entered for workload %s, room %s", workload_id[:8], room_id[:8])
+    logger.info("start_screencast entered for chat %s, room %s", chat_id[:8], room_id[:8])
 
     # NOTE: duplicate-launch guard lives in launch_screencast() which registers
     # the session BEFORE this coroutine runs. Do NOT check _screencast_sessions
     # here — it would always be True and cause an immediate return.
 
-    frames_channel = f"screencast:frames:{workload_id}"
+    frames_channel = f"screencast:frames:{chat_id}"
     ws = None
 
     try:
@@ -133,7 +133,7 @@ async def start_screencast(
         # 2. Find page target
         page_ws_url = await _get_page_ws_url(port)
         if not page_ws_url:
-            logger.warning("No page target found on CDP port %d for workload %s", port, workload_id[:8])
+            logger.warning("No page target found on CDP port %d for chat %s", port, chat_id[:8])
             return
 
         # 3. Connect to page via CDP WebSocket
@@ -152,11 +152,11 @@ async def start_screencast(
             },
         }))
 
-        logger.info("Screencast started for workload %s on CDP port %d", workload_id[:8], port)
+        logger.info("Screencast started for chat %s on CDP port %d", chat_id[:8], port)
 
         # 5. Notify frontend via room-scoped event
-        await redis_client.publish("workload:status", json.dumps({
-            "workload_id": workload_id,
+        await redis_client.publish("chat:status", json.dumps({
+            "chat_id": chat_id,
             "room_id": room_id,
             "screencast_started": True,
             "owner_name": owner_name,
@@ -204,9 +204,9 @@ async def start_screencast(
                 pass
         raise
     except websockets.exceptions.ConnectionClosed:
-        logger.info("CDP connection closed for workload %s (browser shut down)", workload_id[:8])
+        logger.info("CDP connection closed for chat %s (browser shut down)", chat_id[:8])
     except Exception:
-        logger.exception("Screencast error for workload %s", workload_id[:8])
+        logger.exception("Screencast error for chat %s", chat_id[:8])
     finally:
         # Close WebSocket
         if ws:
@@ -224,13 +224,13 @@ async def start_screencast(
         except Exception:
             pass
 
-        _screencast_sessions.pop(workload_id, None)
-        logger.info("Screencast stopped for workload %s", workload_id[:8])
+        _screencast_sessions.pop(chat_id, None)
+        logger.info("Screencast stopped for chat %s", chat_id[:8])
 
 
-async def stop_screencast(workload_id: str) -> None:
-    """Cancel an active screencast for the given workload."""
-    session = _screencast_sessions.pop(workload_id, None)
+async def stop_screencast(chat_id: str) -> None:
+    """Cancel an active screencast for the given chat."""
+    session = _screencast_sessions.pop(chat_id, None)
     if not session:
         return
 
@@ -242,15 +242,15 @@ async def stop_screencast(workload_id: str) -> None:
         except asyncio.CancelledError:
             pass
 
-    logger.info("Screencast cancelled for workload %s", workload_id[:8])
+    logger.info("Screencast cancelled for chat %s", chat_id[:8])
 
 
 async def shutdown_all_screencasts() -> None:
     """Cancel all active screencasts (called during service shutdown)."""
-    workload_ids = list(_screencast_sessions.keys())
-    for wid in workload_ids:
-        await stop_screencast(wid)
-    logger.info("All screencasts shut down (%d)", len(workload_ids))
+    chat_ids = list(_screencast_sessions.keys())
+    for cid in chat_ids:
+        await stop_screencast(cid)
+    logger.info("All screencasts shut down (%d)", len(chat_ids))
 
 
 def _on_screencast_task_done(task: asyncio.Task) -> None:
@@ -261,18 +261,18 @@ def _on_screencast_task_done(task: asyncio.Task) -> None:
 
 
 def launch_screencast(
-    workload_id: str,
+    chat_id: str,
     room_id: str,
     redis_client: aioredis.Redis,
     owner_name: str = "",
 ) -> None:
     """Launch a screencast as a background task and register it in the session registry."""
-    if workload_id in _screencast_sessions:
+    if chat_id in _screencast_sessions:
         return
 
     task = asyncio.create_task(
-        start_screencast(workload_id, room_id, redis_client, owner_name),
-        name=f"screencast-{workload_id[:8]}",
+        start_screencast(chat_id, room_id, redis_client, owner_name),
+        name=f"screencast-{chat_id[:8]}",
     )
     task.add_done_callback(_on_screencast_task_done)
-    _screencast_sessions[workload_id] = {"task": task}
+    _screencast_sessions[chat_id] = {"task": task}

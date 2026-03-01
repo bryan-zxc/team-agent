@@ -14,3 +14,4 @@ class Room(UUIDPrimaryKey, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
+    type: Mapped[str] = mapped_column(String, nullable=False, default="standard", server_default="standard")

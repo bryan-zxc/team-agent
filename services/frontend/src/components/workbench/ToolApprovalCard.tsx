@@ -115,7 +115,7 @@ export function ToolApprovalCard({ block, disabled }: Props) {
       setSubmitting(true);
       try {
         await apiFetch(
-          `/workloads/${block.workload_id}/tool-approval`,
+          `/chats/${block.chat_id}/tool-approval`,
           {
             method: "POST",
             body: JSON.stringify({

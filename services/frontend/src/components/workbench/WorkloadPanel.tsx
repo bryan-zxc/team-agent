@@ -9,9 +9,9 @@ type WorkloadPanelProps = {
   workloads: WorkloadChat[];
   activeChatId: string;
   onSelectWorkload: (chatId: string) => void;
-  onCancel: (workloadId: string) => void;
-  onComplete: (workloadId: string) => void;
-  onInterrupt: (workloadId: string) => void;
+  onCancel: (chatId: string) => void;
+  onComplete: (chatId: string) => void;
+  onInterrupt: (chatId: string) => void;
 };
 
 type StatusGroup = {
@@ -163,7 +163,7 @@ export function WorkloadPanel({
                       {w.status === "needs_attention" && (
                         <button
                           className={styles.actionBtn}
-                          onClick={() => onComplete(w.workload_id)}
+                          onClick={() => onComplete(w.id)}
                         >
                           Complete
                         </button>
@@ -171,7 +171,7 @@ export function WorkloadPanel({
                       {(w.status === "running" || w.status === "assigned") && (
                         <button
                           className={styles.actionBtn}
-                          onClick={() => onInterrupt(w.workload_id)}
+                          onClick={() => onInterrupt(w.id)}
                         >
                           Interrupt
                         </button>
@@ -179,7 +179,7 @@ export function WorkloadPanel({
                       {!TERMINAL_STATUSES.has(w.status) && (
                         <button
                           className={clsx(styles.actionBtn, styles.actionCancel)}
-                          onClick={() => onCancel(w.workload_id)}
+                          onClick={() => onCancel(w.id)}
                         >
                           Cancel
                         </button>

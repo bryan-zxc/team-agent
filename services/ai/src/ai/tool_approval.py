@@ -197,16 +197,16 @@ def _read_original_content(
 
 
 def make_can_use_tool(
-    workload_id: str,
+    session_key: str,
     clone_path: str,
-    worktree_path: str,
+    working_dir: str,
     session_state: dict,
     redis_client: Any,
     chat_id: str,
     member_id: str,
     display_name: str,
 ):
-    """Create a ``can_use_tool`` callback closure for a workload session.
+    """Create a ``can_use_tool`` callback closure for a session.
 
     ``session_state`` must contain:
       - ``session_approvals``: set[str]  — permission keys approved for this session
@@ -242,7 +242,7 @@ def make_can_use_tool(
         session_state["pending_approvals"][approval_request_id] = future
 
         input_summary = _summarise_tool_input(tool_name, tool_input)
-        original_content = _read_original_content(worktree_path, tool_name, tool_input)
+        original_content = _read_original_content(working_dir, tool_name, tool_input)
 
         request_msg = {
             "id": str(uuid.uuid4()),
@@ -254,7 +254,7 @@ def make_can_use_tool(
                 "blocks": [{
                     "type": "tool_approval_request",
                     "approval_request_id": approval_request_id,
-                    "workload_id": workload_id,
+                    "chat_id": session_key,
                     "tool_name": tool_name,
                     "tool_input": tool_input,
                     "input_summary": input_summary,
@@ -267,8 +267,8 @@ def make_can_use_tool(
         }
         await redis_client.publish("chat:responses", json.dumps(request_msg))
         logger.info(
-            "Tool approval request %s for %s (workload %s)",
-            approval_request_id[:8], tool_name, workload_id[:8],
+            "Tool approval request %s for %s (session %s)",
+            approval_request_id[:8], tool_name, session_key[:8],
         )
 
         # 5. Wait for human response
@@ -276,8 +276,8 @@ def make_can_use_tool(
             decision = await asyncio.wait_for(future, timeout=APPROVAL_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
             logger.warning(
-                "Tool approval timed out for %s (workload %s)",
-                tool_name, workload_id[:8],
+                "Tool approval timed out for %s (session %s)",
+                tool_name, session_key[:8],
             )
             return PermissionResultDeny(
                 message=f"Tool approval timed out after {APPROVAL_TIMEOUT_SECONDS}s. "
@@ -315,7 +315,7 @@ def make_can_use_tool(
 
 
 def resolve_tool_approval(
-    workload_id: str,
+    session_key: str,
     approval_request_id: str,
     decision: dict,
 ) -> bool:
@@ -323,18 +323,18 @@ def resolve_tool_approval(
 
     Returns True if resolved, False if no matching pending approval.
     """
-    from .workload import _sessions
+    from .session import _sessions
 
-    session = _sessions.get(workload_id)
+    session = _sessions.get(session_key)
     if not session:
-        logger.warning("No active session for workload %s", workload_id[:8])
+        logger.warning("No active session for %s", session_key[:8])
         return False
 
     future = session.get("pending_approvals", {}).get(approval_request_id)
     if not future or future.done():
         logger.warning(
-            "No pending approval %s for workload %s",
-            approval_request_id[:8], workload_id[:8],
+            "No pending approval %s for session %s",
+            approval_request_id[:8], session_key[:8],
         )
         return False
 

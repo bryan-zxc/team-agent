@@ -6,12 +6,12 @@ import { useScreencastWebSocket } from "@/hooks/useScreencastWebSocket";
 import styles from "./LiveViewTab.module.css";
 
 type LiveViewTabParams = {
-  workloadId: string;
+  chatId: string;
   onClose?: () => void;
 };
 
 export function LiveViewTab({ params }: IDockviewPanelProps<LiveViewTabParams>) {
-  const { workloadId, onClose } = params;
+  const { chatId, onClose } = params;
   const imgRef = useRef<HTMLImageElement>(null);
   const [status, setStatus] = useState<"connecting" | "streaming" | "stopped">("connecting");
 
@@ -29,7 +29,7 @@ export function LiveViewTab({ params }: IDockviewPanelProps<LiveViewTabParams>) 
     }
   }, [onClose]);
 
-  useScreencastWebSocket({ workloadId, onFrame, onStopped });
+  useScreencastWebSocket({ chatId, onFrame, onStopped });
 
   return (
     <div className={styles.container}>

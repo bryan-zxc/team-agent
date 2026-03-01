@@ -10,11 +10,13 @@ from pydantic import BaseModel
 from .agents import generate_agent_profile
 from .config import settings, setup_logging
 from .cost import init_cost_tracker
-from .listener import listen, listen_dispatch_confirmations, listen_tool_approvals, listen_workload_messages
+from .admin import shutdown_all_admin_sessions
+from .listener import listen, listen_chat_messages, listen_dispatch_confirmations, listen_tool_approvals
 from .screencast import shutdown_all_screencasts
+from .session import stop_session
 from .terminal import create_terminal_session, destroy_terminal_session, shutdown_all_terminal_sessions
 from .terminal_listener import listen_terminal_input
-from .workload import shutdown_all_sessions, stop_workload_session
+from .workload import shutdown_all_workload_sessions
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -45,18 +47,19 @@ async def lifespan(app: FastAPI):
     init_cost_tracker(client)
 
     listener_task = asyncio.create_task(listen(client))
-    workload_listener_task = asyncio.create_task(listen_workload_messages(client))
+    chat_listener_task = asyncio.create_task(listen_chat_messages(client))
     tool_approval_task = asyncio.create_task(listen_tool_approvals(client))
     dispatch_task = asyncio.create_task(listen_dispatch_confirmations(client))
     terminal_input_task = asyncio.create_task(listen_terminal_input(client))
 
     yield
 
-    await shutdown_all_sessions()
+    await shutdown_all_workload_sessions(client)
+    await shutdown_all_admin_sessions(client)
     await shutdown_all_screencasts()
     await shutdown_all_terminal_sessions()
     listener_task.cancel()
-    workload_listener_task.cancel()
+    chat_listener_task.cancel()
     tool_approval_task.cancel()
     dispatch_task.cancel()
     terminal_input_task.cancel()
@@ -67,21 +70,21 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="AI Service", lifespan=lifespan)
 
 
-@app.post("/workloads/{workload_id}/interrupt")
-async def interrupt_workload(workload_id: str):
-    """Interrupt a running workload — transitions to needs_attention."""
-    found = await stop_workload_session(workload_id, "needs_attention", app.state.redis)
+@app.post("/chats/{chat_id}/interrupt")
+async def interrupt_session(chat_id: str):
+    """Interrupt a running session — transitions to needs_attention."""
+    found = await stop_session(chat_id, "needs_attention", app.state.redis)
     if not found:
-        raise HTTPException(status_code=404, detail="Workload not found")
+        raise HTTPException(status_code=404, detail="Session not found")
     return {"status": "interrupted"}
 
 
-@app.post("/workloads/{workload_id}/cancel")
-async def cancel_workload(workload_id: str):
-    """Cancel a workload — transitions to cancelled."""
-    found = await stop_workload_session(workload_id, "cancelled", app.state.redis)
+@app.post("/chats/{chat_id}/cancel")
+async def cancel_session(chat_id: str):
+    """Cancel a session — transitions to cancelled."""
+    found = await stop_session(chat_id, "cancelled", app.state.redis)
     if not found:
-        raise HTTPException(status_code=404, detail="Workload not found")
+        raise HTTPException(status_code=404, detail="Session not found")
     return {"status": "cancelled"}
 
 

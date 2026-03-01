@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,4 +22,10 @@ class Chat(UUIDPrimaryKey, TimestampMixin, Base):
     )
     workload_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("workloads.id"), nullable=True
+    )
+    session_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    status: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    permission_mode: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )

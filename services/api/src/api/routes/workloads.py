@@ -58,14 +58,14 @@ class SwitchModeRequest(BaseModel):
     permission_mode: Literal["default", "acceptEdits"]
 
 
-@router.post("/workloads/{workload_id}/tool-approval", status_code=202)
-async def submit_tool_approval(workload_id: str, req: ToolApprovalRequest):
+@router.post("/chats/{chat_id}/tool-approval", status_code=202)
+async def submit_tool_approval(chat_id: str, req: ToolApprovalRequest):
     """Submit a human decision for a pending tool approval request."""
     if req.decision == "deny" and not req.reason:
         raise HTTPException(status_code=422, detail="Reason is required when denying.")
 
     payload = {
-        "workload_id": workload_id,
+        "chat_id": chat_id,
         "approval_request_id": req.approval_request_id,
         "decision": req.decision,
         "tool_name": req.tool_name,
@@ -74,83 +74,76 @@ async def submit_tool_approval(workload_id: str, req: ToolApprovalRequest):
 
     await _get_redis().publish("tool:approvals", json.dumps(payload))
     logger.info(
-        "Published tool approval %s → %s (workload %s)",
-        req.approval_request_id[:8], req.decision, workload_id[:8],
+        "Published tool approval %s → %s (chat %s)",
+        req.approval_request_id[:8], req.decision, chat_id[:8],
     )
 
     return {"status": "accepted"}
 
 
-@router.post("/workloads/{workload_id}/interrupt")
-async def interrupt_workload(workload_id: str):
-    """Interrupt a running workload — proxy to AI service."""
+@router.post("/chats/{chat_id}/interrupt")
+async def interrupt_session(chat_id: str):
+    """Interrupt a running session — proxy to AI service."""
     async with httpx.AsyncClient(timeout=10.0) as http:
         resp = await http.post(
-            f"{settings.ai_service_url}/workloads/{workload_id}/interrupt",
+            f"{settings.ai_service_url}/chats/{chat_id}/interrupt",
         )
     if resp.status_code == 404:
-        raise HTTPException(status_code=404, detail="Workload not found")
+        raise HTTPException(status_code=404, detail="Session not found")
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     return resp.json()
 
 
-@router.post("/workloads/{workload_id}/cancel")
-async def cancel_workload(workload_id: str):
-    """Cancel a workload — proxy to AI service."""
+@router.post("/chats/{chat_id}/cancel")
+async def cancel_session(chat_id: str):
+    """Cancel a session — proxy to AI service."""
     async with httpx.AsyncClient(timeout=10.0) as http:
         resp = await http.post(
-            f"{settings.ai_service_url}/workloads/{workload_id}/cancel",
+            f"{settings.ai_service_url}/chats/{chat_id}/cancel",
         )
     if resp.status_code == 404:
-        raise HTTPException(status_code=404, detail="Workload not found")
+        raise HTTPException(status_code=404, detail="Session not found")
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     return resp.json()
 
 
-@router.patch("/workloads/{workload_id}")
-async def update_workload_status(workload_id: str, req: StatusUpdateRequest):
-    """Manually transition a workload status (needs_attention → completed)."""
+@router.patch("/chats/{chat_id}")
+async def update_chat_status(chat_id: str, req: StatusUpdateRequest):
+    """Manually transition a chat status (needs_attention → completed)."""
+    room_id = None
+    updated_at = None
+    chat_type = None
+
     async with async_session() as session:
-        result = await session.execute(
-            select(Workload).where(Workload.id == uuid.UUID(workload_id))
-        )
-        workload = result.scalar_one_or_none()
+        chat = await session.get(Chat, uuid.UUID(chat_id))
 
-        if not workload:
-            raise HTTPException(status_code=404, detail="Workload not found")
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found")
 
-        if workload.status != "needs_attention":
+        if chat.status != "needs_attention":
             raise HTTPException(
                 status_code=409,
-                detail=f"Cannot transition from '{workload.status}' to '{req.status}'",
+                detail=f"Cannot transition from '{chat.status}' to '{req.status}'",
             )
 
-        workload.status = req.status
-        workload.updated_at = datetime.now(timezone.utc)
+        chat.status = req.status
+        chat.updated_at = datetime.now(timezone.utc)
+        updated_at = chat.updated_at
+        room_id = str(chat.room_id)
+        chat_type = chat.type
         await session.commit()
-
-    # Publish status change so WebSocket clients get instant feedback
-    # Look up room_id via chat
-    room_id = None
-    async with async_session() as session:
-        from ..models.chat import Chat
-        chat_result = await session.execute(
-            select(Chat.room_id).where(Chat.workload_id == uuid.UUID(workload_id))
-        )
-        row = chat_result.first()
-        if row:
-            room_id = str(row[0])
 
     if room_id:
         await _get_redis().publish(
-            "workload:status",
+            "chat:status",
             json.dumps({
-                "workload_id": workload_id,
+                "chat_id": chat_id,
                 "status": req.status,
                 "room_id": room_id,
-                "updated_at": workload.updated_at.isoformat(),
+                "chat_type": chat_type,
+                "updated_at": updated_at.isoformat(),
             }),
         )
 
@@ -213,12 +206,10 @@ async def dispatch_workloads(req: DispatchRequest):
                 member_id=member.id,
                 title=w.title,
                 description=w.description,
-                status="assigned",
                 permission_mode=w.permission_mode,
-                updated_at=now,
             )
             session.add(workload)
-            await session.flush()  # ensure workload FK exists before chat insert
+            await session.flush()
 
             workload_chat = Chat(
                 id=chat_id,
@@ -227,6 +218,8 @@ async def dispatch_workloads(req: DispatchRequest):
                 title=w.title,
                 owner_id=member.id,
                 workload_id=workload_id,
+                status="assigned",
+                updated_at=now,
             )
             session.add(workload_chat)
 
@@ -264,28 +257,39 @@ async def dispatch_workloads(req: DispatchRequest):
     return {"workloads": [{"id": r["id"], "title": r["title"]} for r in results]}
 
 
-@router.post("/workloads/{workload_id}/switch-mode")
-async def switch_workload_mode(workload_id: str, req: SwitchModeRequest):
-    """Switch a workload's permission mode — interrupt, update DB, auto-resume."""
+@router.post("/chats/{chat_id}/switch-mode")
+async def switch_mode(chat_id: str, req: SwitchModeRequest):
+    """Switch a session's permission mode — interrupt, update DB, auto-resume."""
     room_id = None
     updated_at = None
+    chat_type = None
 
     async with async_session() as session:
-        result = await session.execute(
-            select(Workload).where(Workload.id == uuid.UUID(workload_id))
-        )
-        workload = result.scalar_one_or_none()
-        if not workload:
-            raise HTTPException(status_code=404, detail="Workload not found")
+        chat = await session.get(Chat, uuid.UUID(chat_id))
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found")
 
-        if workload.permission_mode == req.permission_mode:
-            return {"status": "no_change"}
+        chat_type = chat.type
+
+        # Permission mode lives on Workload for workload chats, on Chat for admin
+        if chat_type == "workload":
+            result = await session.execute(
+                select(Workload).where(Workload.id == chat.workload_id)
+            )
+            workload = result.scalar_one_or_none()
+            if not workload:
+                raise HTTPException(status_code=404, detail="Workload not found")
+            if workload.permission_mode == req.permission_mode:
+                return {"status": "no_change"}
+        else:
+            if chat.permission_mode == req.permission_mode:
+                return {"status": "no_change"}
 
         # 1. Interrupt if running
-        if workload.status == "running":
+        if chat.status == "running":
             async with httpx.AsyncClient(timeout=10.0) as http:
                 resp = await http.post(
-                    f"{settings.ai_service_url}/workloads/{workload_id}/interrupt",
+                    f"{settings.ai_service_url}/chats/{chat_id}/interrupt",
                 )
                 if resp.status_code >= 400 and resp.status_code != 404:
                     raise HTTPException(
@@ -293,31 +297,27 @@ async def switch_workload_mode(workload_id: str, req: SwitchModeRequest):
                     )
 
         # 2. Update permission_mode
-        workload.permission_mode = req.permission_mode
-        workload.updated_at = datetime.now(timezone.utc)
-        updated_at = workload.updated_at
-        await session.commit()
+        if chat_type == "workload":
+            workload.permission_mode = req.permission_mode
+        else:
+            chat.permission_mode = req.permission_mode
 
-    # 3. Look up room_id for status broadcast
-    async with async_session() as session:
-        chat_result = await session.execute(
-            select(Chat.room_id).where(
-                Chat.workload_id == uuid.UUID(workload_id)
-            )
-        )
-        row = chat_result.first()
-        if row:
-            room_id = str(row[0])
+        # 3. Update chat updated_at
+        chat.updated_at = datetime.now(timezone.utc)
+        updated_at = chat.updated_at
+        room_id = str(chat.room_id)
+        await session.commit()
 
     # 4. Broadcast mode change
     if room_id and updated_at:
         await _get_redis().publish(
-            "workload:status",
+            "chat:status",
             json.dumps({
-                "workload_id": workload_id,
+                "chat_id": chat_id,
                 "status": "needs_attention",
                 "permission_mode": req.permission_mode,
                 "room_id": room_id,
+                "chat_type": chat_type,
                 "updated_at": updated_at.isoformat(),
             }),
         )
@@ -325,16 +325,16 @@ async def switch_workload_mode(workload_id: str, req: SwitchModeRequest):
     # 5. Auto-resume with a system message
     mode_label = "vibe coding" if req.permission_mode == "acceptEdits" else "standard"
     await _get_redis().publish(
-        "workload:messages",
+        "chat:messages",
         json.dumps({
-            "workload_id": workload_id,
+            "chat_id": chat_id,
             "content": f"Session restarted with {mode_label} mode. Continue where you left off.",
         }),
     )
 
     logger.info(
-        "Switched workload %s to %s mode",
-        workload_id[:8], req.permission_mode,
+        "Switched chat %s to %s mode",
+        chat_id[:8], req.permission_mode,
     )
 
     return {"status": "switching", "permission_mode": req.permission_mode}

@@ -31,7 +31,7 @@ async def list_rooms(project_id: uuid.UUID):
         rooms = (
             await session.execute(
                 select(Room)
-                .where(Room.project_id == project_id)
+                .where(Room.project_id == project_id, Room.type == "standard")
                 .order_by(Room.created_at)
             )
         ).scalars().all()
@@ -146,13 +146,13 @@ async def list_workloads(room_id: uuid.UUID):
                 "workload_id": str(workload.id),
                 "title": workload.title,
                 "description": workload.description,
-                "status": workload.status,
+                "status": chat.status,
                 "permission_mode": workload.permission_mode,
-                "has_session": workload.session_id is not None,
+                "has_session": chat.session_id is not None,
                 "owner_name": display_name,
                 "owner_id": str(workload.member_id),
                 "created_at": chat.created_at.isoformat(),
-                "updated_at": workload.updated_at.isoformat() if workload.updated_at else chat.created_at.isoformat(),
+                "updated_at": chat.updated_at.isoformat() if chat.updated_at else chat.created_at.isoformat(),
             }
             for chat, workload, display_name in rows
         ]

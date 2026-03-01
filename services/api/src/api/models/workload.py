@@ -1,8 +1,7 @@
 import uuid
-from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,10 +19,5 @@ class Workload(UUIDPrimaryKey, TimestampMixin, Base):
     )
     title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[str] = mapped_column(String, nullable=False, default="assigned", server_default="assigned")
     worktree_branch: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    session_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     permission_mode: Mapped[str] = mapped_column(String, nullable=False, default="default", server_default="default")
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
-    )

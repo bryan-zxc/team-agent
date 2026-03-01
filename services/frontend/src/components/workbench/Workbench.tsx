@@ -165,11 +165,11 @@ export function Workbench({ projectId }: WorkbenchProps) {
     [projectId],
   );
 
-  const openLiveView = useCallback((workloadId: string, title = "Live View") => {
+  const openLiveView = useCallback((chatId: string, title = "Live View") => {
     const api = apiRef.current;
     if (!api) return;
 
-    const panelId = `liveview-${workloadId}`;
+    const panelId = `liveview-${chatId}`;
     const existing = api.panels.find((p) => p.id === panelId);
     if (existing) {
       existing.api.setActive();
@@ -187,7 +187,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
       id: panelId,
       component: "liveViewTab",
       title,
-      params: { workloadId, onClose: closeLiveView },
+      params: { chatId, onClose: closeLiveView },
     });
   }, []);
 

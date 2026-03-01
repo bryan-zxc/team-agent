@@ -21,6 +21,7 @@ from .routes.auth import router as auth_router
 from .routes.users import router as users_router
 from .routes.skills import router as skills_router
 from .routes.terminals import router as terminals_router
+from .routes.admin import router as admin_router
 from .routes.workloads import router as workloads_router
 from .websocket.handler import router as ws_router
 from .websocket.screencast_handler import router as screencast_ws_router
@@ -33,12 +34,12 @@ logger = logging.getLogger(__name__)
 redis_client = aioredis.from_url(settings.redis_url)
 
 
-async def _listen_for_workload_status():
-    """Subscribe to workload:status and broadcast to room WebSocket clients."""
+async def _listen_for_chat_status():
+    """Subscribe to chat:status and broadcast to room WebSocket clients."""
     sub_client = aioredis.from_url(settings.redis_url)
     pubsub = sub_client.pubsub()
-    await pubsub.subscribe("workload:status")
-    logger.info("Subscribed to workload:status")
+    await pubsub.subscribe("chat:status")
+    logger.info("Subscribed to chat:status")
 
     try:
         async for raw in pubsub.listen():
@@ -49,13 +50,19 @@ async def _listen_for_workload_status():
             if not room_id:
                 continue
 
-            # Wrap with _event marker so frontend can distinguish from chat messages
-            event["_event"] = "workload_status"
+            # Add _event marker so frontend can distinguish from chat messages
+            chat_type = event.get("chat_type")
+            if chat_type == "workload":
+                event["_event"] = "workload_status"
+            elif chat_type == "admin":
+                event["_event"] = "admin_status"
+            else:
+                event["_event"] = "workload_status"
             await manager.broadcast_room(uuid.UUID(room_id), event)
     except asyncio.CancelledError:
         pass
     finally:
-        await pubsub.unsubscribe("workload:status")
+        await pubsub.unsubscribe("chat:status")
         await sub_client.aclose()
 
 
@@ -155,7 +162,7 @@ async def _listen_for_cost_tracking():
 async def lifespan(app: FastAPI):
     await _run_migrations()
     ai_task = asyncio.create_task(_listen_for_ai_responses())
-    status_task = asyncio.create_task(_listen_for_workload_status())
+    status_task = asyncio.create_task(_listen_for_chat_status())
     cost_task = asyncio.create_task(_listen_for_cost_tracking())
     yield
     ai_task.cancel()
@@ -184,6 +191,7 @@ app.include_router(files_router)
 app.include_router(skills_router)
 app.include_router(terminals_router)
 app.include_router(workloads_router)
+app.include_router(admin_router)
 app.include_router(ws_router)
 app.include_router(terminal_ws_router)
 app.include_router(screencast_ws_router)

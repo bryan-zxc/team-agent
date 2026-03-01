@@ -6,13 +6,13 @@ import { API_URL } from "@/lib/api";
 const WS_URL = API_URL.replace(/^http/, "ws");
 
 type UseScreencastWebSocketOptions = {
-  workloadId: string | null;
+  chatId: string | null;
   onFrame: (data: string) => void;
   onStopped: () => void;
 };
 
 export function useScreencastWebSocket({
-  workloadId,
+  chatId,
   onFrame,
   onStopped,
 }: UseScreencastWebSocketOptions) {
@@ -23,9 +23,9 @@ export function useScreencastWebSocket({
   onStoppedRef.current = onStopped;
 
   const connect = useCallback(() => {
-    if (!workloadId) return;
+    if (!chatId) return;
 
-    const ws = new WebSocket(`${WS_URL}/ws/screencast/${workloadId}`);
+    const ws = new WebSocket(`${WS_URL}/ws/screencast/${chatId}`);
     wsRef.current = ws;
 
     let wasConnected = false;
@@ -54,7 +54,7 @@ export function useScreencastWebSocket({
         onStoppedRef.current();
       }
     };
-  }, [workloadId]);
+  }, [chatId]);
 
   useEffect(() => {
     connect();

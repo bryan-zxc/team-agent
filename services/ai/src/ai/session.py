@@ -1,0 +1,546 @@
+"""Shared session utilities — registry, relay loop, and SDK integration."""
+
+import asyncio
+import json
+import logging
+import uuid as uuid_mod
+from datetime import datetime, timezone
+
+import asyncpg
+import httpx
+import redis.asyncio as aioredis
+
+from . import screencast
+from claude_agent_sdk import (
+    AssistantMessage,
+    ResultMessage,
+    TextBlock,
+    ThinkingBlock,
+    ToolResultBlock,
+    ToolUseBlock,
+    UserMessage,
+)
+from claude_agent_sdk.types import StreamEvent
+
+from .config import settings
+
+logger = logging.getLogger(__name__)
+
+_dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+
+# Unified session registry: chat_id → {client, task, ...}
+_sessions: dict[str, dict] = {}
+
+
+# ── Registry ──────────────────────────────────────────────────────────
+
+
+def register_session(session_key: str, session_dict: dict) -> None:
+    """Register a session in the unified registry."""
+    _sessions[session_key] = session_dict
+
+
+def unregister_session(session_key: str) -> dict | None:
+    """Remove a session from the registry, returning it (or None)."""
+    return _sessions.pop(session_key, None)
+
+
+# ── SDK content block conversion ──────────────────────────────────────
+
+
+def convert_blocks(content_blocks: list) -> list[dict]:
+    """Convert SDK content blocks to serialisable dicts."""
+    blocks: list[dict] = []
+    for block in content_blocks:
+        if isinstance(block, TextBlock):
+            blocks.append({"type": "text", "value": block.text})
+        elif isinstance(block, ThinkingBlock):
+            blocks.append({"type": "thinking", "thinking": block.thinking})
+        elif isinstance(block, ToolUseBlock):
+            blocks.append({
+                "type": "tool_use",
+                "tool_use_id": block.id,
+                "name": block.name,
+                "input": block.input,
+            })
+        elif isinstance(block, ToolResultBlock):
+            blocks.append({
+                "type": "tool_result",
+                "tool_use_id": block.tool_use_id,
+                "content": block.content,
+                "is_error": block.is_error,
+            })
+    return blocks
+
+
+# ── Token accumulation ────────────────────────────────────────────────
+
+
+def accumulate_stream_tokens(event: dict, running_total: int) -> int:
+    """Parse a raw Anthropic API stream event and return updated token total."""
+    event_type = event.get("type")
+    if event_type == "message_start":
+        usage = event.get("message", {}).get("usage", {})
+        running_total += usage.get("input_tokens", 0)
+    elif event_type == "message_delta":
+        usage = event.get("usage", {})
+        running_total += usage.get("output_tokens", 0)
+    return running_total
+
+
+# ── Message publishing ────────────────────────────────────────────────
+
+
+async def publish_message(
+    redis_client: aioredis.Redis,
+    chat_id: str,
+    member_id: str,
+    display_name: str,
+    msg_type: str,
+    blocks: list[dict],
+) -> str:
+    """Format and publish a message to chat:responses. Returns the message ID."""
+    structured_content = json.dumps({
+        "blocks": blocks,
+        "mentions": [],
+    })
+
+    msg_id = str(uuid_mod.uuid4())
+    response = {
+        "id": msg_id,
+        "chat_id": chat_id,
+        "member_id": member_id,
+        "display_name": display_name,
+        "type": msg_type,
+        "content": structured_content,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await redis_client.publish("chat:responses", json.dumps(response))
+    return msg_id
+
+
+# ── Heartbeat ─────────────────────────────────────────────────────────
+
+
+def create_heartbeat(
+    redis_client: aioredis.Redis,
+    chat_id: str,
+    session_key: str,
+    get_tokens: callable,
+) -> tuple[callable, callable, callable]:
+    """Create heartbeat management functions.
+
+    Returns (start, stop, restart) callables.
+    ``get_tokens`` is a zero-arg callable returning the current token count.
+    """
+    heartbeat_holder: dict = {"task": None}
+    session_state = _sessions.get(session_key, {})
+
+    async def _heartbeat():
+        try:
+            while True:
+                await asyncio.sleep(1)
+                await redis_client.publish("chat:responses", json.dumps({
+                    "_event": "agent_activity",
+                    "chat_id": chat_id,
+                    "chat_id": session_key,
+                    "phase": "processing",
+                    "tokens": get_tokens(),
+                }))
+        except asyncio.CancelledError:
+            pass
+
+    def start():
+        heartbeat_holder["task"] = asyncio.create_task(_heartbeat())
+        session_state["heartbeat_task"] = heartbeat_holder["task"]
+
+    def stop():
+        task = heartbeat_holder["task"]
+        if task and not task.done():
+            task.cancel()
+        heartbeat_holder["task"] = None
+        session_state["heartbeat_task"] = None
+
+    def restart():
+        stop()
+        start()
+
+    # Expose restart callback so tool_approval can resume the heartbeat
+    session_state["restart_heartbeat"] = start
+
+    return start, stop, restart
+
+
+# ── Chat status persistence ──────────────────────────────────────────
+
+
+async def update_chat_status(
+    chat_id: str,
+    status: str,
+    session_id: str | None = None,
+) -> None:
+    """Update status, updated_at, and optionally session_id on a chat record."""
+    conn = await asyncpg.connect(_dsn)
+    try:
+        if session_id is not None:
+            await conn.execute(
+                "UPDATE chats SET status = $1, updated_at = $2, session_id = $3 WHERE id = $4",
+                status, datetime.now(timezone.utc), session_id, uuid_mod.UUID(chat_id),
+            )
+        else:
+            await conn.execute(
+                "UPDATE chats SET status = $1, updated_at = $2 WHERE id = $3",
+                status, datetime.now(timezone.utc), uuid_mod.UUID(chat_id),
+            )
+    finally:
+        await conn.close()
+
+
+# ── Status event publishing ──────────────────────────────────────────
+
+
+async def publish_status_event(
+    redis_client: aioredis.Redis,
+    chat_id: str,
+    status: str,
+    room_id: str,
+    **extra,
+) -> None:
+    """Publish a status change to the chat:status Redis channel."""
+    event = {
+        "chat_id": chat_id,
+        "status": status,
+        "room_id": room_id,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        **extra,
+    }
+    await redis_client.publish("chat:status", json.dumps(event))
+
+
+# ── Stop session ─────────────────────────────────────────────────────
+
+
+async def stop_session(
+    chat_id: str,
+    target_status: str,
+    redis_client: aioredis.Redis,
+) -> bool:
+    """Stop any session (workload or admin) and transition to the given status.
+
+    Unregisters from the session registry, cancels the relay task,
+    disconnects the SDK client, updates the DB, and publishes status.
+    Returns True if a session was found and stopped.
+    """
+    session = unregister_session(chat_id)
+    room_id = ""
+
+    if session:
+        room_id = session.get("room_id", "")
+        task = session.get("task")
+        if task and not task.done():
+            task.cancel()
+        client = session.get("client")
+        if client:
+            try:
+                await client.disconnect()
+            except Exception:
+                logger.exception("Error disconnecting session %s", chat_id[:8])
+    else:
+        return False
+
+    await update_chat_status(chat_id, target_status)
+
+    if room_id:
+        await publish_status_event(
+            redis_client, chat_id, target_status, room_id,
+            chat_type=session.get("session_type"),
+        )
+
+    logger.info("Stopped session %s → %s", chat_id[:8], target_status)
+    return True
+
+
+# ── Coordinator lookup ────────────────────────────────────────────────
+
+
+async def get_coordinator_for_chat(chat_id: str) -> dict:
+    """Look up the coordinator member for the project owning a chat."""
+    conn = await asyncpg.connect(_dsn)
+    try:
+        row = await conn.fetchrow(
+            "SELECT pm.id, pm.display_name "
+            "FROM chats c "
+            "JOIN rooms r ON r.id = c.room_id "
+            "JOIN project_members pm ON pm.project_id = r.project_id "
+            "WHERE c.id = $1 AND pm.type = 'coordinator'",
+            uuid_mod.UUID(chat_id),
+        )
+        if not row:
+            raise ValueError(f"No coordinator found for chat {chat_id}")
+        return {"id": str(row["id"]), "display_name": row["display_name"]}
+    finally:
+        await conn.close()
+
+
+# ── Git subprocess ────────────────────────────────────────────────────
+
+
+async def run_git(*args: str, cwd: str) -> tuple[int, str, str]:
+    """Run a git command and return (returncode, stdout, stderr)."""
+    proc = await asyncio.create_subprocess_exec(
+        "git", *args,
+        cwd=cwd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    return proc.returncode, stdout.decode().strip(), stderr.decode().strip()
+
+
+# ── Route message to active session ───────────────────────────────────
+
+
+async def route_message(session_key: str, prompt: str) -> bool:
+    """Route a follow-up message to an active session.
+
+    Returns True if delivered, False if no active session.
+    """
+    session = _sessions.get(session_key)
+    if not session:
+        return False
+
+    client = session["client"]
+    await client.query(prompt)
+    logger.info("Routed follow-up message to session %s", session_key[:8])
+    return True
+
+
+# ── Shared relay loop ─────────────────────────────────────────────────
+
+
+async def relay_messages(
+    session_key: str,
+    client,
+    redis_client: aioredis.Redis,
+    completion_status: str = "needs_attention",
+) -> None:
+    """Relay messages from ClaudeSDKClient to Redis chat:responses.
+
+    Shared between workload and admin sessions. Reads session data
+    (chat_id, member_id, display_name, room_id, project_id) from the
+    unified session registry.
+
+    ``completion_status`` controls what status the chat transitions to
+    on ResultMessage: "needs_attention" for workloads, "completed" for admin.
+    """
+    session = _sessions.get(session_key)
+    if not session:
+        logger.error("No session registered for key %s", session_key[:8])
+        return
+
+    chat_id = session["chat_id"]
+    member_id = session["member_id"]
+    display_name = session["display_name"]
+    room_id = session.get("room_id", "")
+    project_id = session.get("project_id")
+
+    # Token accumulator
+    total_tokens = 0
+
+    def get_tokens():
+        return total_tokens
+
+    start_heartbeat, stop_heartbeat, restart_heartbeat = create_heartbeat(
+        redis_client, chat_id, session_key, get_tokens,
+    )
+
+    # Track tool_use_ids of playwright-cli open commands for screencast triggering
+    pending_playwright_opens: set[str] = set()
+
+    try:
+        start_heartbeat()
+
+        async for msg in client.receive_messages():
+            if isinstance(msg, StreamEvent):
+                event = msg.event
+                total_tokens = accumulate_stream_tokens(event, total_tokens)
+                continue
+
+            if isinstance(msg, AssistantMessage):
+                stop_heartbeat()
+
+                blocks = convert_blocks(msg.content)
+
+                # Detect playwright-cli open commands for live view
+                for block in msg.content:
+                    if isinstance(block, ToolUseBlock) and block.name == "Bash":
+                        cmd = block.input.get("command", "") if isinstance(block.input, dict) else ""
+                        if "playwright-cli open" in cmd:
+                            logger.info(
+                                "Detected playwright-cli open for session %s: %s",
+                                session_key[:8], cmd[:100],
+                            )
+                            pending_playwright_opens.add(block.id)
+
+                if not blocks:
+                    start_heartbeat()
+                    continue
+
+                structured_content = json.dumps({
+                    "blocks": blocks,
+                    "mentions": [],
+                })
+
+                response = {
+                    "id": str(uuid_mod.uuid4()),
+                    "chat_id": chat_id,
+                    "member_id": member_id,
+                    "display_name": display_name,
+                    "type": "ai",
+                    "content": structured_content,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+                await redis_client.publish("chat:responses", json.dumps(response))
+
+                start_heartbeat()
+
+            elif isinstance(msg, UserMessage):
+                # Relay tool results (user-role messages containing ToolResultBlock)
+                if isinstance(msg.content, list):
+                    # Check if a playwright-cli open just completed — start screencast
+                    for block in msg.content:
+                        if (
+                            isinstance(block, ToolResultBlock)
+                            and block.tool_use_id in pending_playwright_opens
+                        ):
+                            pending_playwright_opens.discard(block.tool_use_id)
+                            if not block.is_error:
+                                logger.info(
+                                    "Launching screencast for session %s, room_id=%s",
+                                    session_key[:8], room_id,
+                                )
+                                screencast.launch_screencast(
+                                    chat_id, room_id, redis_client,
+                                    owner_name=display_name,
+                                )
+
+                    blocks = convert_blocks(msg.content)
+                    result_blocks = [b for b in blocks if b["type"] == "tool_result"]
+                    if result_blocks:
+                        structured_content = json.dumps({
+                            "blocks": result_blocks,
+                            "mentions": [],
+                        })
+                        response = {
+                            "id": str(uuid_mod.uuid4()),
+                            "chat_id": chat_id,
+                            "member_id": member_id,
+                            "display_name": display_name,
+                            "type": "ai",
+                            "content": structured_content,
+                            "created_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                        await redis_client.publish("chat:responses", json.dumps(response))
+
+            elif isinstance(msg, ResultMessage):
+                stop_heartbeat()
+
+                logger.info(
+                    "Session %s completed (session_id: %s, error: %s, turns: %d)",
+                    session_key[:8], msg.session_id, msg.is_error, msg.num_turns,
+                )
+
+                # Update chat status and session_id
+                await update_chat_status(chat_id, completion_status, session_id=msg.session_id)
+
+                await publish_status_event(
+                    redis_client, chat_id, completion_status, room_id,
+                    chat_type=session.get("session_type"),
+                )
+
+                # Workload-only: post merge summary to main chat
+                merge_state = session.get("merge_state")
+                if merge_state is not None:
+                    main_chat_id = session.get("main_chat_id", "")
+                    workload_title = session.get("workload_data", {}).get("title", "Workload")
+                    merge_succeeded = merge_state.get("succeeded")
+
+                    if merge_succeeded is True:
+                        merged_to = merge_state.get("target_branch", "main")
+                        summary = (
+                            f"Workload **{workload_title}** has finished "
+                            f"and its changes have been merged to {merged_to}."
+                        )
+                    elif merge_succeeded is False:
+                        branch = session.get("branch_name", "unknown")
+                        summary = (
+                            f"Workload **{workload_title}** has finished "
+                            f"but merge conflicts could not be resolved automatically. "
+                            f"Changes remain on branch `{branch}`."
+                        )
+                    else:
+                        summary = (
+                            f"Workload **{workload_title}** has finished "
+                            f"and needs attention."
+                        )
+
+                    if msg.result:
+                        summary += f"\n\nSummary: {msg.result}"
+
+                    coordinator = await get_coordinator_for_chat(main_chat_id)
+                    await publish_message(
+                        redis_client, main_chat_id,
+                        coordinator["id"], coordinator["display_name"],
+                        "coordinator",
+                        [{"type": "text", "value": summary}],
+                    )
+
+                # Post-completion manifest check
+                if project_id and (merge_state is None or merge_state.get("succeeded")):
+                    try:
+                        pull = "false" if merge_state else "true"
+                        async with httpx.AsyncClient(timeout=10.0) as http:
+                            resp = await http.post(
+                                f"{settings.api_service_url}/projects/"
+                                f"{project_id}/check-manifest?pull={pull}",
+                            )
+                            if resp.status_code == 200:
+                                data = resp.json()
+                                if data.get("is_locked"):
+                                    logger.warning(
+                                        "Session %s: manifest check triggered lockdown",
+                                        session_key[:8],
+                                    )
+                            else:
+                                logger.warning(
+                                    "Session %s: manifest check returned %d",
+                                    session_key[:8], resp.status_code,
+                                )
+                    except Exception:
+                        logger.warning(
+                            "Session %s: manifest check failed (non-blocking)",
+                            session_key[:8], exc_info=True,
+                        )
+
+                await screencast.stop_screencast(chat_id)
+                unregister_session(session_key)
+                return
+
+    except asyncio.CancelledError:
+        logger.info("Relay task cancelled for session %s", session_key[:8])
+        stop_heartbeat()
+        await screencast.stop_screencast(chat_id)
+        unregister_session(session_key)
+    except Exception:
+        logger.exception("Relay task error for session %s", session_key[:8])
+        stop_heartbeat()
+        await screencast.stop_screencast(chat_id)
+        try:
+            await update_chat_status(chat_id, "needs_attention")
+            await publish_status_event(
+                redis_client, chat_id, "needs_attention", room_id,
+                chat_type=session.get("session_type"),
+            )
+        except Exception:
+            logger.exception("Failed to update chat status to needs_attention")
+        unregister_session(session_key)

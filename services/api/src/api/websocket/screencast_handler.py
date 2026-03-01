@@ -16,9 +16,9 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.websocket("/ws/screencast/{workload_id}")
-async def screencast_websocket(websocket: WebSocket, workload_id: str):
-    """One-way relay: Redis screencast:frames:{workload_id} → WebSocket."""
+@router.websocket("/ws/screencast/{chat_id}")
+async def screencast_websocket(websocket: WebSocket, chat_id: str):
+    """One-way relay: Redis screencast:frames:{chat_id} → WebSocket."""
 
     # Validate session cookie (same pattern as terminal handler)
     auth_session_id = websocket.cookies.get("session_id")
@@ -34,10 +34,10 @@ async def screencast_websocket(websocket: WebSocket, workload_id: str):
 
     await websocket.accept()
 
-    # Per-connection Redis subscriber for this workload's screencast frames
+    # Per-connection Redis subscriber for this chat's screencast frames
     sub_client = aioredis.from_url(settings.redis_url)
     pubsub = sub_client.pubsub()
-    channel = f"screencast:frames:{workload_id}"
+    channel = f"screencast:frames:{chat_id}"
     await pubsub.subscribe(channel)
 
     try:
@@ -53,8 +53,8 @@ async def screencast_websocket(websocket: WebSocket, workload_id: str):
     except asyncio.CancelledError:
         pass
     except Exception:
-        logger.exception("Screencast relay error for workload %s", workload_id[:8])
+        logger.exception("Screencast relay error for chat %s", chat_id[:8])
     finally:
         await pubsub.unsubscribe(channel)
         await sub_client.aclose()
-        logger.info("Screencast WebSocket closed for workload %s", workload_id[:8])
+        logger.info("Screencast WebSocket closed for chat %s", chat_id[:8])
