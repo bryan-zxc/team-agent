@@ -16,9 +16,6 @@ from claude_agent_sdk import (
 
 logger = logging.getLogger(__name__)
 
-# How long to wait for a human response before auto-denying.
-APPROVAL_TIMEOUT_SECONDS = 300  # 5 minutes
-
 
 # ── Project-level settings persistence ────────────────────────────────
 
@@ -271,18 +268,9 @@ def make_can_use_tool(
             approval_request_id[:8], tool_name, session_key[:8],
         )
 
-        # 5. Wait for human response
+        # 5. Wait for human response (blocks indefinitely — human must decide)
         try:
-            decision = await asyncio.wait_for(future, timeout=APPROVAL_TIMEOUT_SECONDS)
-        except asyncio.TimeoutError:
-            logger.warning(
-                "Tool approval timed out for %s (session %s)",
-                tool_name, session_key[:8],
-            )
-            return PermissionResultDeny(
-                message=f"Tool approval timed out after {APPROVAL_TIMEOUT_SECONDS}s. "
-                        f"No human responded to the request to use {tool_name}.",
-            )
+            decision = await future
         finally:
             session_state["pending_approvals"].pop(approval_request_id, None)
 

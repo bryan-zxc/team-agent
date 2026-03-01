@@ -24,6 +24,7 @@ from claude_agent_sdk import (
 from .config import settings
 from .session import (
     _sessions,
+    cleanup_worktree,
     publish_status_event,
     register_session,
     relay_messages,
@@ -259,8 +260,7 @@ def _make_stop_hook(
             logger.info("Workload %s: merge succeeded on attempt %d", workload_id[:8], retries + 1)
 
             # Clean up worktree and branch
-            await run_git("worktree", "remove", str(worktree_path), "--force", cwd=clone_path)
-            await run_git("branch", "-d", branch_name, cwd=clone_path)
+            await cleanup_worktree(clone_path, branch_name)
 
             # Push merged changes to remote
             push_rc, _, push_err = await run_git("push", cwd=clone_path)

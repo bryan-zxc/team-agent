@@ -22,6 +22,8 @@ from claude_agent_sdk import (
 )
 from claude_agent_sdk.types import StreamEvent
 
+from pathlib import Path
+
 from .config import settings
 
 logger = logging.getLogger(__name__)
@@ -216,6 +218,32 @@ async def publish_status_event(
     await redis_client.publish("chat:status", json.dumps(event))
 
 
+# ── Worktree cleanup ─────────────────────────────────────────────────
+
+
+async def cleanup_worktree(clone_path: str, branch_name: str) -> None:
+    """Remove a worktree and delete its branch.
+
+    Derives the worktree path from clone_path and branch_name.
+    Silently logs failures — cleanup is best-effort.
+    """
+    slug = branch_name.removeprefix("workload/")
+    worktree_path = Path(clone_path).parent / "worktrees" / slug
+
+    if worktree_path.exists():
+        rc, _, err = await run_git("worktree", "remove", str(worktree_path), "--force", cwd=clone_path)
+        if rc != 0:
+            logger.warning("Failed to remove worktree %s: %s", worktree_path, err)
+        else:
+            logger.info("Removed worktree %s", worktree_path)
+
+    rc, _, err = await run_git("branch", "-D", branch_name, cwd=clone_path)
+    if rc != 0:
+        logger.warning("Failed to delete branch %s: %s", branch_name, err)
+    else:
+        logger.info("Deleted branch %s", branch_name)
+
+
 # ── Stop session ─────────────────────────────────────────────────────
 
 
@@ -223,12 +251,20 @@ async def stop_session(
     chat_id: str,
     target_status: str,
     redis_client: aioredis.Redis,
+    *,
+    purge: bool = False,
 ) -> bool:
     """Stop any session (workload or admin) and transition to the given status.
 
     Unregisters from the session registry, cancels the relay task,
     gracefully interrupts the SDK client to capture session_id for resume,
     updates the DB, and publishes status.
+
+    When ``purge`` is True (used for cancel):
+    - Sends a cancellation notice to the agent before interrupting
+    - Does NOT capture session_id (cancel is final, no resume)
+    - Removes the worktree and deletes the branch
+
     Returns True if a session was found and stopped.
     """
     session = unregister_session(chat_id)
@@ -248,15 +284,27 @@ async def stop_session(
         except (asyncio.CancelledError, Exception):
             pass
 
-    # 2. Graceful interrupt + drain to capture session_id for resume
+    # 2. Notify agent + interrupt
     if client:
+        if purge:
+            # Send cancellation notice before interrupting
+            try:
+                await client.query(
+                    "This workload has been cancelled. All data in the worktree "
+                    "will be purged and all uncommitted work is lost."
+                )
+            except Exception:
+                logger.debug("Could not send cancellation notice to session %s", chat_id[:8])
+
         try:
             await client.interrupt()
-            async with asyncio.timeout(5):
-                async for msg in client.receive_messages():
-                    if isinstance(msg, ResultMessage):
-                        session_id = msg.session_id
-                        break
+            if not purge:
+                # Only capture session_id when not purging (for potential resume)
+                async with asyncio.timeout(5):
+                    async for msg in client.receive_messages():
+                        if isinstance(msg, ResultMessage):
+                            session_id = msg.session_id
+                            break
         except Exception:
             pass
 
@@ -264,6 +312,13 @@ async def stop_session(
             await client.disconnect()
         except Exception:
             logger.debug("Expected disconnect error for session %s (cross-task scope)", chat_id[:8])
+
+    # 3. Purge worktree + branch if requested
+    if purge:
+        clone_path = session.get("clone_path")
+        branch_name = session.get("branch_name")
+        if clone_path and branch_name:
+            await cleanup_worktree(clone_path, branch_name)
 
     await update_chat_status(chat_id, target_status, session_id=session_id)
 
@@ -274,8 +329,8 @@ async def stop_session(
         )
 
     logger.info(
-        "Stopped session %s → %s (session_id: %s)",
-        chat_id[:8], target_status, session_id or "none",
+        "Stopped session %s → %s (session_id: %s, purged: %s)",
+        chat_id[:8], target_status, session_id or "none", purge,
     )
     return True
 

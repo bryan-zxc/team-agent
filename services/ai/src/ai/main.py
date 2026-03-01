@@ -81,8 +81,8 @@ async def interrupt_session(chat_id: str):
 
 @app.post("/chats/{chat_id}/cancel")
 async def cancel_session(chat_id: str):
-    """Cancel a session — transitions to cancelled."""
-    found = await stop_session(chat_id, "cancelled", app.state.redis)
+    """Cancel a session — transitions to cancelled, purges worktree."""
+    found = await stop_session(chat_id, "cancelled", app.state.redis, purge=True)
     if not found:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"status": "cancelled"}
