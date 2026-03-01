@@ -4,15 +4,16 @@ import clsx from "clsx";
 import { useTheme } from "@/hooks/useTheme";
 import styles from "./ActivityBar.module.css";
 
-type Panel = "chat" | "files" | "members";
+export type Panel = "chat" | "files" | "members" | "admin";
 
 type ActivityBarProps = {
   activePanel: Panel;
   onPanelChange: (panel: Panel) => void;
   onOpenTerminal?: () => void;
+  coordinatorInitial?: string;
 };
 
-export function ActivityBar({ activePanel, onPanelChange, onOpenTerminal }: ActivityBarProps) {
+export function ActivityBar({ activePanel, onPanelChange, onOpenTerminal, coordinatorInitial }: ActivityBarProps) {
   const { theme, toggle } = useTheme();
 
   return (
@@ -49,17 +50,16 @@ export function ActivityBar({ activePanel, onPanelChange, onOpenTerminal }: Acti
             <circle cx="12" cy="7" r="4" />
           </svg>
         </button>
-        <button
-          className={clsx(styles.icon, styles.iconDisabled)}
-          aria-label="Search"
-          title="Search (coming soon)"
-          disabled
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-        </button>
+        {coordinatorInitial && (
+          <button
+            className={clsx(styles.icon, activePanel === "admin" && styles.iconActive)}
+            onClick={() => onPanelChange("admin")}
+            aria-label="Admin"
+            title="Admin sessions"
+          >
+            <span className={styles.avatarIcon}>{coordinatorInitial}</span>
+          </button>
+        )}
         {onOpenTerminal && (
           <button
             className={styles.icon}

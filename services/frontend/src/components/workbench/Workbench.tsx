@@ -5,23 +5,23 @@ import { DockviewReact, type DockviewApi, type DockviewReadyEvent, type IDockvie
 import { TabIcon } from "./TabIcon";
 import "dockview/dist/styles/dockview.css";
 import "./dockview-theme.css";
-import { ActivityBar } from "./ActivityBar";
+import { ActivityBar, type Panel } from "./ActivityBar";
 import { ChatSidePanel } from "./ChatSidePanel";
 import { FilesSidePanel } from "./FilesSidePanel";
 import { MembersSidePanel } from "./MembersSidePanel";
+import { AdminSidePanel } from "./AdminSidePanel";
 import { ChatTab } from "./ChatTab";
 import { FileTab } from "./FileTab";
 import { MemberProfileTab } from "./MemberProfileTab";
 import { TerminalTab } from "./TerminalTab";
 import { LiveViewTab } from "./LiveViewTab";
+import { AdminTab } from "./AdminTab";
 import { ProjectTopBar } from "./ProjectTopBar";
 import { AddMemberModal } from "@/components/members/AddMemberModal";
 import { useAuth } from "@/hooks/useAuth";
 import { apiFetch } from "@/lib/api";
-import type { Member, Project, Room } from "@/types";
+import type { AdminChat, Member, Project, Room } from "@/types";
 import styles from "./Workbench.module.css";
-
-type Panel = "chat" | "files" | "members";
 
 type WorkbenchProps = {
   projectId: string;
@@ -41,6 +41,7 @@ const components: Record<string, React.FunctionComponent<IDockviewPanelProps<any
   memberTab: MemberProfileTab,
   terminalTab: TerminalTab,
   liveViewTab: LiveViewTab,
+  adminTab: AdminTab,
 };
 
 export function Workbench({ projectId }: WorkbenchProps) {
@@ -52,6 +53,9 @@ export function Workbench({ projectId }: WorkbenchProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeRoomId, setActiveRoomId] = useState<string | undefined>();
   const [project, setProject] = useState<Project | null>(null);
+  const [adminRoomId, setAdminRoomId] = useState<string | null>(null);
+  const [adminChats, setAdminChats] = useState<AdminChat[]>([]);
+  const [adminHistoryChatId, setAdminHistoryChatId] = useState<string | null>(null);
   const apiRef = useRef<DockviewApi | null>(null);
 
   const isLocked = project?.is_locked ?? false;
@@ -60,6 +64,13 @@ export function Workbench({ projectId }: WorkbenchProps) {
     apiFetch(`/projects/${projectId}`).then((r) => r.json()).then(setProject).catch(() => {});
     apiFetch(`/projects/${projectId}/rooms`).then((r) => r.json()).then(setRooms).catch(() => {});
     apiFetch(`/projects/${projectId}/members`).then((r) => r.json()).then(setMembers).catch(() => {});
+    apiFetch(`/projects/${projectId}/admin-room`)
+      .then((r) => r.json())
+      .then((data) => {
+        setAdminRoomId(data.id);
+        setAdminChats(data.chats ?? []);
+      })
+      .catch(() => {});
 
     // Check manifest on project entry
     apiFetch(`/projects/${projectId}/check-manifest`, { method: "POST" })
@@ -80,6 +91,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
   }, [members, authUser]);
 
   const currentMember = members.find((m) => m.id === memberId) ?? null;
+  const coordinator = members.find((m) => m.type === "coordinator");
 
   const openRoom = useCallback(
     (roomId: string) => {
@@ -204,6 +216,71 @@ export function Workbench({ projectId }: WorkbenchProps) {
     });
   }, [projectId]);
 
+  // Open or focus the admin Dockview tab
+  const openAdminTab = useCallback(() => {
+    const api = apiRef.current;
+    if (!api || !adminRoomId) return;
+
+    const panelId = "admin-session";
+    const existing = api.panels.find((p) => p.id === panelId);
+    if (existing) {
+      existing.api.setActive();
+      return;
+    }
+
+    api.addPanel({
+      id: panelId,
+      component: "adminTab",
+      title: "Admin",
+      params: {
+        projectId,
+        memberId,
+        members,
+        adminRoomId,
+        onAdminChatsChanged: setAdminChats,
+        viewHistoryChatId: null,
+      },
+    });
+  }, [projectId, memberId, members, adminRoomId]);
+
+  // Auto-open admin tab when switching to admin panel
+  useEffect(() => {
+    if (activePanel === "admin" && adminRoomId) {
+      openAdminTab();
+    }
+  }, [activePanel, adminRoomId, openAdminTab]);
+
+  // When a history chat is clicked in the side panel, update the admin tab params
+  const handleAdminChatClick = useCallback(
+    (chatId: string) => {
+      const api = apiRef.current;
+      if (!api) return;
+
+      const panelId = "admin-session";
+      const existing = api.panels.find((p) => p.id === panelId);
+      if (existing) {
+        existing.api.setActive();
+        existing.api.updateParameters({ viewHistoryChatId: chatId });
+      } else {
+        // Tab not open — open it with the history view
+        api.addPanel({
+          id: panelId,
+          component: "adminTab",
+          title: "Admin",
+          params: {
+            projectId,
+            memberId,
+            members,
+            adminRoomId,
+            onAdminChatsChanged: setAdminChats,
+            viewHistoryChatId: chatId,
+          },
+        });
+      }
+    },
+    [projectId, memberId, members, adminRoomId],
+  );
+
   const handleReady = useCallback((event: DockviewReadyEvent) => {
     apiRef.current = event.api;
 
@@ -239,7 +316,12 @@ export function Workbench({ projectId }: WorkbenchProps) {
         </div>
       )}
 
-      <ActivityBar activePanel={activePanel} onPanelChange={setActivePanel} onOpenTerminal={openTerminal} />
+      <ActivityBar
+        activePanel={activePanel}
+        onPanelChange={setActivePanel}
+        onOpenTerminal={openTerminal}
+        coordinatorInitial={coordinator?.display_name?.[0]}
+      />
 
       <aside className={styles.sidePanel}>
         {activePanel === "chat" ? (
@@ -276,6 +358,12 @@ export function Workbench({ projectId }: WorkbenchProps) {
                 params: { projectId, memberId: id, memberName: member.display_name },
               });
             }}
+          />
+        ) : activePanel === "admin" ? (
+          <AdminSidePanel
+            adminChats={adminChats}
+            onChatClick={handleAdminChatClick}
+            currentMember={currentMember}
           />
         ) : (
           <FilesSidePanel projectId={projectId} onFileClick={openFile} />

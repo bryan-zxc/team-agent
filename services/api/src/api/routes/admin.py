@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from ..database import async_session
@@ -14,6 +15,10 @@ from ..models.room import Room
 logger = logging.getLogger(__name__)
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
+
+
+class CreateAdminChatRequest(BaseModel):
+    permission_mode: str = "acceptEdits"
 
 
 @router.get("/projects/{project_id}/admin-room")
@@ -63,7 +68,7 @@ async def get_admin_room(project_id: uuid.UUID):
 
 
 @router.post("/projects/{project_id}/admin-room/chats", status_code=201)
-async def create_admin_chat(project_id: uuid.UUID):
+async def create_admin_chat(project_id: uuid.UUID, req: CreateAdminChatRequest = CreateAdminChatRequest()):
     """Create a new admin chat in the project's admin room."""
     async with async_session() as session:
         room = (
@@ -95,7 +100,7 @@ async def create_admin_chat(project_id: uuid.UUID):
             type="admin",
             owner_id=coordinator.id,
             status="running",
-            permission_mode="default",
+            permission_mode=req.permission_mode,
             updated_at=now,
         )
         session.add(chat)

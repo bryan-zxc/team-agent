@@ -54,12 +54,21 @@
   background: var(--accent);
 }
 
-.iconDisabled {
-  opacity: 0.35;
-  cursor: default;
+.avatarIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #F5E6D3;
+  color: #B8763E;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
-.iconDisabled:hover {
-  color: var(--text-muted);
-  background: transparent;
+:global(.dark) .avatarIcon {
+  background: rgba(184, 118, 62, 0.18);
+  color: #D4A574;
 }

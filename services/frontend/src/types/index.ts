@@ -144,3 +144,29 @@ export type TerminalSession = {
   session_id: string;
   project_id: string | null;
 };
+
+export type AdminChat = {
+  id: string;
+  title: string | null;
+  status: string;
+  permission_mode: "default" | "acceptEdits";
+  has_session: boolean;
+  owner_name: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminRoom = {
+  id: string;
+  name: string;
+  chats: AdminChat[];
+};
+
+export type AdminStatusEvent = {
+  _event: "admin_status";
+  chat_id: string;
+  status: string;
+  permission_mode?: "default" | "acceptEdits";
+  room_id: string;
+  updated_at: string;
+};
