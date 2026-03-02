@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -373,24 +373,40 @@ export function ChatView({
       .then((history: Message[]) => setMessages(history));
   }, [chatId, setMessages]);
 
-  useEffect(() => {
-    if (!messages.length) return;
+  // Scroll to bottom before first paint — useLayoutEffect fires after React
+  // commits the DOM but before the browser paints, so the user never sees
+  // the chat stuck at the top.
+  useLayoutEffect(() => {
+    if (!messages.length || initialScrollDone.current) return;
     const container = messagesContainerRef.current;
     if (!container) return;
-    if (initialScrollDone.current) {
-      // New message arrived — smooth scroll
-      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-    } else {
-      // Initial load — double-rAF so the browser finishes layout (including
-      // markdown rendering and flex recalculation) before we measure scrollHeight.
-      const raf = requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          container.scrollTop = container.scrollHeight;
-        });
-      });
-      initialScrollDone.current = true;
-      return () => cancelAnimationFrame(raf);
-    }
+    container.scrollTop = container.scrollHeight;
+    initialScrollDone.current = true;
+  }, [messages]);
+
+  // When dockview hides/shows panels (tab switching), scroll position resets
+  // to 0. Detect the container becoming visible and scroll to bottom.
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    let wasVisible = container.clientHeight > 0;
+    const observer = new ResizeObserver(() => {
+      const isVisible = container.clientHeight > 0;
+      if (!wasVisible && isVisible && initialScrollDone.current) {
+        container.scrollTop = container.scrollHeight;
+      }
+      wasVisible = isVisible;
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  // Smooth scroll on subsequent messages (after initial load)
+  useEffect(() => {
+    if (!messages.length || !initialScrollDone.current) return;
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {

@@ -104,7 +104,18 @@ export function Workbench({ projectId }: WorkbenchProps) {
       const panelId = `room-${roomId}`;
       const existing = api.panels.find((p) => p.id === panelId);
       if (existing) {
-        existing.api.setActive();
+        // Only call setActive() when the panel isn't already active — dockview's
+        // setActive() toggles panel visibility which resets scroll position.
+        if (!existing.api.isActive) {
+          existing.api.setActive();
+        }
+        // Always scroll the chat to the bottom on room click
+        requestAnimationFrame(() => {
+          const container = document.querySelector<HTMLElement>('[class*="messages"]');
+          if (container && container.clientHeight > 0) {
+            container.scrollTop = container.scrollHeight;
+          }
+        });
         setActiveRoomId(roomId);
         return;
       }
@@ -231,7 +242,16 @@ export function Workbench({ projectId }: WorkbenchProps) {
     const panelId = "admin-session";
     const existing = api.panels.find((p) => p.id === panelId);
     if (existing) {
-      existing.api.setActive();
+      if (!existing.api.isActive) {
+        existing.api.setActive();
+      }
+      // Always scroll the chat to the bottom on admin tab click
+      requestAnimationFrame(() => {
+        const container = document.querySelector<HTMLElement>('[class*="messages"]');
+        if (container && container.clientHeight > 0) {
+          container.scrollTop = container.scrollHeight;
+        }
+      });
       return;
     }
 
