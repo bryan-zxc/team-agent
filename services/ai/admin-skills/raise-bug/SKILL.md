@@ -5,156 +5,55 @@ description: Investigate, diagnose, and file a bug ticket with full context for 
 
 # Raise Bug
 
-When you encounter a bug — something broken, an unexpected error, a regression — investigate thoroughly, gather all the evidence, and file a richly detailed ticket. The goal is that a future session can diagnose and fix the issue without starting from scratch.
+Investigate a bug, gather evidence from the diagnostics API, and file a detailed ticket on GitHub. The goal is that a developer picking up the ticket can diagnose and fix the issue without starting from scratch.
 
-## Step 1: Gather Evidence
+## Your environment
 
-Collect as much diagnostic context as possible before filing anything.
+You are running inside the AI service container. Here is what you have:
 
-### Application logs
+- **Diagnostics API** — logs, chat/workload state, rooms, projects. Read `references/diagnostics-api.md` for the full endpoint reference with examples.
+- **File system** at `/data/projects/` — cloned user project repos (for checking git state, worktrees, locks)
+- **`gh` CLI** — for filing tickets on GitHub
 
-Pull recent error logs from both services via their diagnostics endpoints:
+You do **not** have access to the application source code. The repos at `/data/projects/` are user projects (e.g. a dashboard app, a storefront) — they are not the Team Agent codebase. Do not try to read source files, grep for code patterns, explore directories looking for frontend/backend code, or trace code paths. That code is not in your environment. Diagnose purely from the evidence the diagnostics API provides.
 
-```bash
-# AI service errors (last 200 entries)
-curl -s 'http://ai-service:8001/diagnostics/logs?level=ERROR&limit=200' | python3 -m json.tool
+You also do not have direct database access. Do not use `psql` or attempt database connections. All data access goes through the diagnostics API endpoints.
 
-# API service errors
-curl -s 'http://api:8000/diagnostics/logs?level=ERROR&limit=200' | python3 -m json.tool
+## Step 1: Gather evidence
 
-# Warnings too, if errors are sparse
-curl -s 'http://ai-service:8001/diagnostics/logs?level=WARNING&limit=100' | python3 -m json.tool
+Read `references/diagnostics-api.md` for full endpoint details. The typical investigation flow:
 
-# Filter by time window (ISO 8601)
-curl -s 'http://ai-service:8001/diagnostics/logs?since=2026-03-02T00:00:00Z&limit=200' | python3 -m json.tool
-```
+1. **Discover rooms and chats** — start with `GET /diagnostics/rooms` and `GET /diagnostics/chats` to find the relevant entities. You usually won't know chat IDs upfront, so search by status, type, or room.
 
-### Chat and workload context
+2. **Get full context** — once you've identified the relevant chat, fetch `GET /diagnostics/chats/{chat_id}` for the complete picture: chat record, workload, room, project, owner, and recent messages.
 
-If the bug involves a specific chat or workload, fetch the full diagnostic view:
+3. **Check logs** — pull error logs from both services with `GET /diagnostics/logs?level=ERROR`. Cross-reference timestamps with the chat timeline.
 
-```bash
-curl -s 'http://api:8000/diagnostics/chats/<chat_id>' | python3 -m json.tool
-```
+4. **Check git state** — if the bug involves git operations, inspect the clone at the path from the diagnostics response (`project.clone_path`):
+   ```bash
+   git -C <clone_path> worktree list
+   ls -la <clone_path>/.git/worktrees/
+   df -h /data/projects
+   ```
 
-This returns the chat record, its workload, room, project, owner, and recent messages — everything needed to understand the state at the time of the bug.
+## Step 2: Analyse
 
-### File system state
+Before filing, make sense of the evidence:
 
-Check directly on disk — you have access to `/data/projects/`:
+1. **Correlate timestamps** — match error log entries with chat events and status transitions to reconstruct the sequence of events
+2. **Identify the root cause** if the evidence points to one — a state stuck in the wrong status, a failed operation that wasn't cleaned up, a missing transition
+3. **Document reproduction steps** — starting state, numbered actions, expected vs actual result
 
-```bash
-# Worktree status
-git -C /data/projects/<project-dir> worktree list
+If the bug is intermittent and you can't piece together a reproduction, document what you observed and the conditions.
 
-# Check for stale locks or corrupt state
-ls -la /data/projects/<project-dir>/.git/worktrees/
+## Step 3: File the ticket
 
-# Disk space
-df -h /data/projects
-```
+Read `references/github-board.md` for the ticket template and board commands. Create the issue, add it to project board 3, and set the status to Backlog.
 
-### Database (direct psql)
+Before filing, check that your ticket has:
 
-For queries not covered by the diagnostics endpoint:
-
-```bash
-psql -h postgres -U teamagent -c "SELECT id, type, status, updated_at FROM chats WHERE status = 'investigating';"
-```
-
-## Step 2: Analyse and Reproduce
-
-Before filing, try to understand what happened:
-
-1. **Trace the code path** — read the relevant source files to understand expected vs actual behaviour
-2. **Identify the root cause** if possible — is it a race condition, missing check, wrong state transition, data corruption?
-3. **Document reproduction steps** — a minimal set of actions that triggers the bug:
-   - Starting state (what seed, what existing data)
-   - Numbered steps (API calls, messages sent, actions taken)
-   - Expected result
-   - Actual result (including error messages)
-
-If the bug is intermittent or environment-specific and you can't reproduce it, document what you observed and the conditions.
-
-## Step 3: File the Ticket
-
-Create the issue with all gathered context:
-
-```bash
-gh issue create --repo bryan-zxc/team-agent \
-  --title "<symptom-focused title>" \
-  --body "$(cat <<'BODY'
-## Bug
-
-<One-paragraph summary: what's broken, what should happen instead>
-
-## Evidence
-
-### Logs
-\`\`\`
-<relevant log excerpts — stack traces, error messages, timestamps>
-\`\`\`
-
-### Database state
-\`\`\`
-<relevant query results showing the incorrect state>
-\`\`\`
-
-### Additional context
-<file system state, chat diagnostics output, anything else relevant>
-
-## Steps to Reproduce
-
-1. <starting state>
-2. <action>
-3. <action>
-4. **Expected:** <what should happen>
-5. **Actual:** <what happens instead>
-
-## Root Cause
-
-<your analysis of why this is happening — code path, race condition, missing check, etc.>
-<include file paths and line numbers>
-
-## Suggested Fix
-
-<if you have a theory on how to fix it, describe it here>
-BODY
-)" \
-  --label "bug" \
-  --assignee "@me"
-```
-
-### Add to the project board in Backlog:
-
-```bash
-ISSUE_URL=$(gh issue list --repo bryan-zxc/team-agent --limit 1 --json url --jq '.[0].url')
-gh project item-add 3 --owner bryan-zxc --url "$ISSUE_URL" --format json
-
-ITEM_ID=$(gh project item-list 3 --owner bryan-zxc --limit 500 --format json \
-  --jq ".items[] | select(.content.url == \"$ISSUE_URL\") | .id")
-
-if [ -z "$ITEM_ID" ]; then
-  echo "ERROR: Could not find issue on the project board"
-  exit 1
-fi
-
-gh project item-edit \
-  --project-id PVT_kwHOCz6Fr84BOi15 \
-  --id "$ITEM_ID" \
-  --field-id PVTSSF_lAHOCz6Fr84BOi15zg9N0x0 \
-  --single-select-option-id f75ad846
-```
-
-## Quality Checklist
-
-Before filing, verify your ticket has:
-
-- A title that describes the symptom, not the cause ("Workload stuck in running after merge failure" not "Missing status update call")
-- Actual log excerpts with timestamps, not paraphrases
-- Database state showing the incorrect records
+- A title that describes the **symptom** from the user's perspective
+- Actual log excerpts with timestamps (not paraphrases)
+- Diagnostics output showing the state at time of failure
 - Reproduction steps (or explanation of why not reproducible)
-- File paths and line numbers for the relevant code
-- Root cause analysis if you've identified one
-
-A good bug ticket saves hours of debugging. A bad one just creates another investigation.
+- Root cause analysis if you've identified one from the evidence

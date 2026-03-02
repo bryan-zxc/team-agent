@@ -27,6 +27,88 @@ async def get_logs(
     return memory_handler.get_records(level=level, limit=limit, since=since)
 
 
+@router.get("/rooms")
+async def list_rooms(
+    project_id: Optional[uuid.UUID] = Query(None, description="Filter by project ID"),
+):
+    """List rooms with basic metadata."""
+    async with async_session() as session:
+        stmt = select(Room, Project.name.label("project_name")).join(
+            Project, Room.project_id == Project.id
+        )
+        if project_id:
+            stmt = stmt.where(Room.project_id == project_id)
+        stmt = stmt.order_by(desc(Room.created_at))
+
+        rows = (await session.execute(stmt)).all()
+
+    return [
+        {
+            "id": str(room.id),
+            "name": room.name,
+            "type": room.type,
+            "project_id": str(room.project_id),
+            "project_name": project_name,
+            "created_at": room.created_at.isoformat(),
+        }
+        for room, project_name in rows
+    ]
+
+
+@router.get("/chats")
+async def list_chats(
+    status: Optional[str] = Query(None, description="Filter by status (e.g. running, investigating, completed)"),
+    room_id: Optional[uuid.UUID] = Query(None, description="Filter by room ID"),
+    project_id: Optional[uuid.UUID] = Query(None, description="Filter by project ID"),
+    type: Optional[str] = Query(None, description="Filter by chat type (e.g. primary, workload, admin)"),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """List chats with filtering. Returns chat records with room name, owner name, and workload title."""
+    async with async_session() as session:
+        stmt = (
+            select(
+                Chat,
+                Room.name.label("room_name"),
+                Room.type.label("room_type"),
+                ProjectMember.display_name.label("owner_name"),
+                Workload.title.label("workload_title"),
+            )
+            .join(Room, Chat.room_id == Room.id)
+            .outerjoin(ProjectMember, Chat.owner_id == ProjectMember.id)
+            .outerjoin(Workload, Chat.workload_id == Workload.id)
+        )
+
+        if status:
+            stmt = stmt.where(Chat.status == status)
+        if room_id:
+            stmt = stmt.where(Chat.room_id == room_id)
+        if project_id:
+            stmt = stmt.where(Room.project_id == project_id)
+        if type:
+            stmt = stmt.where(Chat.type == type)
+
+        stmt = stmt.order_by(desc(Chat.created_at)).limit(limit)
+        rows = (await session.execute(stmt)).all()
+
+    return [
+        {
+            "id": str(chat.id),
+            "room_id": str(chat.room_id),
+            "room_name": room_name,
+            "room_type": room_type,
+            "type": chat.type,
+            "title": chat.title,
+            "status": chat.status,
+            "owner_name": owner_name,
+            "workload_title": workload_title,
+            "permission_mode": chat.permission_mode,
+            "created_at": chat.created_at.isoformat(),
+            "updated_at": chat.updated_at.isoformat() if chat.updated_at else None,
+        }
+        for chat, room_name, room_type, owner_name, workload_title in rows
+    ]
+
+
 @router.get("/chats/{chat_id}")
 async def get_chat_diagnostics(
     chat_id: uuid.UUID,
