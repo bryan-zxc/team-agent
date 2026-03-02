@@ -113,7 +113,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
         id: panelId,
         component: "chatTab",
         title: room.name,
-        params: { roomId, room, memberId, members, projectId, onScreencastStarted: openLiveView },
+        params: { roomId, room, memberId, members, projectId, onScreencastStarted: openLiveView, onNavigateAdmin: navigateToAdmin },
       });
       setActiveRoomId(roomId);
     },
@@ -176,6 +176,10 @@ export function Workbench({ projectId }: WorkbenchProps) {
     },
     [projectId],
   );
+
+  const navigateToAdmin = useCallback(() => {
+    setActivePanel("admin");
+  }, []);
 
   const openLiveView = useCallback((chatId: string, title = "Live View") => {
     const api = apiRef.current;

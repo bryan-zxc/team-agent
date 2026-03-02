@@ -109,21 +109,41 @@ async def cancel_session(chat_id: str):
     room_id = None
     chat_type = None
     updated_at = None
+    was_investigating = False
+    project_id = None
+    workload_title = None
+    branch_name = None
+
     async with async_session() as session:
         chat = await session.get(Chat, uuid.UUID(chat_id))
         if not chat:
             raise HTTPException(status_code=404, detail="Chat not found")
         if chat.status == "cancelled":
             return {"status": "cancelled"}
+
+        was_investigating = chat.status == "investigating"
         chat.status = "cancelled"
         chat.updated_at = datetime.now(timezone.utc)
         updated_at = chat.updated_at
         room_id = str(chat.room_id)
         chat_type = chat.type
+
+        # If investigating, gather context for notifying admin session
+        if was_investigating and chat.workload_id:
+            room = await session.get(Room, chat.room_id)
+            if room:
+                project_id = str(room.project_id)
+            workload = await session.get(Workload, chat.workload_id)
+            if workload:
+                workload_title = workload.title
+                branch_name = workload.worktree_branch
+
         await session.commit()
 
+    redis = _get_redis()
+
     if room_id:
-        await _get_redis().publish(
+        await redis.publish(
             "chat:status",
             json.dumps({
                 "chat_id": chat_id,
@@ -133,6 +153,47 @@ async def cancel_session(chat_id: str):
                 "updated_at": updated_at.isoformat(),
             }),
         )
+
+    # If the workload was being investigated, notify the admin session to clean up
+    if was_investigating and project_id:
+        try:
+            # Find the running admin chat for this project
+            async with async_session() as session:
+                admin_room = (
+                    await session.execute(
+                        select(Room).where(
+                            Room.project_id == uuid.UUID(project_id),
+                            Room.type == "admin",
+                        )
+                    )
+                ).scalar_one_or_none()
+
+                if admin_room:
+                    admin_chat = (
+                        await session.execute(
+                            select(Chat).where(
+                                Chat.room_id == admin_room.id,
+                                Chat.type == "admin",
+                                Chat.status == "running",
+                            ).order_by(Chat.created_at.desc())
+                        )
+                    ).scalar_first()
+
+                    if admin_chat:
+                        title = workload_title or "Unknown workload"
+                        branch_info = f" Remove worktree and delete branch `{branch_name}`." if branch_name else ""
+                        await redis.publish(
+                            "chat:messages",
+                            json.dumps({
+                                "chat_id": str(admin_chat.id),
+                                "content": (
+                                    f"Workload **{title}** was cancelled by the user. "
+                                    f"Please clean up — no further resolution needed.{branch_info}"
+                                ),
+                            }),
+                        )
+        except Exception:
+            logger.warning("Failed to notify admin session about cancelled investigation", exc_info=True)
 
     return {"status": "cancelled"}
 
@@ -176,6 +237,40 @@ async def update_chat_status(chat_id: str, req: StatusUpdateRequest):
         )
 
     return {"status": req.status}
+
+
+class ResolveRequest(BaseModel):
+    outcome: Literal["success", "failed"]
+    message: str | None = None
+
+
+@router.post("/chats/{chat_id}/resolve")
+async def resolve_workload(chat_id: str, req: ResolveRequest):
+    """Resolve an escalated workload — proxy to AI service."""
+    async with httpx.AsyncClient(timeout=30.0) as http:
+        resp = await http.post(
+            f"{settings.ai_service_url}/chats/{chat_id}/resolve",
+            json=req.model_dump(),
+        )
+    if resp.status_code == 404:
+        raise HTTPException(status_code=404, detail="Workload chat not found")
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    return resp.json()
+
+
+@router.post("/chats/{chat_id}/retry")
+async def retry_workload(chat_id: str):
+    """Retry a failed workload session — proxy to AI service."""
+    async with httpx.AsyncClient(timeout=30.0) as http:
+        resp = await http.post(
+            f"{settings.ai_service_url}/chats/{chat_id}/retry",
+        )
+    if resp.status_code == 404:
+        raise HTTPException(status_code=404, detail="Workload chat not found")
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    return resp.json()
 
 
 @router.post("/workloads/dispatch", status_code=201)

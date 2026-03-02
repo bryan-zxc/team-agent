@@ -1,22 +1,29 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from typing import Optional
+from datetime import datetime
+from typing import Literal, Optional
 
 import redis.asyncio as aioredis
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 from .agents import generate_agent_profile
-from .config import settings, setup_logging
+from .config import memory_handler, settings, setup_logging
 from .cost import init_cost_tracker
 from .admin import shutdown_all_admin_sessions
 from .listener import listen, listen_chat_messages, listen_dispatch_confirmations, listen_tool_approvals
 from .screencast import shutdown_all_screencasts
-from .session import stop_session
+from .session import (
+    get_coordinator_for_chat,
+    publish_message,
+    publish_status_event,
+    stop_session,
+    update_chat_status,
+)
 from .terminal import create_terminal_session, destroy_terminal_session, shutdown_all_terminal_sessions
+from .workload import fetch_workload_data_for_retry, start_workload_session, shutdown_all_workload_sessions
 from .terminal_listener import listen_terminal_input
-from .workload import shutdown_all_workload_sessions
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -30,6 +37,11 @@ class GenerateAgentRequest(BaseModel):
 
 class CreateTerminalRequest(BaseModel):
     cwd: str
+
+
+class ResolveRequest(BaseModel):
+    outcome: Literal["success", "failed"]
+    message: str | None = None
 
 
 @asynccontextmanager
@@ -102,6 +114,16 @@ async def health():
     return {"status": "ok" if ok else "degraded", "redis": redis_status}
 
 
+@app.get("/diagnostics/logs")
+async def get_logs(
+    level: Optional[str] = Query(None),
+    limit: int = Query(100, ge=1, le=1000),
+    since: Optional[datetime] = Query(None),
+):
+    """Return recent application logs from the in-memory ring buffer."""
+    return memory_handler.get_records(level=level, limit=limit, since=since)
+
+
 @app.post("/generate-agent")
 async def generate_agent(req: GenerateAgentRequest):
     """Generate an AI agent profile via LLM."""
@@ -132,3 +154,59 @@ async def delete_terminal(session_id: str):
     if not found:
         raise HTTPException(status_code=404, detail="Terminal session not found")
     return {"status": "destroyed"}
+
+
+@app.post("/chats/{chat_id}/resolve")
+async def resolve_workload(chat_id: str, req: ResolveRequest):
+    """Admin session resolved an escalated issue — transition workload back."""
+    redis = app.state.redis
+
+    data = await fetch_workload_data_for_retry(chat_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Workload chat not found")
+
+    room_id = data.get("room_id", "")
+
+    await update_chat_status(chat_id, "needs_attention")
+    await publish_status_event(redis, chat_id, "needs_attention", room_id, chat_type="workload")
+
+    try:
+        coordinator = await get_coordinator_for_chat(chat_id)
+        main_chat_id = data.get("main_chat_id")
+
+        if main_chat_id:
+            if req.outcome == "success":
+                text = req.message or "I've resolved the issue. The workload is ready for review."
+            else:
+                text = req.message or "I wasn't able to resolve the issue automatically. Manual intervention needed."
+
+            await publish_message(
+                redis, main_chat_id,
+                coordinator["id"], coordinator["display_name"],
+                "coordinator",
+                [{"type": "text", "value": text}],
+            )
+    except Exception:
+        logger.warning("Failed to post coordinator message for resolve", exc_info=True)
+
+    return {"status": "needs_attention", "outcome": req.outcome}
+
+
+@app.post("/chats/{chat_id}/retry")
+async def retry_workload(chat_id: str):
+    """Admin session requests a fresh retry of a failed workload session."""
+    redis = app.state.redis
+
+    data = await fetch_workload_data_for_retry(chat_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Workload chat not found")
+
+    clone_path = data["clone_path"]
+
+    try:
+        await start_workload_session(data, clone_path, redis)
+    except Exception as e:
+        logger.error("Retry failed for chat %s: %s", chat_id[:8], e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"status": "retrying"}

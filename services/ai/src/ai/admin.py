@@ -156,7 +156,7 @@ async def start_admin_session(
         system_prompt=system_prompt,
         permission_mode=permission_mode,
         can_use_tool=can_use_tool,
-        setting_sources=["project"],
+        setting_sources=["project", "user"],
         env=cli_env,
         include_partial_messages=True,
     )

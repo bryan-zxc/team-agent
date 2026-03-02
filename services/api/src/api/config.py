@@ -1,6 +1,9 @@
+import logging
 import logging.config
 
 from pydantic_settings import BaseSettings
+
+from .memory_log_handler import MemoryLogHandler
 
 
 class Settings(BaseSettings):
@@ -26,6 +29,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+memory_handler = MemoryLogHandler(capacity=1000)
 
 
 def setup_logging() -> None:
@@ -57,3 +61,8 @@ def setup_logging() -> None:
             "handlers": ["console"],
         },
     })
+
+    memory_handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s %(message)s",
+    ))
+    logging.getLogger().addHandler(memory_handler)

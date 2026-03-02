@@ -43,7 +43,10 @@ RUN uv sync --frozen --no-dev
 
 COPY . .
 
-RUN chown -R agent:agent /app && \
+# Install admin skills as user-level skills for Claude Code
+COPY admin-skills/ /home/agent/.claude/skills/
+
+RUN chown -R agent:agent /app /home/agent/.claude/skills && \
     mkdir -p /data/projects && chown agent:agent /data/projects
 
 USER agent

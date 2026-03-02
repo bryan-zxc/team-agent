@@ -16,10 +16,11 @@ type ChatTabParams = {
   members: Member[];
   projectId: string;
   onScreencastStarted?: (chatId: string, title: string) => void;
+  onNavigateAdmin?: () => void;
 };
 
 export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
-  const { roomId, room, memberId, members, projectId, onScreencastStarted } = params;
+  const { roomId, room, memberId, members, projectId, onScreencastStarted, onNavigateAdmin } = params;
   const [workloads, setWorkloads] = useState<WorkloadChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>(room.primary_chat_id);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -200,6 +201,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
               onCancel={handleCancel}
               onComplete={handleComplete}
               onInterrupt={handleInterrupt}
+              onNavigateAdmin={onNavigateAdmin}
             />
           )}
         </div>

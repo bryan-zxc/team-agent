@@ -610,12 +610,36 @@ async def relay_messages(
         logger.exception("Relay task error for session %s", session_key[:8])
         stop_heartbeat()
         await screencast.stop_screencast(chat_id)
-        try:
-            await update_chat_status(chat_id, "needs_attention")
-            await publish_status_event(
-                redis_client, chat_id, "needs_attention", room_id,
-                chat_type=session.get("session_type"),
-            )
-        except Exception:
-            logger.exception("Failed to update chat status to needs_attention")
+
+        # Escalate workload relay crashes to admin room
+        session_type = session.get("session_type") if session else None
+        if session_type == "workload" and session:
+            try:
+                import traceback as tb_mod
+                from .escalation import escalate_to_admin
+
+                await escalate_to_admin(
+                    redis_client,
+                    project_id=session.get("project_id", ""),
+                    clone_path=session.get("clone_path", ""),
+                    workload_chat_id=chat_id,
+                    workload_title=session.get("workload_data", {}).get("title", "Workload"),
+                    main_chat_id=session.get("main_chat_id", ""),
+                    room_id=room_id,
+                    error_type="relay_crash",
+                    error_details=tb_mod.format_exc(),
+                )
+            except Exception:
+                logger.exception("Failed to escalate relay crash for session %s", session_key[:8])
+        else:
+            # Non-workload (admin) relay crash — just set needs_attention
+            try:
+                await update_chat_status(chat_id, "needs_attention")
+                await publish_status_event(
+                    redis_client, chat_id, "needs_attention", room_id,
+                    chat_type=session_type,
+                )
+            except Exception:
+                logger.exception("Failed to update chat status to needs_attention")
+
         unregister_session(session_key)

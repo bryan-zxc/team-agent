@@ -22,6 +22,7 @@ from claude_agent_sdk import (
 )
 
 from .config import settings
+from .escalation import escalate_to_admin
 from .session import (
     _sessions,
     cleanup_worktree,
@@ -40,12 +41,8 @@ logger = logging.getLogger(__name__)
 _dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
 
 
-async def fetch_workload_data_for_resume(chat_id: str) -> dict | None:
-    """Fetch full workload data from DB for session resume.
-
-    Looks up by chat_id (the universal session key). Returns the workload_data
-    dict compatible with start_workload_session(), or None if not found or no session_id.
-    """
+async def _fetch_workload_row(chat_id: str) -> dict | None:
+    """Fetch the raw workload+chat+project row from DB by chat_id."""
     conn = await asyncpg.connect(_dsn)
     try:
         row = await conn.fetchrow(
@@ -62,29 +59,52 @@ async def fetch_workload_data_for_resume(chat_id: str) -> dict | None:
             "WHERE c.id = $1 AND c.type = 'workload'",
             uuid.UUID(chat_id),
         )
-        if not row or not row["session_id"]:
-            return None
-
-        return {
-            "id": str(row["id"]),
-            "title": row["title"],
-            "description": row["description"],
-            "status": row["status"],
-            "session_id": row["session_id"],
-            "chat_id": str(row["chat_id"]),
-            "member_id": str(row["member_id"]),
-            "display_name": row["display_name"],
-            "room_id": str(row["room_id"]),
-            "main_chat_id": str(row["main_chat_id"]),
-            "clone_path": row["clone_path"],
-            "project_id": str(row["project_id"]),
-            "permission_mode": row["permission_mode"],
-            # Not needed for resume (initial prompt is skipped)
-            "background_context": None,
-            "problem": None,
-        }
+        return dict(row) if row else None
     finally:
         await conn.close()
+
+
+def _row_to_workload_data(row: dict) -> dict:
+    """Convert a raw DB row into the workload_data dict for start_workload_session()."""
+    return {
+        "id": str(row["id"]),
+        "title": row["title"],
+        "description": row["description"],
+        "status": row["status"],
+        "session_id": row["session_id"],
+        "chat_id": str(row["chat_id"]),
+        "member_id": str(row["member_id"]),
+        "display_name": row["display_name"],
+        "room_id": str(row["room_id"]),
+        "main_chat_id": str(row["main_chat_id"]),
+        "clone_path": row["clone_path"],
+        "project_id": str(row["project_id"]),
+        "permission_mode": row["permission_mode"],
+        "background_context": None,
+        "problem": None,
+    }
+
+
+async def fetch_workload_data_for_resume(chat_id: str) -> dict | None:
+    """Fetch full workload data from DB for session resume.
+
+    Looks up by chat_id (the universal session key). Returns the workload_data
+    dict compatible with start_workload_session(), or None if not found or no session_id.
+    """
+    row = await _fetch_workload_row(chat_id)
+    if not row or not row["session_id"]:
+        return None
+    return _row_to_workload_data(row)
+
+
+async def fetch_workload_data_for_retry(chat_id: str) -> dict | None:
+    """Fetch workload data for a fresh retry (no session_id required)."""
+    row = await _fetch_workload_row(chat_id)
+    if not row:
+        return None
+    data = _row_to_workload_data(row)
+    data["session_id"] = None  # Fresh start, no resume
+    return data
 
 
 def _slugify(title: str, workload_id: str) -> str:
@@ -190,9 +210,6 @@ def _build_initial_prompt(workload_data: dict) -> str:
     return "\n".join(parts)
 
 
-_MAX_MERGE_RETRIES = 2
-
-
 def _make_stop_hook(
     workload_id: str,
     clone_path: str,
@@ -200,13 +217,23 @@ def _make_stop_hook(
     branch_name: str,
     display_name: str,
     target_branch: str,
+    *,
+    redis_client,
+    chat_id: str,
+    main_chat_id: str,
+    room_id: str,
+    project_id: str,
+    workload_title: str,
 ) -> tuple:
     """Create a Stop hook that merges the workload branch into the project's default branch.
 
     Returns (hook_callback, merge_state_dict).
     The merge_state dict is shared with the relay handler to report merge outcome.
+
+    On merge conflict or push failure, escalates to the admin room instead of
+    retrying or silently logging.
     """
-    merge_state: dict = {"succeeded": None, "retries": 0, "target_branch": target_branch}
+    merge_state: dict = {"succeeded": None, "target_branch": target_branch}
 
     async def stop_hook(
         input_data: HookInput,
@@ -218,22 +245,6 @@ def _make_stop_hook(
             logger.info("Workload %s: worktree already removed, skipping merge", workload_id[:8])
             merge_state["succeeded"] = True
             return {"continue_": False}
-
-        retries = merge_state["retries"]
-
-        if retries >= _MAX_MERGE_RETRIES:
-            logger.warning(
-                "Workload %s: merge failed after %d retries, giving up",
-                workload_id[:8], retries,
-            )
-            merge_state["succeeded"] = False
-            return {
-                "continue_": False,
-                "stopReason": (
-                    f"Merge failed after {retries} attempts. "
-                    f"Branch '{branch_name}' is preserved for manual resolution."
-                ),
-            }
 
         # Auto-commit any uncommitted changes in the worktree
         await run_git("add", "-A", cwd=str(worktree_path))
@@ -257,7 +268,7 @@ def _make_stop_hook(
         )
 
         if rc == 0:
-            logger.info("Workload %s: merge succeeded on attempt %d", workload_id[:8], retries + 1)
+            logger.info("Workload %s: merge succeeded", workload_id[:8])
 
             # Clean up worktree and branch
             await cleanup_worktree(clone_path, branch_name)
@@ -265,33 +276,49 @@ def _make_stop_hook(
             # Push merged changes to remote
             push_rc, _, push_err = await run_git("push", cwd=clone_path)
             if push_rc != 0:
-                logger.warning("Workload %s: post-merge push failed: %s", workload_id[:8], push_err)
-            else:
-                logger.info("Workload %s: pushed merged changes to remote", workload_id[:8])
+                # Push failure — escalate to admin room
+                logger.warning("Workload %s: push failed, escalating: %s", workload_id[:8], push_err)
+                merge_state["succeeded"] = False
+                await escalate_to_admin(
+                    redis_client, project_id, clone_path,
+                    workload_chat_id=chat_id,
+                    workload_title=workload_title,
+                    main_chat_id=main_chat_id,
+                    room_id=room_id,
+                    error_type="push_failure",
+                    error_details=push_err,
+                    extra_context={
+                        "clone_path": clone_path,
+                        "target_branch": target_branch,
+                    },
+                )
+                return {"continue_": False}
 
+            logger.info("Workload %s: pushed merged changes to remote", workload_id[:8])
             merge_state["succeeded"] = True
             return {"continue_": False}
 
-        # Merge conflict — abort and ask agent to rebase
-        logger.warning(
-            "Workload %s: merge conflict on attempt %d: %s",
-            workload_id[:8], retries + 1, stderr,
-        )
+        # Merge conflict — abort and escalate to admin room
+        logger.warning("Workload %s: merge conflict, escalating: %s", workload_id[:8], stderr)
         await run_git("merge", "--abort", cwd=clone_path)
-        merge_state["retries"] = retries + 1
+        merge_state["succeeded"] = False
 
-        return {
-            "continue_": True,
-            "reason": (
-                f"Your branch '{branch_name}' has merge conflicts with {target_branch} "
-                f"(attempt {retries + 1} of {_MAX_MERGE_RETRIES}). "
-                f"Please rebase onto {target_branch} and resolve the conflicts:\n\n"
-                f"1. Run: git rebase {target_branch}\n"
-                f"2. Resolve any conflicts in the affected files\n"
-                f"3. Run: git rebase --continue\n"
-                f"4. Then finish your task as normal."
-            ),
-        }
+        await escalate_to_admin(
+            redis_client, project_id, clone_path,
+            workload_chat_id=chat_id,
+            workload_title=workload_title,
+            main_chat_id=main_chat_id,
+            room_id=room_id,
+            error_type="merge_conflict",
+            error_details=stderr,
+            extra_context={
+                "worktree_path": str(worktree_path),
+                "branch_name": branch_name,
+                "target_branch": target_branch,
+                "clone_path": clone_path,
+            },
+        )
+        return {"continue_": False}
 
     return stop_hook, merge_state
 
@@ -319,10 +346,21 @@ async def start_workload_session(
     # 1. Create/reuse worktree
     try:
         worktree_path = await _ensure_worktree(clone_path, slug)
-    except RuntimeError:
+    except RuntimeError as exc:
         logger.exception("Failed to create worktree for workload %s", workload_id[:8])
-        await update_chat_status(chat_id, "needs_attention")
-        await publish_status_event(redis_client, chat_id, "needs_attention", room_id, chat_type="workload")
+        branch_name = f"workload/{slug}"
+        await escalate_to_admin(
+            redis_client,
+            project_id=workload_data.get("project_id", ""),
+            clone_path=clone_path,
+            workload_chat_id=chat_id,
+            workload_title=workload_data.get("title", "Workload"),
+            main_chat_id=workload_data.get("main_chat_id", ""),
+            room_id=room_id,
+            error_type="worktree_failure",
+            error_details=str(exc),
+            extra_context={"branch_name": branch_name},
+        )
         return
 
     # 2. Update worktree_branch and status in DB
@@ -357,6 +395,12 @@ async def start_workload_session(
         branch_name=branch_name,
         display_name=workload_data["display_name"],
         target_branch=target_branch,
+        redis_client=redis_client,
+        chat_id=chat_id,
+        main_chat_id=workload_data.get("main_chat_id", ""),
+        room_id=room_id,
+        project_id=workload_data.get("project_id", ""),
+        workload_title=workload_data.get("title", "Workload"),
     )
 
     # 6. Pre-register session so tool_approval can access it

@@ -12,6 +12,7 @@ type WorkloadPanelProps = {
   onCancel: (chatId: string) => void;
   onComplete: (chatId: string) => void;
   onInterrupt: (chatId: string) => void;
+  onNavigateAdmin?: () => void;
 };
 
 type StatusGroup = {
@@ -23,6 +24,13 @@ type StatusGroup = {
 };
 
 const GROUPS: StatusGroup[] = [
+  {
+    key: "investigating",
+    label: "Investigating",
+    colour: "var(--investigating, #8B7EC8)",
+    defaultExpanded: true,
+    statuses: ["investigating"],
+  },
   {
     key: "attention",
     label: "Needs Attention",
@@ -74,6 +82,7 @@ export function WorkloadPanel({
   onCancel,
   onComplete,
   onInterrupt,
+  onNavigateAdmin,
 }: WorkloadPanelProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(GROUPS.map((g) => [g.key, g.defaultExpanded])),
@@ -164,6 +173,23 @@ export function WorkloadPanel({
                         {timeAgo(w.updated_at)}
                       </span>
                     </div>
+                    {w.status === "investigating" && (
+                      <div className={styles.investigatingBanner}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="11" cy="11" r="8" />
+                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        <span>Zimomo is investigating</span>
+                        {onNavigateAdmin && (
+                          <button
+                            className={styles.viewLink}
+                            onClick={(e) => { e.stopPropagation(); onNavigateAdmin(); }}
+                          >
+                            View &rarr;
+                          </button>
+                        )}
+                      </div>
+                    )}
                     <div
                       className={styles.cardActions}
                       onClick={(e) => e.stopPropagation()}
@@ -172,6 +198,14 @@ export function WorkloadPanel({
                         <button
                           className={styles.actionBtn}
                           onClick={() => onComplete(w.id)}
+                        >
+                          Complete
+                        </button>
+                      )}
+                      {w.status === "investigating" && (
+                        <button
+                          className={clsx(styles.actionBtn, styles.actionDisabled)}
+                          disabled
                         >
                           Complete
                         </button>

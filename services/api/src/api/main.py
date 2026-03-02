@@ -22,6 +22,7 @@ from .routes.users import router as users_router
 from .routes.skills import router as skills_router
 from .routes.terminals import router as terminals_router
 from .routes.admin import router as admin_router
+from .routes.diagnostics import router as diagnostics_router
 from .routes.workloads import router as workloads_router
 from .websocket.handler import router as ws_router
 from .websocket.screencast_handler import router as screencast_ws_router
@@ -192,6 +193,7 @@ app.include_router(skills_router)
 app.include_router(terminals_router)
 app.include_router(workloads_router)
 app.include_router(admin_router)
+app.include_router(diagnostics_router)
 app.include_router(ws_router)
 app.include_router(terminal_ws_router)
 app.include_router(screencast_ws_router)
