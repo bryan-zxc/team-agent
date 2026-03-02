@@ -381,9 +381,12 @@ export function ChatView({
       // New message arrived — smooth scroll
       container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
     } else {
-      // Initial load — instant jump after layout settles
+      // Initial load — double-rAF so the browser finishes layout (including
+      // markdown rendering and flex recalculation) before we measure scrollHeight.
       const raf = requestAnimationFrame(() => {
-        container.scrollTop = container.scrollHeight;
+        requestAnimationFrame(() => {
+          container.scrollTop = container.scrollHeight;
+        });
       });
       initialScrollDone.current = true;
       return () => cancelAnimationFrame(raf);
