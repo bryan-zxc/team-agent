@@ -5,15 +5,11 @@ import clsx from "clsx";
 import type { IDockviewPanelProps } from "dockview";
 import type { AdminChat, Member } from "@/types";
 import { apiFetch } from "@/lib/api";
+import type { ContentBlock } from "@/hooks/useWebSocket";
 import { ChatView } from "./ChatView";
 import styles from "./AdminTab.module.css";
 // Reuse ModeToggleStrip styles for the local-only mode toggle in landing state
 import modeStyles from "./ModeToggleStrip.module.css";
-
-type ContentBlock =
-  | { type: "text"; value: string }
-  | { type: "mention"; member_id: string; display_name: string }
-  | { type: "skill"; name: string };
 
 type AdminTabParams = {
   projectId: string;
@@ -21,11 +17,12 @@ type AdminTabParams = {
   members: Member[];
   adminRoomId: string;
   onAdminChatsChanged: (chats: AdminChat[]) => void;
+  onSessionComplete?: () => void;
   viewHistoryChatId?: string | null;
 };
 
 export function AdminTab({ params }: IDockviewPanelProps<AdminTabParams>) {
-  const { projectId, memberId, members, adminRoomId, onAdminChatsChanged, viewHistoryChatId } = params;
+  const { projectId, memberId, members, adminRoomId, onAdminChatsChanged, onSessionComplete, viewHistoryChatId } = params;
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [permissionMode, setPermissionMode] = useState<"default" | "acceptEdits">("acceptEdits");
   const [chatStatus, setChatStatus] = useState<string | undefined>(undefined);
@@ -77,9 +74,14 @@ export function AdminTab({ params }: IDockviewPanelProps<AdminTabParams>) {
           setPermissionMode(event.permission_mode as "default" | "acceptEdits");
         }
         refreshAdminChats();
+
+        // Auto-close tab when session completes
+        if (status === "completed") {
+          onSessionComplete?.();
+        }
       }
     },
-    [refreshAdminChats],
+    [refreshAdminChats, onSessionComplete],
   );
 
   const handleFirstMessage = useCallback(
@@ -87,9 +89,24 @@ export function AdminTab({ params }: IDockviewPanelProps<AdminTabParams>) {
       if (isCreating) return;
       setIsCreating(true);
       try {
+        // Derive title from first message content
+        const rawTitle = blocks
+          .map((b) => {
+            if (b.type === "text") return b.value;
+            if (b.type === "mention") return `@${b.display_name}`;
+            if (b.type === "skill") return `/${b.name}`;
+            if (b.type === "link") return b.label || b.url;
+            return "";
+          })
+          .join("")
+          .trim();
+        const title = rawTitle.length <= 60
+          ? rawTitle
+          : rawTitle.substring(0, 60).replace(/\s+\S*$/, "") + "\u2026";
+
         const res = await apiFetch(`/projects/${projectId}/admin-room/chats`, {
           method: "POST",
-          body: JSON.stringify({ permission_mode: permissionMode }),
+          body: JSON.stringify({ permission_mode: permissionMode, title }),
         });
         const data = await res.json();
         setActiveChatId(data.id);

@@ -22,12 +22,15 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
+const ACTIVE_STATUSES = new Set(["running", "needs_attention"]);
+
 export function AdminSidePanel({ adminChats, onChatClick, currentMember }: AdminSidePanelProps) {
   const [historyOpen, setHistoryOpen] = useState(true);
 
-  const sortedChats = [...adminChats].sort(
-    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-  );
+  const currentChat = adminChats.find((c) => ACTIVE_STATUSES.has(c.status)) ?? null;
+  const historyChats = adminChats
+    .filter((c) => !ACTIVE_STATUSES.has(c.status))
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
   return (
     <div className={styles.panel}>
@@ -43,23 +46,43 @@ export function AdminSidePanel({ adminChats, onChatClick, currentMember }: Admin
       </div>
 
       <div className={styles.historySection}>
+        {currentChat && (
+          <>
+            <div className={styles.currentLabel}>Current</div>
+            <div className={styles.historyList}>
+              <button
+                className={styles.chatItem}
+                onClick={() => onChatClick(currentChat.id)}
+              >
+                <div className={styles.chatTitle}>
+                  {currentChat.title || "Untitled session"}
+                </div>
+                <div className={styles.chatMeta}>
+                  <span>{timeAgo(currentChat.updated_at)}</span>
+                  {currentChat.owner_name && <span>· {currentChat.owner_name}</span>}
+                </div>
+              </button>
+            </div>
+          </>
+        )}
+
         <button
           className={styles.historyToggle}
           onClick={() => setHistoryOpen((p) => !p)}
         >
           <span className={clsx(styles.chevron, historyOpen && styles.chevronOpen)}>&#x25B6;</span>
           <span className={styles.historyLabel}>History</span>
-          {sortedChats.length > 0 && (
-            <span className={styles.historyCount}>{sortedChats.length}</span>
+          {historyChats.length > 0 && (
+            <span className={styles.historyCount}>{historyChats.length}</span>
           )}
         </button>
 
         {historyOpen && (
           <div className={styles.historyList}>
-            {sortedChats.length === 0 && (
+            {historyChats.length === 0 && (
               <div className={styles.emptyState}>No sessions yet</div>
             )}
-            {sortedChats.map((chat) => {
+            {historyChats.map((chat) => {
               const isCancelled = chat.status === "cancelled";
               return (
                 <button

@@ -103,7 +103,7 @@ GitHub CLI requires an interactive browser-based login.
 1. Run the login flow inside the container:
 
 ```bash
-$COMPOSE exec -it ai-service gh auth login --web --git-protocol https
+$COMPOSE exec -it ai-service gh auth login --web --git-protocol https --scopes read:project,project
 ```
 
 This prints a one-time code and a URL. Open the URL in a browser, enter the

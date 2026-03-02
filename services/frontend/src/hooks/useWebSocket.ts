@@ -6,10 +6,11 @@ import type { AgentActivityEvent, Message } from "@/types";
 
 const WS_URL = API_URL.replace(/^http/, "ws");
 
-type ContentBlock =
+export type ContentBlock =
   | { type: "text"; value: string }
   | { type: "mention"; member_id: string; display_name: string }
-  | { type: "skill"; name: string };
+  | { type: "skill"; name: string }
+  | { type: "link"; url: string; label?: string };
 
 export type TypingEvent = { member_id: string; display_name: string };
 

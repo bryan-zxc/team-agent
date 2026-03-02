@@ -279,7 +279,7 @@ def _make_stop_hook(
                 # Push failure — escalate to admin room
                 logger.warning("Workload %s: push failed, escalating: %s", workload_id[:8], push_err)
                 merge_state["succeeded"] = False
-                await escalate_to_admin(
+                admin_id = await escalate_to_admin(
                     redis_client, project_id, clone_path,
                     workload_chat_id=chat_id,
                     workload_title=workload_title,
@@ -292,6 +292,8 @@ def _make_stop_hook(
                         "target_branch": target_branch,
                     },
                 )
+                if admin_id:
+                    merge_state["admin_chat_id"] = admin_id
                 return {"continue_": False}
 
             logger.info("Workload %s: pushed merged changes to remote", workload_id[:8])
@@ -303,7 +305,7 @@ def _make_stop_hook(
         await run_git("merge", "--abort", cwd=clone_path)
         merge_state["succeeded"] = False
 
-        await escalate_to_admin(
+        admin_id = await escalate_to_admin(
             redis_client, project_id, clone_path,
             workload_chat_id=chat_id,
             workload_title=workload_title,
@@ -318,6 +320,8 @@ def _make_stop_hook(
                 "clone_path": clone_path,
             },
         )
+        if admin_id:
+            merge_state["admin_chat_id"] = admin_id
         return {"continue_": False}
 
     return stop_hook, merge_state

@@ -16,7 +16,7 @@ type ChatTabParams = {
   members: Member[];
   projectId: string;
   onScreencastStarted?: (chatId: string, title: string) => void;
-  onNavigateAdmin?: () => void;
+  onNavigateAdmin?: (chatId?: string) => void;
 };
 
 export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
@@ -24,6 +24,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
   const [workloads, setWorkloads] = useState<WorkloadChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>(room.primary_chat_id);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [hiddenTabs, setHiddenTabs] = useState<Set<string>>(new Set());
 
   const refreshWorkloads = useCallback(() => {
     apiFetch(`/rooms/${roomId}/workloads`)
@@ -134,6 +135,16 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
     [refreshWorkloads],
   );
 
+  const handleLinkClick = useCallback(
+    (url: string) => {
+      const adminMatch = url.match(/^\/admin\/chats\/(.+)$/);
+      if (adminMatch && onNavigateAdmin) {
+        onNavigateAdmin(adminMatch[1]);
+      }
+    },
+    [onNavigateAdmin],
+  );
+
   // Find workload for the active chat (if viewing a workload chat)
   const activeWorkload = workloads.find((w) => w.id === activeChatId);
 
@@ -146,19 +157,34 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
     <div className={styles.container}>
       <div className={styles.tabs}>
         <button
-          className={clsx(styles.tab, activeChatId === room.primary_chat_id && styles.tabActive)}
+          className={clsx(styles.tab, styles.tabMain, activeChatId === room.primary_chat_id && styles.tabActive)}
           onClick={() => setActiveChatId(room.primary_chat_id)}
         >
           Main
         </button>
-        {workloads.map((w) => (
-          <button
-            key={w.id}
-            className={clsx(styles.tab, activeChatId === w.id && styles.tabActive)}
-            onClick={() => setActiveChatId(w.id)}
-          >
-            {w.owner_name}: {w.title}
-          </button>
+        {workloads.filter((w) => !hiddenTabs.has(w.id)).map((w) => (
+          <div key={w.id} className={clsx(styles.tab, activeChatId === w.id && styles.tabActive)}>
+            <button
+              className={styles.tabLabel}
+              onClick={() => setActiveChatId(w.id)}
+            >
+              {w.owner_name}: {w.title}
+            </button>
+            <button
+              className={styles.tabClose}
+              onClick={(e) => {
+                e.stopPropagation();
+                setHiddenTabs((prev) => new Set(prev).add(w.id));
+                if (activeChatId === w.id) setActiveChatId(room.primary_chat_id);
+              }}
+              aria-label={`Close ${w.title}`}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
         ))}
         <button
           className={clsx(styles.panelToggle, panelOpen && styles.panelToggleActive)}
@@ -182,6 +208,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
           placeholder={`Message ${room.name}...`}
           onAiMessage={activeChatId === room.primary_chat_id ? refreshWorkloads : undefined}
           onRoomEvent={handleRoomEvent}
+          onLinkClick={handleLinkClick}
           workloadStatus={activeWorkload?.status}
           workloadHasSession={activeWorkload?.has_session}
           permissionMode={activeWorkload?.permission_mode}

@@ -1,4 +1,4 @@
-.ta-dockview {
+.ta-dockview.dockview-theme-abyss {
   --dv-group-view-background-color: var(--bg);
   --dv-tabs-and-actions-container-background-color: var(--bg-subtle);
   --dv-activegroup-visiblepanel-tab-background-color: var(--surface);

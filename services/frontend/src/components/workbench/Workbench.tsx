@@ -177,10 +177,6 @@ export function Workbench({ projectId }: WorkbenchProps) {
     [projectId],
   );
 
-  const navigateToAdmin = useCallback(() => {
-    setActivePanel("admin");
-  }, []);
-
   const openLiveView = useCallback((chatId: string, title = "Live View") => {
     const api = apiRef.current;
     if (!api) return;
@@ -220,6 +216,13 @@ export function Workbench({ projectId }: WorkbenchProps) {
     });
   }, [projectId]);
 
+  const closeAdminTab = useCallback(() => {
+    const api = apiRef.current;
+    if (!api) return;
+    const panel = api.panels.find((p) => p.id === "admin-session");
+    if (panel) api.removePanel(panel);
+  }, []);
+
   // Open or focus the admin Dockview tab
   const openAdminTab = useCallback(() => {
     const api = apiRef.current;
@@ -242,10 +245,11 @@ export function Workbench({ projectId }: WorkbenchProps) {
         members,
         adminRoomId,
         onAdminChatsChanged: setAdminChats,
+        onSessionComplete: closeAdminTab,
         viewHistoryChatId: null,
       },
     });
-  }, [projectId, memberId, members, adminRoomId]);
+  }, [projectId, memberId, members, adminRoomId, closeAdminTab]);
 
   // Auto-open admin tab when switching to admin panel
   useEffect(() => {
@@ -277,13 +281,22 @@ export function Workbench({ projectId }: WorkbenchProps) {
             members,
             adminRoomId,
             onAdminChatsChanged: setAdminChats,
+            onSessionComplete: closeAdminTab,
             viewHistoryChatId: chatId,
           },
         });
       }
     },
-    [projectId, memberId, members, adminRoomId],
+    [projectId, memberId, members, adminRoomId, closeAdminTab],
   );
+
+  const navigateToAdmin = useCallback((chatId?: string) => {
+    setActivePanel("admin");
+    if (chatId) {
+      // Defer so the admin panel has time to mount before we update params
+      setTimeout(() => handleAdminChatClick(chatId), 0);
+    }
+  }, [handleAdminChatClick]);
 
   const handleReady = useCallback((event: DockviewReadyEvent) => {
     apiRef.current = event.api;

@@ -5,7 +5,7 @@ import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AnimatePresence } from "motion/react";
-import { useWebSocket, type TypingEvent } from "@/hooks/useWebSocket";
+import { useWebSocket, type TypingEvent, type ContentBlock } from "@/hooks/useWebSocket";
 import type { AgentActivityEvent, DispatchCardBlock, Member, Message, Skill, TodoItem, ToolApprovalBlock } from "@/types";
 import { apiFetch } from "@/lib/api";
 import { ToolApprovalCard } from "./ToolApprovalCard";
@@ -16,19 +16,15 @@ import { SlashCommandDropdown, filterSkills } from "./SlashCommandDropdown";
 import { RichInput, type RichInputHandle, type TriggerState } from "./RichInput";
 import styles from "./ChatTab.module.css";
 
-type ContentBlock =
-  | { type: "text"; value: string }
-  | { type: "mention"; member_id: string; display_name: string }
-  | { type: "skill"; name: string };
-
 export function getMessageText(content: string): string {
   try {
     const data = JSON.parse(content);
     if (data?.blocks) {
       return data.blocks
-        .map((b: { type: string; value?: string; display_name?: string; name?: string }) => {
+        .map((b: { type: string; value?: string; display_name?: string; name?: string; label?: string; url?: string }) => {
           if (b.type === "mention") return `@${b.display_name}`;
           if (b.type === "skill") return `/${b.name}`;
+          if (b.type === "link") return b.label || b.url || "";
           return b.value ?? "";
         })
         .join("");
@@ -44,7 +40,7 @@ function renderMessageContent(content: string): React.ReactNode {
     const data = JSON.parse(content);
     if (data?.blocks) {
       return data.blocks.map(
-        (block: { type: string; value?: string; display_name?: string; name?: string }, i: number) => {
+        (block: { type: string; value?: string; display_name?: string; name?: string; label?: string; url?: string }, i: number) => {
           if (block.type === "mention") {
             return (
               <span key={i} className={styles.mention}>
@@ -58,6 +54,9 @@ function renderMessageContent(content: string): React.ReactNode {
                 /{block.name}
               </span>
             );
+          }
+          if (block.type === "link") {
+            return <span key={i}>{block.label || block.url}</span>;
           }
           return <span key={i}>{block.value}</span>;
         },
@@ -158,7 +157,7 @@ function toolUseSummary(name: string, input: Record<string, unknown>): string {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function renderRichBlocks(blocks: any[]): React.ReactNode {
+function renderRichBlocks(blocks: any[], onLinkClick?: (url: string) => void): React.ReactNode {
   return blocks.map((block, i) => {
     switch (block.type) {
       case "text":
@@ -172,6 +171,15 @@ function renderRichBlocks(blocks: any[]): React.ReactNode {
           <span key={i} className={styles.mention}>
             @{block.display_name}
           </span>
+        );
+      case "link":
+        return (
+          <button
+            key={i}
+            className={styles.inlineLink}
+            onClick={() => onLinkClick?.(block.url)}
+          >{block.label || block.url}
+          </button>
         );
       case "thinking":
         return (
@@ -223,11 +231,11 @@ function renderRichBlocks(blocks: any[]): React.ReactNode {
   });
 }
 
-function renderMsgContent(msg: Message): React.ReactNode {
+function renderMsgContent(msg: Message, onLinkClick?: (url: string) => void): React.ReactNode {
   if (msg.type === "human") return renderMessageContent(msg.content);
   try {
     const data = JSON.parse(msg.content);
-    if (data?.blocks) return renderRichBlocks(data.blocks);
+    if (data?.blocks) return renderRichBlocks(data.blocks, onLinkClick);
   } catch { /* legacy plain text */ }
   return msg.content;
 }
@@ -256,6 +264,7 @@ export type ChatViewProps = {
   placeholder: string;
   onAiMessage?: () => void;
   onRoomEvent?: (event: Record<string, unknown>) => void;
+  onLinkClick?: (url: string) => void;
   workloadStatus?: string;
   workloadHasSession?: boolean;
   permissionMode?: "default" | "acceptEdits";
@@ -275,6 +284,7 @@ export function ChatView({
   placeholder,
   onAiMessage,
   onRoomEvent,
+  onLinkClick,
   workloadStatus,
   workloadHasSession,
   permissionMode,
@@ -303,8 +313,10 @@ export function ChatView({
     elapsed: number;
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const richInputRef = useRef<RichInputHandle>(null);
   const prevCountRef = useRef(0);
+  const initialScrollDone = useRef(false);
   const prevStatusRef = useRef(workloadStatus);
   const lastTypingRef = useRef(0);
   const initialSentRef = useRef(false);
@@ -355,13 +367,27 @@ export function ChatView({
 
   useEffect(() => {
     if (!chatId) return;
+    initialScrollDone.current = false;
     apiFetch(`/chats/${chatId}/messages`)
       .then((r) => r.json())
       .then((history: Message[]) => setMessages(history));
   }, [chatId, setMessages]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!messages.length) return;
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    if (initialScrollDone.current) {
+      // New message arrived — smooth scroll
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    } else {
+      // Initial load — instant jump after layout settles
+      const raf = requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+      });
+      initialScrollDone.current = true;
+      return () => cancelAnimationFrame(raf);
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -626,7 +652,7 @@ export function ChatView({
           )}
         </div>
       )}
-      <div className={styles.messages}>
+      <div ref={messagesContainerRef} className={styles.messages}>
         {messages.map((msg) => {
           // Tool approval request — detect from content (type may be "ai" when loaded from API)
           const approvalBlock = getToolApprovalBlock(msg.content);
@@ -653,7 +679,7 @@ export function ChatView({
                       <span className={styles.aiBadge}>AI</span>
                       <span className={styles.msgTime}>{formatTime(msg.created_at)}</span>
                     </div>
-                    <div className={styles.msgBubble}>{renderMsgContent(msg)}</div>
+                    <div className={styles.msgBubble}>{renderMsgContent(msg, onLinkClick)}</div>
                   </div>
                 </div>
                 <div className={styles.approvalRow}>
@@ -699,7 +725,7 @@ export function ChatView({
                     </span>
                   </button>
                 )}
-                <div className={styles.msgBubble}>{renderMsgContent(msg)}</div>
+                <div className={styles.msgBubble}>{renderMsgContent(msg, onLinkClick)}</div>
                 {!readOnly && (
                   <button
                     className={styles.replyBtn}
@@ -790,7 +816,7 @@ export function ChatView({
               </button>
             </div>
           )}
-          <div className={clsx(styles.inputWrapper, chatId && permissionMode && !replyTo && styles.inputWrapperNoTopRadius)}>
+          <div className={clsx(styles.inputWrapper, (inputPrefix || (chatId && permissionMode)) && !replyTo && styles.inputWrapperNoTopRadius)}>
             <AnimatePresence>
               {mentionState && filteredMentionMembers.length > 0 && (
                 <MentionDropdown

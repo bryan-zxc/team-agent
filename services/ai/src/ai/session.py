@@ -566,12 +566,25 @@ async def relay_messages(
                     if msg.result:
                         summary += f"\n\nSummary: {msg.result}"
 
+                    # If escalation was triggered, append notice and link
+                    admin_chat_id = merge_state.get("admin_chat_id")
+                    if admin_chat_id:
+                        summary += "\n\nI'm looking into it."
+
+                    blocks: list[dict] = [{"type": "text", "value": summary}]
+                    if admin_chat_id:
+                        blocks.append({
+                            "type": "link",
+                            "url": f"/admin/chats/{admin_chat_id}",
+                            "label": "View \u2192",
+                        })
+
                     coordinator = await get_coordinator_for_chat(main_chat_id)
                     await publish_message(
                         redis_client, main_chat_id,
                         coordinator["id"], coordinator["display_name"],
                         "coordinator",
-                        [{"type": "text", "value": summary}],
+                        blocks,
                     )
 
                 # Post-completion manifest check

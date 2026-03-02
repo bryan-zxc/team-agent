@@ -19,6 +19,7 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 
 class CreateAdminChatRequest(BaseModel):
     permission_mode: str = "acceptEdits"
+    title: str | None = None
 
 
 @router.get("/projects/{project_id}/admin-room")
@@ -101,6 +102,7 @@ async def create_admin_chat(project_id: uuid.UUID, req: CreateAdminChatRequest =
             owner_id=coordinator.id,
             status="running",
             permission_mode=req.permission_mode,
+            title=req.title,
             updated_at=now,
         )
         session.add(chat)

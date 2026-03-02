@@ -11,8 +11,6 @@ import redis.asyncio as aioredis
 from .admin import fetch_admin_chat_data, start_admin_session
 from .config import settings
 from .session import (
-    get_coordinator_for_chat,
-    publish_message,
     publish_status_event,
     route_message,
     update_chat_status,
@@ -131,14 +129,6 @@ def _build_context_prompt(
     return "\n".join(parts)
 
 
-_ERROR_DESCRIPTIONS = {
-    "merge_conflict": "a merge conflict",
-    "push_failure": "a push failure",
-    "worktree_failure": "a git issue",
-    "relay_crash": "a session error",
-}
-
-
 async def escalate_to_admin(
     redis_client: aioredis.Redis,
     project_id: str,
@@ -153,8 +143,9 @@ async def escalate_to_admin(
 ) -> str | None:
     """Escalate a mechanical error to the admin room.
 
-    Creates an admin chat, starts an admin session with full context,
-    and posts a coordinator message to the main chat.
+    Creates an admin chat and starts an admin session with full context.
+    The coordinator message in the main chat is posted by the session
+    completion handler (which includes a link to this admin chat).
 
     Returns the admin chat_id on success, None on failure.
     """
@@ -179,7 +170,7 @@ async def escalate_to_admin(
         async with httpx.AsyncClient(timeout=10.0, headers=headers) as http:
             resp = await http.post(
                 f"{settings.api_service_url}/projects/{project_id}/admin-room/chats",
-                json={"permission_mode": "acceptEdits"},
+                json={"permission_mode": "acceptEdits", "title": f"Escalation: {workload_title}"},
             )
             if resp.status_code not in (200, 201):
                 logger.error(
@@ -192,20 +183,7 @@ async def escalate_to_admin(
         admin_chat_id = admin_chat["id"]
         logger.info("Created admin chat %s for escalation (%s)", admin_chat_id[:8], error_type)
 
-        # 4. Post coordinator message to main chat
-        error_desc = _ERROR_DESCRIPTIONS.get(error_type, "an issue")
-        coordinator = await get_coordinator_for_chat(main_chat_id)
-        await publish_message(
-            redis_client, main_chat_id,
-            coordinator["id"], coordinator["display_name"],
-            "coordinator",
-            [{"type": "text", "value": (
-                f"I ran into {error_desc} while finishing "
-                f"**{workload_title}**. I'm looking into it."
-            )}],
-        )
-
-        # 5. Start admin session
+        # 4. Start admin session
         chat_data = await fetch_admin_chat_data(admin_chat_id)
         if not chat_data:
             logger.error("Failed to fetch admin chat data for %s", admin_chat_id[:8])
@@ -213,7 +191,7 @@ async def escalate_to_admin(
 
         await start_admin_session(chat_data, redis_client)
 
-        # 6. Send context prompt to the admin session
+        # 5. Send context prompt to the admin session
         context_prompt = _build_context_prompt(error_type, error_details, extra, md_file_path)
         delivered = await route_message(admin_chat_id, context_prompt)
         if not delivered:
