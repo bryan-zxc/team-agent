@@ -526,15 +526,19 @@ async def relay_messages(
                 )
 
                 # Update chat status and session_id
-                await update_chat_status(chat_id, completion_status, session_id=msg.session_id)
+                # If escalation already set "investigating", preserve it
+                merge_state = session.get("merge_state")
+                escalated = merge_state is not None and merge_state.get("succeeded") is False
+                final_status = "investigating" if escalated else completion_status
+
+                await update_chat_status(chat_id, final_status, session_id=msg.session_id)
 
                 await publish_status_event(
-                    redis_client, chat_id, completion_status, room_id,
+                    redis_client, chat_id, final_status, room_id,
                     chat_type=session.get("session_type"),
                 )
 
                 # Workload-only: post merge summary to main chat
-                merge_state = session.get("merge_state")
                 if merge_state is not None:
                     main_chat_id = session.get("main_chat_id", "")
                     workload_title = session.get("workload_data", {}).get("title", "Workload")
@@ -574,7 +578,8 @@ async def relay_messages(
                 if project_id and (merge_state is None or merge_state.get("succeeded")):
                     try:
                         pull = "false" if merge_state else "true"
-                        async with httpx.AsyncClient(timeout=10.0) as http:
+                        _headers = {"x-internal-key": settings.internal_api_key}
+                        async with httpx.AsyncClient(timeout=10.0, headers=_headers) as http:
                             resp = await http.post(
                                 f"{settings.api_service_url}/projects/"
                                 f"{project_id}/check-manifest?pull={pull}",

@@ -36,6 +36,7 @@ The workload branch couldn't merge cleanly into the target branch. The merge was
    ```bash
    curl -s -X POST http://api:8000/chats/<workload_chat_id>/resolve \
      -H 'Content-Type: application/json' \
+     -H 'x-internal-key: team-agent-internal' \
      -d '{"outcome": "success", "message": "Resolved merge conflict in <files> and pushed."}'
    ```
 
@@ -44,6 +45,7 @@ If the conflict is too complex or ambiguous to resolve confidently:
 git merge --abort
 curl -s -X POST http://api:8000/chats/<workload_chat_id>/resolve \
   -H 'Content-Type: application/json' \
+  -H 'x-internal-key: team-agent-internal' \
   -d '{"outcome": "failed", "message": "Merge conflict in <files> requires manual resolution — both sides made structural changes to the same functions."}'
 ```
 
@@ -70,6 +72,7 @@ The merge itself succeeded, but `git push` failed afterwards. The worktree has a
    ```bash
    curl -s -X POST http://api:8000/chats/<workload_chat_id>/resolve \
      -H 'Content-Type: application/json' \
+     -H 'x-internal-key: team-agent-internal' \
      -d '{"outcome": "success", "message": "Push succeeded after <what you fixed>."}'
    ```
 
@@ -77,6 +80,7 @@ If the push issue is persistent (e.g., branch protection rules you can't overrid
 ```bash
 curl -s -X POST http://api:8000/chats/<workload_chat_id>/resolve \
   -H 'Content-Type: application/json' \
+  -H 'x-internal-key: team-agent-internal' \
   -d '{"outcome": "failed", "message": "Cannot push to <branch> — <reason>. Manual intervention needed."}'
 ```
 
@@ -99,7 +103,8 @@ The system couldn't create a git worktree for the workload, so the session never
    - **Branch already checked out**: remove the stale worktree that has the branch, then prune
 4. Once the underlying issue is fixed, retry the workload:
    ```bash
-   curl -s -X POST http://api:8000/chats/<workload_chat_id>/retry
+   curl -s -X POST http://api:8000/chats/<workload_chat_id>/retry \
+     -H 'x-internal-key: team-agent-internal'
    ```
 
 The retry endpoint re-dispatches the workload from scratch — new worktree, new session.
@@ -110,13 +115,15 @@ The relay task (which forwards messages between the SDK and the chat) crashed un
 
 **If it looks transient** (network timeout, Redis disconnect, connection reset):
 ```bash
-curl -s -X POST http://api:8000/chats/<workload_chat_id>/retry
+curl -s -X POST http://api:8000/chats/<workload_chat_id>/retry \
+  -H 'x-internal-key: team-agent-internal'
 ```
 
 **If it looks persistent** (code bug, missing dependency, corrupted state), report it so a human can investigate:
 ```bash
 curl -s -X POST http://api:8000/chats/<workload_chat_id>/resolve \
   -H 'Content-Type: application/json' \
+  -H 'x-internal-key: team-agent-internal' \
   -d '{"outcome": "failed", "message": "Relay crashed due to <root cause from traceback>. This appears to be a code-level issue, not a transient failure."}'
 ```
 
@@ -146,4 +153,4 @@ No API call needed — the workload is already cancelled.
 | `/chats/{chat_id}/resolve` | POST | `{"outcome": "success"\|"failed", "message": "..."}` | Transitions workload to `needs_attention`, posts coordinator message to main chat |
 | `/chats/{chat_id}/retry` | POST | (none) | Re-dispatches workload from scratch — new worktree, new session |
 
-Both endpoints are on `http://api:8000` inside Docker.
+Both endpoints are on `http://api:8000` inside Docker. All requests require the `x-internal-key: team-agent-internal` header for authentication.

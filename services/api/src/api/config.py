@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # Auth
     session_max_age_days: int = 7
     frontend_url: str = "http://localhost:3000"
+    internal_api_key: str = "team-agent-internal"
 
     @property
     def cookie_secure(self) -> bool:

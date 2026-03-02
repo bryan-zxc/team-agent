@@ -34,7 +34,9 @@ RUN apt-get update && \
 RUN useradd -m -u 1000 -s /bin/bash agent && \
     mkdir -p /home/agent/.claude /home/agent/.config/gh && \
     chown -R agent:agent /home/agent/.claude /home/agent/.config && \
-    git config --system credential.helper '!/usr/bin/gh auth git-credential'
+    git config --system credential.helper '!/usr/bin/gh auth git-credential' && \
+    git config --system user.email "agent@team-agent.local" && \
+    git config --system user.name "Team Agent"
 
 WORKDIR /app
 
@@ -43,12 +45,12 @@ RUN uv sync --frozen --no-dev
 
 COPY . .
 
-# Install admin skills as user-level skills for Claude Code
-COPY admin-skills/ /home/agent/.claude/skills/
-
-RUN chown -R agent:agent /app /home/agent/.claude/skills && \
+RUN chown -R agent:agent /app && \
     mkdir -p /data/projects && chown agent:agent /data/projects
 
 USER agent
 
-CMD ["uv", "run", "uvicorn", "src.ai.main:app", "--host", "0.0.0.0", "--port", "8001"]
+# Copy admin skills into the claude_auth volume at startup (volume overlays build-time COPY)
+CMD mkdir -p /home/agent/.claude/skills && \
+    cp -r /app/admin-skills/* /home/agent/.claude/skills/ 2>/dev/null; \
+    exec uv run uvicorn src.ai.main:app --host 0.0.0.0 --port 8001

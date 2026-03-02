@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5.2"
     team_agent_env: str = "dev"
     api_service_url: str = "http://api:8000"
+    internal_api_key: str = "team-agent-internal"
     log_level: str = "INFO"
     log_format: str = "text"
 

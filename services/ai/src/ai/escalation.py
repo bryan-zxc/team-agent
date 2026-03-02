@@ -28,8 +28,9 @@ async def _dump_chat_messages(chat_id: str) -> str | None:
 
     Returns the file path, or None on failure.
     """
+    headers = {"x-internal-key": settings.internal_api_key}
     try:
-        async with httpx.AsyncClient(timeout=10.0) as http:
+        async with httpx.AsyncClient(timeout=10.0, headers=headers) as http:
             resp = await http.get(f"{settings.api_service_url}/chats/{chat_id}/messages")
             if resp.status_code != 200:
                 logger.warning("Failed to fetch messages for chat %s: %d", chat_id[:8], resp.status_code)
@@ -174,7 +175,8 @@ async def escalate_to_admin(
         )
 
         # 3. Create admin chat via API
-        async with httpx.AsyncClient(timeout=10.0) as http:
+        headers = {"x-internal-key": settings.internal_api_key}
+        async with httpx.AsyncClient(timeout=10.0, headers=headers) as http:
             resp = await http.post(
                 f"{settings.api_service_url}/projects/{project_id}/admin-room/chats",
                 json={"permission_mode": "acceptEdits"},
