@@ -1,6 +1,7 @@
 """Agent profile generation."""
 
 import asyncio
+import base64
 import logging
 import uuid
 from pathlib import Path
@@ -55,6 +56,7 @@ async def _get_existing_agent_names(project_name: str) -> list[str]:
 
 async def _insert_project_member(
     project_name: str, agent_name: str, member_type: str = "ai",
+    avatar: str | None = None,
 ) -> uuid.UUID:
     """Insert a new project member into the database. Returns the member id."""
     conn = await asyncpg.connect(_dsn)
@@ -67,12 +69,13 @@ async def _insert_project_member(
 
         member_id = uuid.uuid4()
         await conn.execute(
-            "INSERT INTO project_members (id, project_id, user_id, display_name, type, created_at) "
-            "VALUES ($1, $2, NULL, $3, $4, NOW())",
+            "INSERT INTO project_members (id, project_id, user_id, display_name, type, avatar, created_at) "
+            "VALUES ($1, $2, NULL, $3, $4, $5, NOW())",
             member_id,
             project_id,
             agent_name,
             member_type,
+            avatar,
         )
         return member_id
     finally:
@@ -118,8 +121,17 @@ async def generate_agent_profile(
     if not isinstance(result, AgentProfile):
         raise RuntimeError(f"Expected AgentProfile, got {type(result)}")
 
+    # Attempt to load a matching character headshot as base64 avatar
+    avatar = None
+    avatar_filename = result.name.lower().replace(" ", "") + ".jpg"
+    avatar_path = Path(__file__).parent / "references" / avatar_filename
+    if avatar_path.exists():
+        encoded = base64.b64encode(avatar_path.read_bytes()).decode()
+        avatar = f"data:image/jpeg;base64,{encoded}"
+        logger.info("Loaded avatar for %s from %s", result.name, avatar_filename)
+
     # Insert into database as project member
-    member_id = await _insert_project_member(project_name, result.name, member_type)
+    member_id = await _insert_project_member(project_name, result.name, member_type, avatar=avatar)
 
     # Write markdown file into the project's cloned repo
     clone_path = await _get_clone_path(project_name)
@@ -153,6 +165,7 @@ async def generate_agent_profile(
         "id": str(member_id),
         "display_name": result.name,
         "file_path": str(file_path),
+        "avatar": avatar,
     }
 
 

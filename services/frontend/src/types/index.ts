@@ -51,6 +51,7 @@ export type Member = {
   display_name: string;
   type: "human" | "ai" | "coordinator";
   user_id: string | null;
+  avatar: string | null;
 };
 
 export type AvailableUser = {

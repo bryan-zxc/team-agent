@@ -689,9 +689,13 @@ export function ChatView({
             return (
               <div key={msg.id}>
                 <div className={clsx(styles.messageGroup, styles.ai)}>
-                  <div className={clsx(styles.msgAvatar, styles.avatarAi)}>
-                    {msg.display_name[0]}
-                  </div>
+                  {memberMap.get(msg.member_id)?.avatar ? (
+                    <img src={memberMap.get(msg.member_id)!.avatar!} alt={msg.display_name} className={styles.avatarImg} />
+                  ) : (
+                    <div className={clsx(styles.msgAvatar, styles.avatarAi)}>
+                      {msg.display_name[0]}
+                    </div>
+                  )}
                   <div className={styles.msgBody}>
                     <div className={styles.msgHeader}>
                       <span className={styles.msgAuthor}>{msg.display_name}</span>
@@ -720,9 +724,13 @@ export function ChatView({
               id={`msg-${msg.id}`}
               className={clsx(styles.messageGroup, isSelf && styles.self, isAi && styles.ai)}
             >
-              <div className={clsx(styles.msgAvatar, isAi ? styles.avatarAi : styles.avatarHuman)}>
-                {msg.display_name[0]}
-              </div>
+              {memberMap.get(msg.member_id)?.avatar ? (
+                <img src={memberMap.get(msg.member_id)!.avatar!} alt={msg.display_name} className={styles.avatarImg} />
+              ) : (
+                <div className={clsx(styles.msgAvatar, isAi ? styles.avatarAi : styles.avatarHuman)}>
+                  {msg.display_name[0]}
+                </div>
+              )}
               <div className={styles.msgBody}>
                 <div className={styles.msgHeader}>
                   <span className={styles.msgAuthor}>{msg.display_name}</span>

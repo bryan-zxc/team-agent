@@ -20,9 +20,13 @@ export function MemberList({ members, onAddClick, onMemberClick }: MemberListPro
             className={clsx(styles.memberItem, member.type !== "human" && styles.memberItemClickable)}
             onClick={() => member.type !== "human" && onMemberClick?.(member.id)}
           >
-            <div className={clsx(styles.avatar, member.type !== "human" ? styles.avatarAi : styles.avatarHuman)}>
-              {member.display_name[0]}
-            </div>
+            {member.avatar ? (
+              <img src={member.avatar} alt={member.display_name} className={styles.avatarImg} />
+            ) : (
+              <div className={clsx(styles.avatar, member.type !== "human" ? styles.avatarAi : styles.avatarHuman)}>
+                {member.display_name[0]}
+              </div>
+            )}
             <div className={styles.memberInfo}>
               <span className={styles.memberName}>{member.display_name}</span>
             </div>

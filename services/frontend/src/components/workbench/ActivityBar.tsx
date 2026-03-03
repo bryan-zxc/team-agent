@@ -11,11 +11,12 @@ type ActivityBarProps = {
   onPanelChange: (panel: Panel) => void;
   onOpenTerminal?: () => void;
   coordinatorInitial?: string;
+  coordinatorAvatar?: string | null;
   chatBadge?: boolean;
   adminBadge?: boolean;
 };
 
-export function ActivityBar({ activePanel, onPanelChange, onOpenTerminal, coordinatorInitial, chatBadge, adminBadge }: ActivityBarProps) {
+export function ActivityBar({ activePanel, onPanelChange, onOpenTerminal, coordinatorInitial, coordinatorAvatar, chatBadge, adminBadge }: ActivityBarProps) {
   const { theme, toggle } = useTheme();
 
   return (
@@ -60,7 +61,11 @@ export function ActivityBar({ activePanel, onPanelChange, onOpenTerminal, coordi
             aria-label="Admin"
             title="Admin sessions"
           >
-            <span className={styles.avatarIcon}>{coordinatorInitial}</span>
+            {coordinatorAvatar ? (
+              <img src={coordinatorAvatar} alt="Admin" className={styles.avatarImg} />
+            ) : (
+              <span className={styles.avatarIcon}>{coordinatorInitial}</span>
+            )}
             {adminBadge && <span className={styles.badge} />}
           </button>
         )}

@@ -137,6 +137,7 @@ async def generate_agent(req: GenerateAgentRequest):
         "id": result["id"],
         "display_name": result["display_name"],
         "type": "ai",
+        "avatar": result.get("avatar"),
     }
 
 

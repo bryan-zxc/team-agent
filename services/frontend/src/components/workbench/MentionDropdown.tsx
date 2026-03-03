@@ -48,9 +48,13 @@ export function MentionDropdown({ members, query, selectedIndex, onSelect }: Men
               onSelect(member);
             }}
           >
-            <div className={clsx(styles.avatar, isAi ? styles.avatarAi : styles.avatarHuman)}>
-              {member.display_name[0]}
-            </div>
+            {member.avatar ? (
+              <img src={member.avatar} alt={member.display_name} className={styles.avatarImg} />
+            ) : (
+              <div className={clsx(styles.avatar, isAi ? styles.avatarAi : styles.avatarHuman)}>
+                {member.display_name[0]}
+              </div>
+            )}
             <span className={styles.name}>{member.display_name}</span>
             {isAi && <span className={styles.badge}>AI</span>}
           </button>

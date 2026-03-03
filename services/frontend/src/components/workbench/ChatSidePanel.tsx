@@ -180,9 +180,13 @@ export function ChatSidePanel({
       {currentMember && (
         <div className={styles.footer}>
           <div className={styles.userDisplay}>
-            <div className={clsx(styles.avatar, styles.avatarHuman)}>
-              {currentMember.display_name[0]}
-            </div>
+            {currentMember.avatar ? (
+              <img src={currentMember.avatar} alt={currentMember.display_name} className={styles.avatarImg} />
+            ) : (
+              <div className={clsx(styles.avatar, styles.avatarHuman)}>
+                {currentMember.display_name[0]}
+              </div>
+            )}
             <div className={styles.userInfo}>
               <div className={styles.userName}>{currentMember.display_name}</div>
               <div className={styles.userRole}>{currentMember.type}</div>

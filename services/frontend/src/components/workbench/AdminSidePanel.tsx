@@ -107,9 +107,13 @@ export function AdminSidePanel({ adminChats, onChatClick, currentMember }: Admin
       {currentMember && (
         <div className={styles.footer}>
           <div className={styles.userDisplay}>
-            <div className={styles.avatar}>
-              {currentMember.display_name[0]}
-            </div>
+            {currentMember.avatar ? (
+              <img src={currentMember.avatar} alt={currentMember.display_name} className={styles.avatarImg} />
+            ) : (
+              <div className={styles.avatar}>
+                {currentMember.display_name[0]}
+              </div>
+            )}
             <div className={styles.userInfo}>
               <div className={styles.userName}>{currentMember.display_name}</div>
               <div className={styles.userRole}>{currentMember.type}</div>

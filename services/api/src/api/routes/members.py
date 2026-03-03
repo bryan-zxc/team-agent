@@ -51,6 +51,7 @@ async def list_members(project_id: uuid.UUID):
                 "display_name": m.display_name,
                 "type": m.type,
                 "user_id": str(m.user_id) if m.user_id else None,
+                "avatar": m.avatar,
             }
             for m in members
         ]
@@ -104,6 +105,7 @@ async def add_human_member(
             "id": str(member.id),
             "display_name": member.display_name,
             "type": member.type,
+            "avatar": member.avatar,
         }
 
 

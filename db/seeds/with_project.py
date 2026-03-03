@@ -16,12 +16,24 @@ Usage: docker compose exec api .venv/bin/python db/seeds/with_project.py
 """
 
 import asyncio
+import base64
 import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 from base import connect, reset_schema
+
+REFERENCES_DIR = Path("/app/references")
+
+
+def _load_avatar(name: str) -> str | None:
+    """Load a character headshot as a base64 data URL, or None if not found."""
+    path = REFERENCES_DIR / f"{name.lower()}.jpg"
+    if not path.exists():
+        return None
+    encoded = base64.b64encode(path.read_bytes()).decode()
+    return f"data:image/jpeg;base64,{encoded}"
 
 GIT_REPO_URL = "https://github.com/bryan-zxc/popmart.git"
 CLONE_BASE = Path("/data/projects")
@@ -176,23 +188,23 @@ async def seed():
 
         zimomo_member_id = uuid.uuid4()
         await conn.execute(
-            "INSERT INTO project_members (id, project_id, user_id, display_name, type, created_at) "
-            "VALUES ($1, $2, NULL, $3, $4, $5)",
-            zimomo_member_id, project_id, "Zimomo", "coordinator", now,
+            "INSERT INTO project_members (id, project_id, user_id, display_name, type, avatar, created_at) "
+            "VALUES ($1, $2, NULL, $3, $4, $5, $6)",
+            zimomo_member_id, project_id, "Zimomo", "coordinator", _load_avatar("Zimomo"), now,
         )
 
         molly_member_id = uuid.uuid4()
         await conn.execute(
-            "INSERT INTO project_members (id, project_id, user_id, display_name, type, created_at) "
-            "VALUES ($1, $2, NULL, $3, $4, $5)",
-            molly_member_id, project_id, "Molly", "ai", now,
+            "INSERT INTO project_members (id, project_id, user_id, display_name, type, avatar, created_at) "
+            "VALUES ($1, $2, NULL, $3, $4, $5, $6)",
+            molly_member_id, project_id, "Molly", "ai", _load_avatar("Molly"), now,
         )
 
         pucky_member_id = uuid.uuid4()
         await conn.execute(
-            "INSERT INTO project_members (id, project_id, user_id, display_name, type, created_at) "
-            "VALUES ($1, $2, NULL, $3, $4, $5)",
-            pucky_member_id, project_id, "Pucky", "ai", now,
+            "INSERT INTO project_members (id, project_id, user_id, display_name, type, avatar, created_at) "
+            "VALUES ($1, $2, NULL, $3, $4, $5, $6)",
+            pucky_member_id, project_id, "Pucky", "ai", _load_avatar("Pucky"), now,
         )
         print("Inserted 5 members (Alice, Bob, Zimomo, Molly, Pucky)")
 

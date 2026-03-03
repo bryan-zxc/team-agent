@@ -394,6 +394,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
         onPanelChange={setActivePanel}
         onOpenTerminal={openTerminal}
         coordinatorInitial={coordinator?.display_name?.[0]}
+        coordinatorAvatar={coordinator?.avatar}
         chatBadge={[...attentionRoomIds].some((id) => id !== activeRoomId)}
         adminBadge={adminNeedsAttention && activePanel !== "admin"}
       />

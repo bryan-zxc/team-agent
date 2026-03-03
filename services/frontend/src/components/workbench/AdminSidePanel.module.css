@@ -183,6 +183,14 @@
   flex-shrink: 0;
 }
 
+.avatarImg {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
 .userInfo {
   flex: 1;
 }

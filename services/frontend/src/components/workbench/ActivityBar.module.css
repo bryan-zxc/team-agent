@@ -68,6 +68,13 @@
   line-height: 1;
 }
 
+.avatarImg {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 :global(.dark) .avatarIcon {
   background: rgba(184, 118, 62, 0.18);
   color: #D4A574;

@@ -28,6 +28,7 @@ services:
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
     volumes:
       - ./db:/app/db
+      - ./services/ai/src/ai/references:/app/references:ro
       - project_data:/data/projects
     depends_on:
       postgres:
