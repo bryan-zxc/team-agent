@@ -275,6 +275,24 @@
   box-shadow: none;
 }
 
+/* ── Queued messages (held during tool approval) ── */
+
+.queuedMessage {
+  opacity: 0.5;
+}
+
+.queuedBadge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--border);
+}
+
 .ai .msgBubble {
   background: var(--bubble-ai);
 }

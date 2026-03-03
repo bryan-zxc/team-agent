@@ -296,6 +296,9 @@ export function ChatView({
   inputPrefix,
 }: ChatViewProps) {
   const [resuming, setResuming] = useState(false);
+  const [queuedMessages, setQueuedMessages] = useState<
+    Array<{ blocks: ContentBlock[]; mentions: string[]; replyToId?: string }>
+  >([]);
   const [mentionState, setMentionState] = useState<{ query: string } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [commandState, setCommandState] = useState<{ query: string } | null>(null);
@@ -445,6 +448,21 @@ export function ChatView({
     prevStatusRef.current = workloadStatus;
   }, [workloadStatus]);
 
+  // Flush queued messages when tool approval resolves, discard if workload stops
+  useEffect(() => {
+    if (queuedMessages.length === 0) return;
+    if (workloadStatus === "running") {
+      // Approval resolved — flush queued messages to the backend
+      for (const msg of queuedMessages) {
+        sendMessage(msg.blocks, msg.mentions, msg.replyToId);
+      }
+      setQueuedMessages([]);
+    } else if (workloadStatus !== "awaiting_approval") {
+      // Workload stopped (interrupted, completed, etc.) — discard
+      setQueuedMessages([]);
+    }
+  }, [workloadStatus, queuedMessages, sendMessage]);
+
   // Elapsed timer for agent activity indicator
   const isAgentActive = agentActivity !== null;
   useEffect(() => {
@@ -546,6 +564,16 @@ export function ChatView({
       return;
     }
 
+    // Queue messages while a tool approval is pending — don't send to backend
+    if (workloadStatus === "awaiting_approval") {
+      setQueuedMessages((prev) => [...prev, { blocks, mentions, replyToId: replyTo?.id }]);
+      ri.clear();
+      setReplyTo(null);
+      setMentionState(null);
+      setCommandState(null);
+      return;
+    }
+
     sendMessage(blocks, mentions, replyTo?.id);
     ri.clear();
     setReplyTo(null);
@@ -554,7 +582,7 @@ export function ChatView({
     if (isPaused && workloadHasSession) {
       setResuming(true);
     }
-  }, [sendMessage, replyTo, isPaused, workloadHasSession, chatId, onFirstMessage]);
+  }, [sendMessage, replyTo, isPaused, workloadHasSession, chatId, onFirstMessage, workloadStatus]);
 
   const isRunning = workloadStatus === "running" || workloadStatus === "assigned" || workloadStatus === "awaiting_approval";
 
@@ -772,6 +800,23 @@ export function ChatView({
             </div>
           );
         })}
+        {queuedMessages.map((qm, i) => (
+          <div key={`queued-${i}`} className={clsx(styles.messageGroup, styles.self, styles.queuedMessage)}>
+            <div className={clsx(styles.msgAvatar, styles.avatarHuman)}>
+              {memberMap.get(memberId ?? "")?.display_name?.[0] ?? "?"}
+            </div>
+            <div className={styles.msgBody}>
+              <div className={styles.msgHeader} style={{ flexDirection: "row-reverse" }}>
+                <span className={styles.queuedBadge}>Queued</span>
+              </div>
+              <div className={styles.msgBubble}>
+                {renderMessageContent(
+                  JSON.stringify({ blocks: qm.blocks, mentions: [] }),
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
         <div ref={messagesEndRef} />
       </div>
 
