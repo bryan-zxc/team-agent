@@ -28,11 +28,19 @@ The workload branch couldn't merge cleanly into the target branch. The merge was
    git add <resolved_files>
    git commit --no-edit
    ```
-5. Push the branch:
+5. Switch to the clone path, merge the resolved branch, and push:
    ```bash
-   git push origin <branch_name>
+   cd <clone_path>
+   git merge <branch_name> --no-edit
+   git push
    ```
-6. Report success:
+6. Clean up the worktree and remote branch:
+   ```bash
+   git worktree remove <worktree_path> --force
+   git branch -D <branch_name>
+   git push origin --delete <branch_name>
+   ```
+7. Report success:
    ```bash
    curl -s -X POST http://api:8000/chats/<workload_chat_id>/resolve \
      -H 'Content-Type: application/json' \
@@ -135,9 +143,10 @@ The user cancelled a workload while you were investigating it. Clean up the git 
    ```bash
    git -C <clone_path> worktree remove <worktree_path> --force
    ```
-2. Delete the branch (if provided):
+2. Delete the local and remote branch (if provided):
    ```bash
    git -C <clone_path> branch -D <branch_name>
+   git -C <clone_path> push origin --delete <branch_name>
    ```
 3. Prune any stale worktree entries:
    ```bash

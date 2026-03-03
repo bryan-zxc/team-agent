@@ -243,6 +243,13 @@ async def cleanup_worktree(clone_path: str, branch_name: str) -> None:
     else:
         logger.info("Deleted branch %s", branch_name)
 
+    # Delete the remote branch (best-effort — it may not have been pushed)
+    rc, _, err = await run_git("push", "origin", "--delete", branch_name, cwd=clone_path)
+    if rc != 0:
+        logger.info("Remote branch %s not deleted (may not exist): %s", branch_name, err)
+    else:
+        logger.info("Deleted remote branch %s", branch_name)
+
 
 # ── Stop session ─────────────────────────────────────────────────────
 

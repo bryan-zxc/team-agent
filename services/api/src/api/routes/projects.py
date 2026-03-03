@@ -300,9 +300,9 @@ async def list_branches(project_id: uuid.UUID):
 
         clone_path = project.clone_path
 
-        # Fetch latest refs
+        # Fetch latest refs and prune stale tracking branches
         fetch_proc = await asyncio.create_subprocess_exec(
-            "git", "fetch", "origin",
+            "git", "fetch", "--prune", "origin",
             cwd=clone_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
