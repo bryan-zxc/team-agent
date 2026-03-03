@@ -30,6 +30,20 @@ description: Manage GitHub project board tickets for the teamagent project. Use 
 
 Stories are linked to epics as sub-issues via the GitHub GraphQL API. Bugs are standalone — they don't belong to an epic.
 
+## Adding to Board
+
+After creating any issue, add it to the board **and immediately set its status to Backlog**. Items added via CLI have no status by default — without this step they won't appear in any board column.
+
+```bash
+ITEM_ID=$(gh project item-add 3 --owner @me --url <issue-url> --format json --jq '.id')
+
+gh project item-edit \
+  --project-id PVT_kwHOCz6Fr84BOi15 \
+  --id "$ITEM_ID" \
+  --field-id PVTSSF_lAHOCz6Fr84BOi15zg9N0x0 \
+  --single-select-option-id f75ad846
+```
+
 ## Creating an Epic
 
 ```bash
@@ -40,11 +54,7 @@ gh issue create --repo bryan-zxc/team-agent \
   --assignee "@me"
 ```
 
-Then add to the project board:
-
-```bash
-gh project item-add 3 --owner @me --url <issue-url> --format json
-```
+Then add to the project board (see [Adding to Board](#adding-to-board)).
 
 ## Creating a Bug
 
@@ -56,11 +66,7 @@ gh issue create --repo bryan-zxc/team-agent \
   --assignee "@me"
 ```
 
-Then add to the project board:
-
-```bash
-gh project item-add 3 --owner @me --url <issue-url> --format json
-```
+Then add to the project board (see [Adding to Board](#adding-to-board)).
 
 ## Creating a Story Under an Epic
 
@@ -74,11 +80,7 @@ gh issue create --repo bryan-zxc/team-agent \
   --assignee "@me"
 ```
 
-Add to the project board:
-
-```bash
-gh project item-add 3 --owner @me --url <issue-url> --format json
-```
+Add to the project board (see [Adding to Board](#adding-to-board)).
 
 Link as sub-issue to the epic using node IDs:
 
@@ -97,7 +99,7 @@ mutation {
 
 ## Transitioning Status
 
-Get the item ID from the `gh project item-add` output (`id` field), then:
+Use the item ID captured from `gh project item-add` (see [Adding to Board](#adding-to-board)), or look it up (see [Looking Up Item IDs](#looking-up-item-ids)). Then:
 
 ```bash
 gh project item-edit \
