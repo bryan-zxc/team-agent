@@ -13,6 +13,7 @@ type ChatSidePanelProps = {
   onCreateRoom?: (name: string) => void;
   onRenameRoom?: (roomId: string, newName: string) => void;
   currentMember?: Member | null;
+  attentionRoomIds?: Set<string>;
 };
 
 export function ChatSidePanel({
@@ -22,6 +23,7 @@ export function ChatSidePanel({
   onCreateRoom,
   onRenameRoom,
   currentMember,
+  attentionRoomIds,
 }: ChatSidePanelProps) {
   const [creating, setCreating] = useState(false);
   const [createValue, setCreateValue] = useState("");
@@ -147,6 +149,9 @@ export function ChatSidePanel({
                 <div className={styles.roomName}>{room.name}</div>
               )}
             </div>
+            {attentionRoomIds?.has(room.id) && room.id !== activeRoomId && (
+              <span className={styles.attentionDot} />
+            )}
           </button>
         ))}
 

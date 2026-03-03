@@ -55,6 +55,14 @@
   cursor: pointer;
 }
 
+.attentionDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #E5484D;
+  flex-shrink: 0;
+}
+
 .tabClose {
   display: flex;
   align-items: center;

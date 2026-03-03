@@ -14,6 +14,8 @@ from claude_agent_sdk import (
     ToolPermissionContext,
 )
 
+from .session import publish_status_event, update_chat_status
+
 logger = logging.getLogger(__name__)
 
 
@@ -268,13 +270,29 @@ def make_can_use_tool(
             approval_request_id[:8], tool_name, session_key[:8],
         )
 
+        # 4b. Transition status to needs_attention so badges appear
+        room_id = session_state.get("room_id", "")
+        chat_type = session_state.get("session_type")
+        await update_chat_status(chat_id, "needs_attention")
+        if room_id:
+            await publish_status_event(
+                redis_client, chat_id, "needs_attention", room_id,
+                chat_type=chat_type,
+            )
+
         # 5. Wait for human response (blocks indefinitely — human must decide)
         try:
             decision = await future
         finally:
             session_state["pending_approvals"].pop(approval_request_id, None)
 
-        # 6. Restart activity heartbeat now that approval is resolved
+        # 6. Transition back to running and restart heartbeat
+        await update_chat_status(chat_id, "running")
+        if room_id:
+            await publish_status_event(
+                redis_client, chat_id, "running", room_id,
+                chat_type=chat_type,
+            )
         restart_hb = session_state.get("restart_heartbeat")
         if restart_hb:
             restart_hb()

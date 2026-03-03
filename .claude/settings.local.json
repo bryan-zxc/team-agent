@@ -81,7 +81,10 @@
       "Bash(PLAYWRIGHT_MCP_SANDBOX=false playwright-cli press:*)",
       "Bash(PLAYWRIGHT_MCP_SANDBOX=false playwright-cli screenshot:*)",
       "Bash(PLAYWRIGHT_MCP_SANDBOX=false playwright-cli snapshot:*)",
-      "Bash(PLAYWRIGHT_MCP_SANDBOX=false playwright-cli run-code:*)"
+      "Bash(PLAYWRIGHT_MCP_SANDBOX=false playwright-cli run-code:*)",
+      "Bash(PLAYWRIGHT_MCP_SANDBOX=false playwright-cli reload:*)",
+      "Bash(PLAYWRIGHT_MCP_SANDBOX=false playwright-cli console:*)",
+      "Bash(PLAYWRIGHT_MCP_SANDBOX=false playwright-cli close:*)"
     ],
     "deny": [
       "AskUserQuestion"

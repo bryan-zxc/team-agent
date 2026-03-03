@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DockviewReact, type DockviewApi, type DockviewReadyEvent, type IDockviewPanelProps, type IWatermarkPanelProps } from "dockview";
 import { TabIcon } from "./TabIcon";
 import "dockview/dist/styles/dockview.css";
@@ -19,6 +19,7 @@ import { AdminTab } from "./AdminTab";
 import { ProjectTopBar } from "./ProjectTopBar";
 import { AddMemberModal } from "@/components/members/AddMemberModal";
 import { useAuth } from "@/hooks/useAuth";
+import { AttentionProvider } from "@/hooks/useAttention";
 import { apiFetch } from "@/lib/api";
 import type { AdminChat, Member, Project, Room } from "@/types";
 import styles from "./Workbench.module.css";
@@ -56,9 +57,32 @@ export function Workbench({ projectId }: WorkbenchProps) {
   const [adminRoomId, setAdminRoomId] = useState<string | null>(null);
   const [adminChats, setAdminChats] = useState<AdminChat[]>([]);
   const [adminHistoryChatId, setAdminHistoryChatId] = useState<string | null>(null);
+  const [attentionRoomIds, setAttentionRoomIds] = useState<Set<string>>(new Set());
   const apiRef = useRef<DockviewApi | null>(null);
 
   const isLocked = project?.is_locked ?? false;
+  const adminNeedsAttention = adminChats.some(
+    (c) => c.status === "running" || c.status === "needs_attention",
+  );
+
+  const attentionValue = useMemo(
+    () => ({ attentionRoomIds, adminNeedsAttention }),
+    [attentionRoomIds, adminNeedsAttention],
+  );
+
+  const handleAttentionChange = useCallback((roomId: string, needsAttention: boolean) => {
+    setAttentionRoomIds((prev) => {
+      if (needsAttention && prev.has(roomId)) return prev;
+      if (!needsAttention && !prev.has(roomId)) return prev;
+      const next = new Set(prev);
+      if (needsAttention) {
+        next.add(roomId);
+      } else {
+        next.delete(roomId);
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     apiFetch(`/projects/${projectId}`).then((r) => r.json()).then(setProject).catch(() => {});
@@ -124,7 +148,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
         id: panelId,
         component: "chatTab",
         title: room.name,
-        params: { roomId, room, memberId, members, projectId, onScreencastStarted: openLiveView, onNavigateAdmin: navigateToAdmin },
+        params: { roomId, room, memberId, members, projectId, onScreencastStarted: openLiveView, onNavigateAdmin: navigateToAdmin, onAttentionChange: handleAttentionChange },
       });
       setActiveRoomId(roomId);
     },
@@ -328,6 +352,18 @@ export function Workbench({ projectId }: WorkbenchProps) {
         setActiveRoomId(undefined);
       }
     });
+
+    event.api.onDidRemovePanel((panel) => {
+      if (panel.id.startsWith("room-")) {
+        const removedRoomId = panel.id.replace("room-", "");
+        setAttentionRoomIds((prev) => {
+          if (!prev.has(removedRoomId)) return prev;
+          const next = new Set(prev);
+          next.delete(removedRoomId);
+          return next;
+        });
+      }
+    });
   }, []);
 
   return (
@@ -358,6 +394,8 @@ export function Workbench({ projectId }: WorkbenchProps) {
         onPanelChange={setActivePanel}
         onOpenTerminal={openTerminal}
         coordinatorInitial={coordinator?.display_name?.[0]}
+        chatBadge={[...attentionRoomIds].some((id) => id !== activeRoomId)}
+        adminBadge={adminNeedsAttention && activePanel !== "admin"}
       />
 
       <aside className={styles.sidePanel}>
@@ -369,6 +407,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
             onCreateRoom={isLocked ? undefined : handleCreateRoom}
             onRenameRoom={isLocked ? undefined : handleRenameRoom}
             currentMember={currentMember}
+            attentionRoomIds={attentionRoomIds}
           />
         ) : activePanel === "members" ? (
           <MembersSidePanel
@@ -408,13 +447,15 @@ export function Workbench({ projectId }: WorkbenchProps) {
       </aside>
 
       <main className={styles.editorArea}>
-        <DockviewReact
-          className="ta-dockview"
-          components={components}
-          defaultTabComponent={TabIcon}
-          watermarkComponent={Watermark}
-          onReady={handleReady}
-        />
+        <AttentionProvider value={attentionValue}>
+          <DockviewReact
+            className="ta-dockview"
+            components={components}
+            defaultTabComponent={TabIcon}
+            watermarkComponent={Watermark}
+            onReady={handleReady}
+          />
+        </AttentionProvider>
       </main>
 
       <AddMemberModal

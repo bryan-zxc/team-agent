@@ -5,6 +5,7 @@ import type { IDockviewPanelHeaderProps } from "dockview-core";
 import { getFileIcon } from "@/lib/fileIcons";
 import { SetiIcon } from "./SetiIcon";
 import { ConfirmCloseDialog } from "@/components/terminal/ConfirmCloseDialog";
+import { useAttention } from "@/hooks/useAttention";
 
 function useTitle(api: IDockviewPanelHeaderProps["api"]) {
   const [title, setTitle] = React.useState(api.title);
@@ -18,6 +19,20 @@ function useTitle(api: IDockviewPanelHeaderProps["api"]) {
     return () => disposable.dispose();
   }, [api]);
   return title;
+}
+
+function useIsActive(api: IDockviewPanelHeaderProps["api"]) {
+  const [isActive, setIsActive] = React.useState(api.isActive);
+  React.useEffect(() => {
+    const disposable = api.onDidActiveChange(() => {
+      setIsActive(api.isActive);
+    });
+    if (isActive !== api.isActive) {
+      setIsActive(api.isActive);
+    }
+    return () => disposable.dispose();
+  }, [api]);
+  return isActive;
 }
 
 const ChatIcon = () => (
@@ -49,12 +64,19 @@ const CloseIcon = () => (
 
 export const TabIcon: React.FunctionComponent<IDockviewPanelHeaderProps> = ({ api, containerApi: _containerApi, params: _params }) => {
   const title = useTitle(api);
+  const isActive = useIsActive(api);
+  const { attentionRoomIds, adminNeedsAttention } = useAttention();
   const isMiddleMouseButton = useRef(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
   const isRoom = api.id.startsWith("room-");
   const isMember = api.id.startsWith("member-");
   const isTerminal = api.id.startsWith("terminal-");
+  const isAdmin = api.id === "admin-session";
+
+  const showBadge =
+    (isRoom && !isActive && attentionRoomIds.has(api.id.replace("room-", ""))) ||
+    (isAdmin && !isActive && adminNeedsAttention);
 
   const onClose = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
@@ -97,8 +119,9 @@ export const TabIcon: React.FunctionComponent<IDockviewPanelHeaderProps> = ({ ap
       onPointerLeave={onPointerLeave}
     >
       <span className="dv-default-tab-content" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-        {isTerminal ? <TerminalIcon /> : isRoom ? <ChatIcon /> : isMember ? <PersonIcon /> : <SetiIcon svg={getFileIcon(title ?? "")} size={14} />}
+        {isTerminal ? <TerminalIcon /> : isRoom || isAdmin ? <ChatIcon /> : isMember ? <PersonIcon /> : <SetiIcon svg={getFileIcon(title ?? "")} size={14} />}
         {title}
+        {showBadge && <span className="ta-tab-badge" />}
       </span>
       <div className="dv-default-tab-action" onPointerDown={onBtnPointerDown} onClick={onClose}>
         <CloseIcon />

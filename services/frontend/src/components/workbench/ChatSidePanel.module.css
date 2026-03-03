@@ -106,6 +106,15 @@
   background: var(--accent-light);
 }
 
+.attentionDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #E5484D;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .roomIcon {
   width: 30px;
   height: 30px;

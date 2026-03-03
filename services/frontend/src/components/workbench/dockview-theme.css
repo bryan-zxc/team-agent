@@ -37,3 +37,12 @@
 .ta-dockview .dv-tabs-container .dv-tab:hover .dv-default-tab-action {
   opacity: 1;
 }
+
+.ta-dockview .ta-tab-badge {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #E5484D;
+  flex-shrink: 0;
+  margin-left: 2px;
+}

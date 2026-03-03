@@ -17,10 +17,11 @@ type ChatTabParams = {
   projectId: string;
   onScreencastStarted?: (chatId: string, title: string) => void;
   onNavigateAdmin?: (chatId?: string) => void;
+  onAttentionChange?: (roomId: string, needsAttention: boolean) => void;
 };
 
 export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
-  const { roomId, room, memberId, members, projectId, onScreencastStarted, onNavigateAdmin } = params;
+  const { roomId, room, memberId, members, projectId, onScreencastStarted, onNavigateAdmin, onAttentionChange } = params;
   const [workloads, setWorkloads] = useState<WorkloadChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>(room.primary_chat_id);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -36,6 +37,12 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
   useEffect(() => {
     refreshWorkloads();
   }, [refreshWorkloads]);
+
+  // Report to Workbench when any workload in this room needs attention
+  useEffect(() => {
+    const needsAttention = workloads.some((w) => w.status === "needs_attention");
+    onAttentionChange?.(roomId, needsAttention);
+  }, [workloads, roomId, onAttentionChange]);
 
   const handleRoomEvent = useCallback(
     (event: Record<string, unknown>) => {
@@ -170,6 +177,9 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
             >
               {w.owner_name}: {w.title}
             </button>
+            {w.status === "needs_attention" && w.id !== activeChatId && (
+              <span className={styles.attentionDot} />
+            )}
             <button
               className={styles.tabClose}
               onClick={(e) => {

@@ -11,9 +11,11 @@ type ActivityBarProps = {
   onPanelChange: (panel: Panel) => void;
   onOpenTerminal?: () => void;
   coordinatorInitial?: string;
+  chatBadge?: boolean;
+  adminBadge?: boolean;
 };
 
-export function ActivityBar({ activePanel, onPanelChange, onOpenTerminal, coordinatorInitial }: ActivityBarProps) {
+export function ActivityBar({ activePanel, onPanelChange, onOpenTerminal, coordinatorInitial, chatBadge, adminBadge }: ActivityBarProps) {
   const { theme, toggle } = useTheme();
 
   return (
@@ -28,6 +30,7 @@ export function ActivityBar({ activePanel, onPanelChange, onOpenTerminal, coordi
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
+          {chatBadge && <span className={styles.badge} />}
         </button>
         <button
           className={clsx(styles.icon, activePanel === "files" && styles.iconActive)}
@@ -58,6 +61,7 @@ export function ActivityBar({ activePanel, onPanelChange, onOpenTerminal, coordi
             title="Admin sessions"
           >
             <span className={styles.avatarIcon}>{coordinatorInitial}</span>
+            {adminBadge && <span className={styles.badge} />}
           </button>
         )}
         {onOpenTerminal && (
