@@ -270,13 +270,13 @@ def make_can_use_tool(
             approval_request_id[:8], tool_name, session_key[:8],
         )
 
-        # 4b. Transition status to needs_attention so badges appear
+        # 4b. Transition status to awaiting_approval so badges appear
         room_id = session_state.get("room_id", "")
         chat_type = session_state.get("session_type")
-        await update_chat_status(chat_id, "needs_attention")
+        await update_chat_status(chat_id, "awaiting_approval")
         if room_id:
             await publish_status_event(
-                redis_client, chat_id, "needs_attention", room_id,
+                redis_client, chat_id, "awaiting_approval", room_id,
                 chat_type=chat_type,
             )
 

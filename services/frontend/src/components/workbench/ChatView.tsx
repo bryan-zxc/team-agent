@@ -556,7 +556,7 @@ export function ChatView({
     }
   }, [sendMessage, replyTo, isPaused, workloadHasSession, chatId, onFirstMessage]);
 
-  const isRunning = workloadStatus === "running" || workloadStatus === "assigned";
+  const isRunning = workloadStatus === "running" || workloadStatus === "assigned" || workloadStatus === "awaiting_approval";
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

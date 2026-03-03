@@ -40,7 +40,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
 
   // Report to Workbench when any workload in this room needs attention
   useEffect(() => {
-    const needsAttention = workloads.some((w) => w.status === "needs_attention");
+    const needsAttention = workloads.some((w) => w.status === "needs_attention" || w.status === "awaiting_approval");
     onAttentionChange?.(roomId, needsAttention);
   }, [workloads, roomId, onAttentionChange]);
 
@@ -177,7 +177,7 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
             >
               {w.owner_name}: {w.title}
             </button>
-            {w.status === "needs_attention" && w.id !== activeChatId && (
+            {(w.status === "needs_attention" || w.status === "awaiting_approval") && w.id !== activeChatId && (
               <span className={styles.attentionDot} />
             )}
             <button

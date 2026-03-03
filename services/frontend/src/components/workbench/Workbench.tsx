@@ -62,7 +62,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
 
   const isLocked = project?.is_locked ?? false;
   const adminNeedsAttention = adminChats.some(
-    (c) => c.status === "running" || c.status === "needs_attention",
+    (c) => c.status === "running" || c.status === "needs_attention" || c.status === "awaiting_approval",
   );
 
   const attentionValue = useMemo(
