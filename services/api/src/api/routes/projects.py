@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ..config import settings
 from ..database import async_session
+from ..github import GitHubError, create_repo
 from ..manifest import (
     ManifestStatus,
     check_unclaimed,
@@ -28,11 +29,12 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 logger = logging.getLogger(__name__)
 
 CLONE_BASE = Path("/data/projects")
+PROJECT_TEMPLATE = Path(__file__).resolve().parents[3] / "project-template"
 
 
 class CreateProjectRequest(BaseModel):
     name: str
-    git_repo_url: str
+    git_repo_url: str | None = None
     default_branch: str | None = None
 
 
@@ -96,6 +98,48 @@ async def get_project(project_id: uuid.UUID):
         }
 
 
+async def _init_and_push_repo(clone_path: str, clone_url: str) -> None:
+    """Initialise a git repo, commit the scaffold, and push to remote."""
+    token = settings.github_token
+    # Use token-embedded URL for push, then reset to clean URL
+    if token:
+        parts = clone_url.split("://", 1)
+        push_url = f"{parts[0]}://{token}@{parts[1]}" if len(parts) == 2 else clone_url
+    else:
+        push_url = clone_url
+
+    cmds = [
+        ["git", "init"],
+        ["git", "add", "."],
+        ["git", "-c", "user.name=Team Agent", "-c", "user.email=agent@team-agent",
+         "commit", "-m", "Initial project scaffold"],
+        ["git", "branch", "-M", "main"],
+        ["git", "remote", "add", "origin", push_url],
+        ["git", "push", "-u", "origin", "main"],
+    ]
+    for cmd in cmds:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=clone_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Git init failed ({' '.join(cmd[:2])}): {stderr.decode().strip()}",
+            )
+
+    # Reset remote URL to clean version (no token)
+    await asyncio.create_subprocess_exec(
+        "git", "remote", "set-url", "origin", clone_url,
+        cwd=clone_path,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+
 @router.post("/projects")
 async def create_project(req: CreateProjectRequest, creator: User = Depends(get_current_user)):
     async with async_session() as session:
@@ -106,67 +150,95 @@ async def create_project(req: CreateProjectRequest, creator: User = Depends(get_
         if existing:
             raise HTTPException(status_code=409, detail="Project name already exists")
 
+        creating_new = not req.git_repo_url
+
+        # If no URL provided, create a GitHub repo
+        git_repo_url = req.git_repo_url
+        if creating_new:
+            try:
+                git_repo_url = await create_repo(req.name)
+            except GitHubError as e:
+                raise HTTPException(status_code=e.status_code, detail=e.detail)
+
         # Create project
         project = Project(
             name=req.name,
-            git_repo_url=req.git_repo_url,
+            git_repo_url=git_repo_url,
         )
         session.add(project)
         await session.flush()
 
-        # Clone repo
         clone_path = str(CLONE_BASE / str(project.id) / "repo")
         Path(clone_path).parent.mkdir(parents=True, exist_ok=True)
 
-        clone_args = ["git", "clone"]
-        if req.default_branch:
-            clone_args += ["--branch", req.default_branch]
-        clone_args += [req.git_repo_url, clone_path]
+        if creating_new:
+            # Copy template scaffold and initialise repo
+            shutil.copytree(str(PROJECT_TEMPLATE), clone_path)
 
-        proc = await asyncio.create_subprocess_exec(
-            *clone_args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        _, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Git clone failed: {stderr.decode().strip()}",
+            # Create .team-agent/agents/ directory and write manifest
+            (Path(clone_path) / ".team-agent" / "agents").mkdir(parents=True, exist_ok=True)
+            write_manifest(
+                clone_path,
+                project_id=str(project.id),
+                project_name=req.name,
+                env=settings.team_agent_env,
             )
 
-        project.clone_path = clone_path
+            await _init_and_push_repo(clone_path, git_repo_url)
+            project.clone_path = clone_path
+            project.default_branch = "main"
+            logger.info("Created new repo for %s at %s", req.name, git_repo_url)
+        else:
+            # Clone existing repo
+            clone_args = ["git", "clone"]
+            if req.default_branch:
+                clone_args += ["--branch", req.default_branch]
+            clone_args += [git_repo_url, clone_path]
 
-        # Read the actual checked-out branch and store it
-        branch_proc = await asyncio.create_subprocess_exec(
-            "git", "symbolic-ref", "--short", "HEAD",
-            cwd=clone_path,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        branch_out, _ = await branch_proc.communicate()
-        if branch_proc.returncode == 0:
-            project.default_branch = branch_out.decode().strip()
+            proc = await asyncio.create_subprocess_exec(
+                *clone_args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Git clone failed: {stderr.decode().strip()}",
+                )
 
-        logger.info("Cloned %s to %s (branch: %s)", req.git_repo_url, clone_path, project.default_branch)
+            project.clone_path = clone_path
 
-        # Check if repo is already claimed by another project
-        claim_check = check_unclaimed(clone_path)
-        if claim_check.status == ManifestStatus.CLAIMED_PROD:
-            shutil.rmtree(Path(clone_path).parent)
-            raise HTTPException(status_code=409, detail=claim_check.reason)
-        if claim_check.status == ManifestStatus.CLAIMED_OTHER:
-            shutil.rmtree(Path(clone_path).parent)
-            raise HTTPException(status_code=409, detail=claim_check.reason)
+            # Read the actual checked-out branch and store it
+            branch_proc = await asyncio.create_subprocess_exec(
+                "git", "symbolic-ref", "--short", "HEAD",
+                cwd=clone_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            branch_out, _ = await branch_proc.communicate()
+            if branch_proc.returncode == 0:
+                project.default_branch = branch_out.decode().strip()
 
-        # Create .team-agent/agents/ directory and write manifest
-        (Path(clone_path) / ".team-agent" / "agents").mkdir(parents=True, exist_ok=True)
-        write_manifest(
-            clone_path,
-            project_id=str(project.id),
-            project_name=req.name,
-            env=settings.team_agent_env,
-        )
+            logger.info("Cloned %s to %s (branch: %s)", git_repo_url, clone_path, project.default_branch)
+
+            # Check if repo is already claimed by another project
+            claim_check = check_unclaimed(clone_path)
+            if claim_check.status == ManifestStatus.CLAIMED_PROD:
+                shutil.rmtree(Path(clone_path).parent)
+                raise HTTPException(status_code=409, detail=claim_check.reason)
+            if claim_check.status == ManifestStatus.CLAIMED_OTHER:
+                shutil.rmtree(Path(clone_path).parent)
+                raise HTTPException(status_code=409, detail=claim_check.reason)
+
+            # Create .team-agent/agents/ directory and write manifest
+            (Path(clone_path) / ".team-agent" / "agents").mkdir(parents=True, exist_ok=True)
+            write_manifest(
+                clone_path,
+                project_id=str(project.id),
+                project_name=req.name,
+                env=settings.team_agent_env,
+            )
 
         # Add creator as human member
         creator_member = ProjectMember(

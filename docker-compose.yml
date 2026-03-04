@@ -29,6 +29,7 @@ services:
     volumes:
       - ./db:/app/db
       - ./services/ai/src/ai/references:/app/references:ro
+      - gh_auth:/home/agent/.config/gh:ro
       - project_data:/data/projects
     depends_on:
       postgres:

@@ -18,20 +18,25 @@ export function CreateProjectModal({ open, onClose, onCreated }: CreateProjectMo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isNewRepo = !gitRepoUrl.trim();
+
   const handleSubmit = useCallback(async () => {
-    if (!name.trim() || !gitRepoUrl.trim()) return;
+    if (!name.trim()) return;
+    if (!isNewRepo && !gitRepoUrl.trim()) return;
 
     setLoading(true);
     setError(null);
 
     try {
+      const body: Record<string, string> = { name: name.trim() };
+      if (gitRepoUrl.trim()) {
+        body.git_repo_url = gitRepoUrl.trim();
+        if (branch.trim()) body.default_branch = branch.trim();
+      }
+
       const res = await apiFetch("/projects", {
         method: "POST",
-        body: JSON.stringify({
-          name: name.trim(),
-          git_repo_url: gitRepoUrl.trim(),
-          ...(branch.trim() && { default_branch: branch.trim() }),
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -51,7 +56,7 @@ export function CreateProjectModal({ open, onClose, onCreated }: CreateProjectMo
     } finally {
       setLoading(false);
     }
-  }, [name, gitRepoUrl, onCreated, onClose]);
+  }, [name, gitRepoUrl, branch, isNewRepo, onCreated, onClose]);
 
   if (!open) return null;
 
@@ -98,26 +103,31 @@ export function CreateProjectModal({ open, onClose, onCreated }: CreateProjectMo
                 onChange={(e) => setGitRepoUrl(e.target.value)}
                 disabled={loading}
               />
+              <span className={styles.hint}>
+                Leave empty to create a new GitHub repository
+              </span>
             </div>
 
-            <div className={styles.field}>
-              <label className={styles.label}>Branch</label>
-              <input
-                className={styles.input}
-                placeholder="main"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                disabled={loading}
-              />
-              <span className={styles.hint}>Leave empty to use the repository&apos;s default branch</span>
-            </div>
+            {!isNewRepo && (
+              <div className={styles.field}>
+                <label className={styles.label}>Branch</label>
+                <input
+                  className={styles.input}
+                  placeholder="main"
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
+                  disabled={loading}
+                />
+                <span className={styles.hint}>Leave empty to use the repository&apos;s default branch</span>
+              </div>
+            )}
 
             <button
               className={styles.submitBtn}
               onClick={handleSubmit}
-              disabled={loading || !name.trim() || !gitRepoUrl.trim()}
+              disabled={loading || !name.trim()}
             >
-              {loading ? <span className={styles.spinner} /> : "Create"}
+              {loading ? <span className={styles.spinner} /> : isNewRepo ? "Create New Repository" : "Create"}
             </button>
 
             {error && <p className={styles.error}>{error}</p>}

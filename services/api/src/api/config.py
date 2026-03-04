@@ -1,6 +1,9 @@
 import logging
 import logging.config
+from functools import cached_property
+from pathlib import Path
 
+import yaml
 from pydantic_settings import BaseSettings
 
 from .memory_log_handler import MemoryLogHandler
@@ -24,9 +27,24 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
     internal_api_key: str = "team-agent-internal"
 
+    # GitHub
+    github_owner: str = "bryan-zxc"
+
     @property
     def cookie_secure(self) -> bool:
         return self.team_agent_env == "prod"
+
+    @cached_property
+    def github_token(self) -> str | None:
+        """Read GitHub OAuth token from gh CLI auth config (mounted volume)."""
+        hosts_path = Path("/home/agent/.config/gh/hosts.yml")
+        if not hosts_path.exists():
+            return None
+        try:
+            hosts = yaml.safe_load(hosts_path.read_text())
+            return hosts.get("github.com", {}).get("oauth_token")
+        except Exception:
+            return None
 
 
 settings = Settings()
