@@ -19,12 +19,20 @@
   font-family: var(--font-body);
 }
 
+.workbenchCollapsed {
+  grid-template-columns: 48px 0px 1fr;
+}
+
 .sidePanel {
   grid-row: 3;
   background: var(--surface);
   border-right: 1px solid var(--border);
   overflow: hidden;
   transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+.sidePanelCollapsed {
+  border-right: none;
 }
 
 .editorArea {

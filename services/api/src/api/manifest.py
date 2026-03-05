@@ -83,6 +83,17 @@ def write_manifest(
     return manifest
 
 
+def update_manifest_board(clone_path: str | Path, board: dict) -> dict | None:
+    """Add or update the board section of an existing manifest."""
+    manifest = read_manifest(clone_path)
+    if manifest is None:
+        return None
+    manifest["board"] = board
+    manifest_file = Path(clone_path) / MANIFEST_PATH
+    manifest_file.write_text(json.dumps(manifest, indent=2) + "\n")
+    return manifest
+
+
 async def git_commit_and_push(clone_path: str | Path, message: str) -> tuple[bool, str]:
     """Stage .team-agent/, commit, and push. Returns (success, error_message)."""
     cwd = str(clone_path)

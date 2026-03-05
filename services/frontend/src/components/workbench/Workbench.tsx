@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DockviewReact, type DockviewApi, type DockviewReadyEvent, type IDockviewPanelProps, type IWatermarkPanelProps } from "dockview";
 import { TabIcon } from "./TabIcon";
@@ -10,6 +11,7 @@ import { ChatSidePanel } from "./ChatSidePanel";
 import { FilesSidePanel } from "./FilesSidePanel";
 import { MembersSidePanel } from "./MembersSidePanel";
 import { AdminSidePanel } from "./AdminSidePanel";
+import { FavouritesSidePanel } from "./FavouritesSidePanel";
 import { ChatTab } from "./ChatTab";
 import { FileTab } from "./FileTab";
 import { MemberProfileTab } from "./MemberProfileTab";
@@ -48,6 +50,7 @@ const components: Record<string, React.FunctionComponent<IDockviewPanelProps<any
 export function Workbench({ projectId }: WorkbenchProps) {
   const { user: authUser } = useAuth();
   const [activePanel, setActivePanel] = useState<Panel>("chat");
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [memberId, setMemberId] = useState<string | null>(null);
@@ -336,11 +339,21 @@ export function Workbench({ projectId }: WorkbenchProps) {
 
   const navigateToAdmin = useCallback((chatId?: string) => {
     setActivePanel("admin");
+    setPanelCollapsed(false);
     if (chatId) {
       // Defer so the admin panel has time to mount before we update params
       setTimeout(() => handleAdminChatClick(chatId), 0);
     }
   }, [handleAdminChatClick]);
+
+  const handlePanelChange = useCallback((panel: Panel) => {
+    if (panel === activePanel && !panelCollapsed) {
+      setPanelCollapsed(true);
+    } else {
+      setActivePanel(panel);
+      setPanelCollapsed(false);
+    }
+  }, [activePanel, panelCollapsed]);
 
   const handleReady = useCallback((event: DockviewReadyEvent) => {
     apiRef.current = event.api;
@@ -367,7 +380,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
   }, []);
 
   return (
-    <div className={styles.workbench}>
+    <div className={clsx(styles.workbench, panelCollapsed && styles.workbenchCollapsed)}>
       {project && (
         <ProjectTopBar
           project={project}
@@ -391,7 +404,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
 
       <ActivityBar
         activePanel={activePanel}
-        onPanelChange={setActivePanel}
+        onPanelChange={handlePanelChange}
         onOpenTerminal={openTerminal}
         coordinatorInitial={coordinator?.display_name?.[0]}
         coordinatorAvatar={coordinator?.avatar}
@@ -399,51 +412,55 @@ export function Workbench({ projectId }: WorkbenchProps) {
         adminBadge={adminNeedsAttention && activePanel !== "admin"}
       />
 
-      <aside className={styles.sidePanel}>
-        {activePanel === "chat" ? (
-          <ChatSidePanel
-            rooms={rooms}
-            activeRoomId={activeRoomId}
-            onRoomClick={openRoom}
-            onCreateRoom={isLocked ? undefined : handleCreateRoom}
-            onRenameRoom={isLocked ? undefined : handleRenameRoom}
-            currentMember={currentMember}
-            attentionRoomIds={attentionRoomIds}
-          />
-        ) : activePanel === "members" ? (
-          <MembersSidePanel
-            members={members}
-            onAddMember={isLocked ? undefined : () => setShowAddModal(true)}
-            onMemberClick={(id) => {
-              const api = apiRef.current;
-              if (!api) return;
+      <aside className={clsx(styles.sidePanel, panelCollapsed && styles.sidePanelCollapsed)}>
+        {!panelCollapsed && (
+          activePanel === "chat" ? (
+            <ChatSidePanel
+              rooms={rooms}
+              activeRoomId={activeRoomId}
+              onRoomClick={openRoom}
+              onCreateRoom={isLocked ? undefined : handleCreateRoom}
+              onRenameRoom={isLocked ? undefined : handleRenameRoom}
+              currentMember={currentMember}
+              attentionRoomIds={attentionRoomIds}
+            />
+          ) : activePanel === "favourites" ? (
+            <FavouritesSidePanel projectId={projectId} onFileClick={openFile} />
+          ) : activePanel === "members" ? (
+            <MembersSidePanel
+              members={members}
+              onAddMember={isLocked ? undefined : () => setShowAddModal(true)}
+              onMemberClick={(id) => {
+                const api = apiRef.current;
+                if (!api) return;
 
-              const panelId = `member-${id}`;
-              const existing = api.panels.find((p) => p.id === panelId);
-              if (existing) {
-                existing.api.setActive();
-                return;
-              }
+                const panelId = `member-${id}`;
+                const existing = api.panels.find((p) => p.id === panelId);
+                if (existing) {
+                  existing.api.setActive();
+                  return;
+                }
 
-              const member = members.find((m) => m.id === id);
-              if (!member) return;
+                const member = members.find((m) => m.id === id);
+                if (!member) return;
 
-              api.addPanel({
-                id: panelId,
-                component: "memberTab",
-                title: member.display_name,
-                params: { projectId, memberId: id, memberName: member.display_name },
-              });
-            }}
-          />
-        ) : activePanel === "admin" ? (
-          <AdminSidePanel
-            adminChats={adminChats}
-            onChatClick={handleAdminChatClick}
-            currentMember={currentMember}
-          />
-        ) : (
-          <FilesSidePanel projectId={projectId} onFileClick={openFile} />
+                api.addPanel({
+                  id: panelId,
+                  component: "memberTab",
+                  title: member.display_name,
+                  params: { projectId, memberId: id, memberName: member.display_name },
+                });
+              }}
+            />
+          ) : activePanel === "admin" ? (
+            <AdminSidePanel
+              adminChats={adminChats}
+              onChatClick={handleAdminChatClick}
+              currentMember={currentMember}
+            />
+          ) : (
+            <FilesSidePanel projectId={projectId} onFileClick={openFile} />
+          )
         )}
       </aside>
 
