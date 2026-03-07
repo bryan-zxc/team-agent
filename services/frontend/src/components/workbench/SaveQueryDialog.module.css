@@ -1,0 +1,258 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  width: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.closeBtn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.closeBtn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.body {
+  padding: 16px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.filenameRow {
+  display: flex;
+}
+
+.filenameInput {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  border: 1px solid var(--border);
+  border-radius: 12px 0 0 12px;
+  background: transparent;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.filenameInput:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.filenameInput::placeholder {
+  color: var(--text-muted);
+}
+
+.fileExtension {
+  padding: 10px 14px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 12px 12px 0;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.folderTree {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.folderItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+
+.folderItem:hover {
+  background: var(--surface-hover);
+}
+
+.folderItemSelected {
+  background: var(--accent-light);
+}
+
+.folderItemSelected:hover {
+  background: var(--accent-light);
+}
+
+.chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.chevronExpanded {
+  transform: rotate(90deg);
+}
+
+.chevronSpacer {
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.folderIcon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.rootIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.pathPreview {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  padding: 8px 12px;
+  background: var(--bg-subtle);
+  border-radius: 8px;
+}
+
+.pathPreview span {
+  color: var(--text-secondary);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.cancelBtn {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-body);
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cancelBtn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.saveBtn {
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  background: var(--accent);
+  color: var(--accent-text);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.saveBtn:hover {
+  background: var(--accent-hover);
+}
+
+.saveBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.saveBtnWarning {
+  background: var(--error);
+}
+
+.saveBtnWarning:hover {
+  background: var(--error);
+  opacity: 0.9;
+}
+
+.fileItem {
+  color: var(--text-secondary);
+}
+
+.fileIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.overwriteWarning {
+  font-size: 12px;
+  color: var(--error);
+  padding: 6px 12px;
+  border-radius: 8px;
+}

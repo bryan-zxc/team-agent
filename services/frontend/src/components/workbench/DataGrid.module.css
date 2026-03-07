@@ -1,0 +1,84 @@
+.container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.tableContainer {
+  flex: 1;
+  overflow: auto;
+}
+
+.thead {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.th {
+  flex: 1;
+  min-width: 120px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.th:hover {
+  background: var(--surface-hover);
+}
+
+.sortIndicator {
+  color: var(--text-muted);
+  font-size: 10px;
+  margin-left: 4px;
+}
+
+.tr {
+  display: flex;
+  width: 100%;
+}
+
+.tr:hover .td {
+  background: var(--surface-hover);
+}
+
+.td {
+  flex: 1;
+  min-width: 120px;
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.15s ease;
+}
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.loadingDot {
+  color: var(--accent);
+}

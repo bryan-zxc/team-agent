@@ -18,6 +18,9 @@ import { MemberProfileTab } from "./MemberProfileTab";
 import { TerminalTab } from "./TerminalTab";
 import { LiveViewTab } from "./LiveViewTab";
 import { AdminTab } from "./AdminTab";
+import { SqlTab } from "./SqlTab";
+import { DataTableTab } from "./DataTableTab";
+import { DataSidePanel } from "./DataSidePanel";
 import { ProjectTopBar } from "./ProjectTopBar";
 import { AddMemberModal } from "@/components/members/AddMemberModal";
 import { useAuth } from "@/hooks/useAuth";
@@ -45,6 +48,8 @@ const components: Record<string, React.FunctionComponent<IDockviewPanelProps<any
   terminalTab: TerminalTab,
   liveViewTab: LiveViewTab,
   adminTab: AdminTab,
+  sqlTab: SqlTab,
+  dataTableTab: DataTableTab,
 };
 
 export function Workbench({ projectId }: WorkbenchProps) {
@@ -158,27 +163,45 @@ export function Workbench({ projectId }: WorkbenchProps) {
     [rooms, memberId, members],
   );
 
+  const closeStaleTabsForPath = useCallback((filePath: string, keepPanelId: string) => {
+    const api = apiRef.current;
+    if (!api) return;
+    for (const panel of api.panels) {
+      if (panel.id === keepPanelId) continue;
+      const p = panel.params as any;
+      if (p?.filePath === filePath) {
+        api.removePanel(panel);
+      }
+    }
+  }, []);
+
   const openFile = useCallback(
     (filePath: string) => {
       const api = apiRef.current;
       if (!api) return;
 
+      // Check by panel ID first, then by filePath param (covers saved SQL tabs)
       const panelId = `file-${filePath}`;
-      const existing = api.panels.find((p) => p.id === panelId);
+      const existing =
+        api.panels.find((p) => p.id === panelId) ??
+        api.panels.find((p) => (p.params as any)?.filePath === filePath);
       if (existing) {
         existing.api.setActive();
         return;
       }
 
       const fileName = filePath.split("/").pop() ?? filePath;
+      const isSql = fileName.endsWith(".sql");
       api.addPanel({
         id: panelId,
-        component: "fileTab",
+        component: isSql ? "sqlTab" : "fileTab",
         title: fileName,
-        params: { filePath, projectId },
+        params: isSql
+          ? { filePath, projectId, database: "data", onSavedOverwrite: closeStaleTabsForPath }
+          : { filePath, projectId },
       });
     },
-    [projectId],
+    [projectId, closeStaleTabsForPath],
   );
 
   const handleCreateRoom = useCallback(
@@ -253,6 +276,44 @@ export function Workbench({ projectId }: WorkbenchProps) {
       params: { projectId },
     });
   }, [projectId]);
+
+  const openSqlTab = useCallback(
+    (database: string) => {
+      const api = apiRef.current;
+      if (!api) return;
+
+      const tabId = `sql-${Date.now()}`;
+      api.addPanel({
+        id: tabId,
+        component: "sqlTab",
+        title: "New Query",
+        params: { projectId, database, onSavedOverwrite: closeStaleTabsForPath },
+      });
+    },
+    [projectId, closeStaleTabsForPath],
+  );
+
+  const openTable = useCallback(
+    (database: string, tableName: string) => {
+      const api = apiRef.current;
+      if (!api) return;
+
+      const panelId = `table-${database}-${tableName}`;
+      const existing = api.panels.find((p) => p.id === panelId);
+      if (existing) {
+        existing.api.setActive();
+        return;
+      }
+
+      api.addPanel({
+        id: panelId,
+        component: "dataTableTab",
+        title: tableName,
+        params: { projectId, database, tableName },
+      });
+    },
+    [projectId],
+  );
 
   const closeAdminTab = useCallback(() => {
     const api = apiRef.current;
@@ -424,6 +485,8 @@ export function Workbench({ projectId }: WorkbenchProps) {
               currentMember={currentMember}
               attentionRoomIds={attentionRoomIds}
             />
+          ) : activePanel === "data" ? (
+            <DataSidePanel projectId={projectId} onOpenTable={openTable} onOpenSqlTab={openSqlTab} />
           ) : activePanel === "favourites" ? (
             <FavouritesSidePanel projectId={projectId} onFileClick={openFile} />
           ) : activePanel === "members" ? (

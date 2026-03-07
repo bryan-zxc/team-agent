@@ -176,6 +176,13 @@ async def create_project(req: CreateProjectRequest, creator: User = Depends(get_
         clone_path = str(CLONE_BASE / str(project.id) / "repo")
         Path(clone_path).parent.mkdir(parents=True, exist_ok=True)
 
+        # Provision project database
+        db_dir = Path(clone_path).parent / "databases"
+        db_dir.mkdir(parents=True, exist_ok=True)
+        import duckdb as _duckdb
+        _conn = _duckdb.connect(db_dir / "data.duckdb")
+        _conn.close()
+
         if creating_new:
             # Copy template scaffold and initialise repo
             shutil.copytree(str(PROJECT_TEMPLATE), clone_path)

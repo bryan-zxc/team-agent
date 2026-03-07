@@ -22,6 +22,7 @@ from .routes.users import router as users_router
 from .routes.skills import router as skills_router
 from .routes.terminals import router as terminals_router
 from .routes.admin import router as admin_router
+from .routes.data import router as data_router
 from .routes.diagnostics import router as diagnostics_router
 from .routes.workloads import router as workloads_router
 from .websocket.handler import router as ws_router
@@ -189,6 +190,7 @@ app.include_router(members_router)
 app.include_router(rooms_router)
 app.include_router(users_router)
 app.include_router(files_router)
+app.include_router(data_router)
 app.include_router(skills_router)
 app.include_router(terminals_router)
 app.include_router(workloads_router)

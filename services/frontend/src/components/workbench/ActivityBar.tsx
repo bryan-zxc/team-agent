@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { useTheme } from "@/hooks/useTheme";
 import styles from "./ActivityBar.module.css";
 
-export type Panel = "chat" | "files" | "favourites" | "members" | "admin";
+export type Panel = "chat" | "files" | "data" | "favourites" | "members" | "admin";
 
 type ActivityBarProps = {
   activePanel: Panel;
@@ -41,6 +41,18 @@ export function ActivityBar({ activePanel, onPanelChange, onOpenTerminal, coordi
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+          </svg>
+        </button>
+        <button
+          className={clsx(styles.icon, activePanel === "data" && styles.iconActive)}
+          onClick={() => onPanelChange("data")}
+          aria-label="Data"
+          title="Data"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3" />
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
           </svg>
         </button>
         <button
