@@ -104,7 +104,15 @@ async def execute_query(
 
                 # Only the last statement gets pagination and sorting
                 if idx == len(statements) - 1:
-                    conn.execute("CREATE OR REPLACE TEMP VIEW __last_result AS " + stmt)
+                    # Register the already-executed result as a temp table
+                    # to avoid running the statement a second time (which
+                    # would duplicate side effects for DML...RETURNING).
+                    conn.register("__last_result_rel", rel.fetchdf())
+                    conn.execute(
+                        "CREATE OR REPLACE TEMP TABLE __last_result AS "
+                        "SELECT * FROM __last_result_rel"
+                    )
+                    conn.unregister("__last_result_rel")
 
                     count_result = conn.execute(
                         "SELECT COUNT(*) FROM __last_result"

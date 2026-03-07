@@ -143,9 +143,13 @@ async def _init_and_push_repo(clone_path: str, clone_url: str) -> None:
         )
         _, stderr = await proc.communicate()
         if proc.returncode != 0:
+            err_msg = stderr.decode().strip()
+            # Sanitise: strip any token from URLs that git may echo
+            if token:
+                err_msg = err_msg.replace(token, "***")
             raise HTTPException(
                 status_code=422,
-                detail=f"Git init failed ({' '.join(cmd[:2])}): {stderr.decode().strip()}",
+                detail=f"Git init failed ({' '.join(cmd[:2])}): {err_msg}",
             )
 
     # Reset remote URL to clean version (no token)

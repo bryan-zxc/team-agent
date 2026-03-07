@@ -90,7 +90,7 @@ export function SqlTab({ params, api: panelApi }: IDockviewPanelProps<SqlTabPara
     )
       .then((r) => r.json())
       .then((data) => setSql(data.content))
-      .catch(() => {});
+      .catch(() => setError("Failed to load file"));
   }, [filePath, projectId]);
 
   useEffect(() => {
@@ -168,14 +168,6 @@ export function SqlTab({ params, api: panelApi }: IDockviewPanelProps<SqlTabPara
     executeQuery(undefined, 0, null, false);
   }, [executeQuery]);
 
-  const handleSave = useCallback(() => {
-    if (savePath) {
-      saveToPath(savePath);
-    } else {
-      setShowSaveDialog(true);
-    }
-  }, [savePath]);
-
   const saveToPath = useCallback(
     async (targetPath: string) => {
       setSaving(true);
@@ -200,6 +192,14 @@ export function SqlTab({ params, api: panelApi }: IDockviewPanelProps<SqlTabPara
     },
     [sql, projectId, panelApi],
   );
+
+  const handleSave = useCallback(() => {
+    if (savePath) {
+      saveToPath(savePath);
+    } else {
+      setShowSaveDialog(true);
+    }
+  }, [savePath, saveToPath]);
 
   // Keep refs in sync for Monaco actions
   runRef.current = handleRun;
