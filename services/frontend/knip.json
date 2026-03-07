@@ -1,6 +1,7 @@
 {
   "ignoreDependencies": [
-    "dockview-core"
+    "dockview-core",
+    "seti-icons"
   ],
   "ignoreExportsUsedInFile": true,
   "ignore": [
