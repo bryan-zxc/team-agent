@@ -27,10 +27,14 @@
     "seti-icons": "^0.0.4"
   },
   "devDependencies": {
+    "@eslint/compat": "^2.0.3",
     "@types/node": "^25",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.1.6",
+    "knip": "^5.85.0",
     "typescript": "^5.9.3"
   }
 }
