@@ -13,8 +13,10 @@ async def list_users():
     """List all global users (for the landing page user picker)."""
     async with async_session() as session:
         users = (
-            await session.execute(select(User).order_by(User.display_name))
-        ).scalars().all()
+            (await session.execute(select(User).order_by(User.display_name)))
+            .scalars()
+            .all()
+        )
         return [
             {
                 "id": str(u.id),

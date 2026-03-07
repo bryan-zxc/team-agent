@@ -21,4 +21,6 @@ class Workload(UUIDPrimaryKey, TimestampMixin, Base):
     description: Mapped[str] = mapped_column(String, nullable=False)
     worktree_branch: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     dispatch_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    permission_mode: Mapped[str] = mapped_column(String, nullable=False, default="default", server_default="default")
+    permission_mode: Mapped[str] = mapped_column(
+        String, nullable=False, default="default", server_default="default"
+    )

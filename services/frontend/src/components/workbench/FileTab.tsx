@@ -60,6 +60,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const fileName = filePath.split("/").pop() ?? "";
   const language = getLanguage(fileName);
@@ -129,6 +130,10 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [editing, handleSave]);
+
+  useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage({ type: "theme", theme }, "*");
+  }, [theme]);
 
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     monacoRef.current = monaco;
@@ -277,9 +282,11 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
         ) : (
           <div className={styles.htmlPreview}>
             <iframe
+              ref={iframeRef}
               src={`${API_URL}/projects/${projectId}/raw/${filePath}`}
               sandbox="allow-scripts allow-same-origin"
               title={fileName}
+              onLoad={() => iframeRef.current?.contentWindow?.postMessage({ type: "theme", theme }, "*")}
             />
           </div>
         )

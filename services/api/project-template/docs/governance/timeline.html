@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timeline</title>
+<style>
+:root {
+  --bg: #F5F2ED;
+  --surface: #FFFFFF;
+  --surface-hover: #F8F6F2;
+  --accent: #7B9E87;
+  --accent-light: #E4EDE7;
+  --warm: #C4956A;
+  --warm-light: #F5EDE4;
+  --text-primary: #2C2A27;
+  --text-secondary: #7A756D;
+  --text-muted: #B0AAA0;
+  --border: #E4E0D8;
+  --border-light: #EEEAE4;
+  --error: #c44;
+  --shadow-sm: 0 1px 3px rgba(44,42,39,0.04);
+  --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+
+  --status-backlog: #B0AAA0;
+  --status-ready: #D4A574;
+  --status-inprogress: #7B9E87;
+  --status-inreview: #9B8EC4;
+  --status-done: #6BAF8D;
+}
+html.dark {
+  --bg: #161514;
+  --surface: #222120;
+  --surface-hover: #2A2928;
+  --accent: #8FB39A;
+  --accent-light: rgba(143,179,154,0.12);
+  --warm: #D4A574;
+  --warm-light: rgba(212,165,116,0.12);
+  --text-primary: #E0DCD6;
+  --text-secondary: #8E8983;
+  --text-muted: #555250;
+  --border: #2E2D2B;
+  --border-light: #262524;
+  --error: #d66;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.15);
+  --status-backlog: #555250;
+  --status-ready: #D4A574;
+  --status-inprogress: #8FB39A;
+  --status-inreview: #A89BD4;
+  --status-done: #7CC49E;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.header h1 { font-size: 15px; font-weight: 600; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn:hover { background: var(--surface-hover); }
+.btn-icon {
+  padding: 6px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+}
+.btn-icon:hover { background: var(--surface-hover); color: var(--text-primary); }
+.zoom-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.zoom-group button {
+  padding: 4px 10px;
+  border: none;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  line-height: 1;
+}
+.zoom-group button:hover { background: var(--surface-hover); }
+.zoom-group .zoom-label {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  border-left: 1px solid var(--border-light);
+  border-right: 1px solid var(--border-light);
+  min-width: 36px;
+  text-align: center;
+}
+
+/* Timeline container — full width, no label column */
+.chart-area {
+  height: calc(100vh - 49px);
+  overflow: auto;
+}
+.chart-inner {
+  position: relative;
+  min-height: 100%;
+}
+
+/* Date header */
+.date-header {
+  position: sticky;
+  top: 0;
+  height: 40px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  background: var(--surface);
+  z-index: 2;
+}
+.date-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--border-light);
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.date-cell.month-start {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.date-cell.today {
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Rows */
+.chart-row {
+  height: 36px;
+  position: relative;
+  border-bottom: 1px solid var(--border-light);
+}
+.chart-row:nth-child(even) {
+  background: rgba(0,0,0,0.015);
+}
+html.dark .chart-row:nth-child(even) {
+  background: rgba(255,255,255,0.015);
+}
+
+/* Bars and dots */
+.bar {
+  position: absolute;
+  top: 8px;
+  height: 20px;
+  border-radius: 4px;
+  opacity: 0.85;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bar:hover { opacity: 1; }
+.dot {
+  position: absolute;
+  top: 12px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  opacity: 0.85;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  transform: translateX(-6px);
+}
+.dot:hover { opacity: 1; }
+.dot-label {
+  position: absolute;
+  top: 9px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Today line */
+.today-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  opacity: 0.5;
+  z-index: 1;
+}
+
+/* Status colours */
+.status-backlog { background: var(--status-backlog); }
+.status-ready { background: var(--status-ready); }
+.status-inprogress { background: var(--status-inprogress); }
+.status-inreview { background: var(--status-inreview); }
+.status-done { background: var(--status-done); }
+
+.loading, .error-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 14px;
+}
+.loading { color: var(--text-muted); }
+.error-state { color: var(--error); }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">Loading timeline...</div></div>
+
+<script>
+let dayWidth = 32;
+const ZOOM_LEVELS = [12, 18, 24, 32, 48, 64, 96];
+let zoomIndex = ZOOM_LEVELS.indexOf(dayWidth);
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+let cachedItems = [];
+
+function statusClass(status) {
+  const map = {
+    'Backlog': 'status-backlog',
+    'Ready': 'status-ready',
+    'In progress': 'status-inprogress',
+    'In review': 'status-inreview',
+    'Done': 'status-done',
+  };
+  return map[status] || 'status-backlog';
+}
+
+function getType(item) {
+  return (item.labels || []).includes('epic') ? 'epic' : 'task';
+}
+
+function parseDate(str) {
+  if (!str) return null;
+  const d = new Date(str + 'T00:00:00');
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function daysBetween(a, b) {
+  return Math.round((b - a) / (1000 * 60 * 60 * 24));
+}
+
+function formatDate(d) {
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
+function zoomIn() {
+  if (zoomIndex < ZOOM_LEVELS.length - 1) {
+    zoomIndex++;
+    dayWidth = ZOOM_LEVELS[zoomIndex];
+    render(cachedItems);
+  }
+}
+
+function zoomOut() {
+  if (zoomIndex > 0) {
+    zoomIndex--;
+    dayWidth = ZOOM_LEVELS[zoomIndex];
+    render(cachedItems);
+  }
+}
+
+async function init() {
+  try {
+    const manifestResp = await fetch('../../.team-agent/manifest.json');
+    if (!manifestResp.ok) throw new Error('Could not load manifest');
+    const manifest = await manifestResp.json();
+
+    const boardResp = await fetch(`/projects/${manifest.project_id}/board`);
+    if (!boardResp.ok) throw new Error('Could not load board data');
+    const data = await boardResp.json();
+
+    cachedItems = data.items || [];
+    render(cachedItems);
+  } catch (err) {
+    document.getElementById('app').innerHTML =
+      `<div class="error-state">${err.message}</div>`;
+  }
+}
+
+function render(items) {
+  cachedItems = items;
+
+  const dated = [];
+  const undated = [];
+
+  items.forEach(item => {
+    const start = parseDate(item.startDate);
+    const end = parseDate(item.targetDate);
+    if (start || end) {
+      dated.push({ ...item, _start: start, _end: end });
+    } else {
+      undated.push(item);
+    }
+  });
+
+  if (dated.length === 0 && undated.length === 0) {
+    document.getElementById('app').innerHTML =
+      '<div class="loading">No items on the board yet.</div>';
+    return;
+  }
+
+  // Calculate date range
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  let minDate = new Date(today);
+  let maxDate = new Date(today);
+
+  dated.forEach(item => {
+    if (item._start && item._start < minDate) minDate = new Date(item._start);
+    if (item._end && item._end > maxDate) maxDate = new Date(item._end);
+    if (item._start && !item._end && item._start > maxDate) maxDate = new Date(item._start);
+  });
+
+  // Padding
+  minDate.setDate(minDate.getDate() - 14);
+  maxDate.setDate(maxDate.getDate() + 14);
+
+  const totalDays = daysBetween(minDate, maxDate) + 1;
+  const chartWidth = totalDays * dayWidth;
+
+  // Sort: epics first, then by start date
+  dated.sort((a, b) => {
+    const ta = getType(a) === 'epic' ? 0 : 1;
+    const tb = getType(b) === 'epic' ? 0 : 1;
+    if (ta !== tb) return ta - tb;
+    const da = a._start || a._end || today;
+    const db = b._start || b._end || today;
+    return da - db;
+  });
+
+  // Date header
+  let dateHeaderHtml = '';
+  for (let i = 0; i < totalDays; i++) {
+    const d = new Date(minDate);
+    d.setDate(d.getDate() + i);
+    const isToday = d.getTime() === today.getTime();
+    const isMonthStart = d.getDate() === 1;
+    const showLabel = dayWidth >= 24 ? (i % 7 === 0 || isToday || isMonthStart) :
+                      dayWidth >= 18 ? (i % 14 === 0 || isToday || isMonthStart) :
+                      (isMonthStart || isToday);
+    const label = isMonthStart ? `${MONTHS[d.getMonth()]} ${d.getFullYear()}` :
+                  showLabel ? formatDate(d) : '';
+    const cls = isToday ? 'date-cell today' : isMonthStart ? 'date-cell month-start' : 'date-cell';
+    dateHeaderHtml += `<div class="${cls}" style="width:${dayWidth}px;min-width:${dayWidth}px">${label}</div>`;
+  }
+
+  // Chart rows
+  let chartRowsHtml = '';
+
+  dated.forEach(item => {
+    const type = getType(item);
+    const cls = statusClass(item.status);
+    let barHtml = '';
+
+    if (type === 'epic' && item._start && item._end) {
+      const left = daysBetween(minDate, item._start) * dayWidth;
+      const width = Math.max((daysBetween(item._start, item._end) + 1) * dayWidth, dayWidth);
+      barHtml = `<div class="bar ${cls}" style="left:${left}px;width:${width}px" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>`;
+    } else if (type === 'epic' && item._start) {
+      const left = daysBetween(minDate, item._start) * dayWidth;
+      const endDate = today > item._start ? today : item._start;
+      const width = Math.max((daysBetween(item._start, endDate) + 1) * dayWidth, dayWidth);
+      barHtml = `<div class="bar ${cls}" style="left:${left}px;width:${width}px" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>`;
+    } else if (type === 'epic' && item._end) {
+      const left = daysBetween(minDate, item._end) * dayWidth + dayWidth / 2;
+      barHtml = `<div class="dot ${cls}" style="left:${left}px" title="${escapeHtml(item.title)}"></div>` +
+                `<span class="dot-label" style="left:${left + 10}px">${escapeHtml(item.title)}</span>`;
+    } else {
+      const d = item._end || item._start;
+      if (d) {
+        const left = daysBetween(minDate, d) * dayWidth + dayWidth / 2;
+        barHtml = `<div class="dot ${cls}" style="left:${left}px" title="${escapeHtml(item.title)}"></div>` +
+                  `<span class="dot-label" style="left:${left + 10}px">${escapeHtml(item.title)}</span>`;
+      }
+    }
+
+    chartRowsHtml += `<div class="chart-row">${barHtml}</div>`;
+  });
+
+  // Today line
+  const todayOffset = daysBetween(minDate, today) * dayWidth + dayWidth / 2;
+  const todayLineHtml = `<div class="today-line" style="left:${todayOffset}px"></div>`;
+
+  const zoomPct = Math.round((dayWidth / 32) * 100);
+
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <h1>Timeline</h1>
+      <div class="header-actions">
+        <div class="zoom-group">
+          <button onclick="zoomOut()" title="Zoom out">&minus;</button>
+          <span class="zoom-label">${zoomPct}%</span>
+          <button onclick="zoomIn()" title="Zoom in">+</button>
+        </div>
+        <button class="btn" onclick="location.reload()" title="Refresh">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+    <div class="chart-area">
+      <div class="chart-inner" style="width:${chartWidth}px">
+        <div class="date-header">${dateHeaderHtml}</div>
+        ${todayLineHtml}
+        ${chartRowsHtml}
+      </div>
+    </div>`;
+
+  // Scroll to today
+  const chartArea = document.querySelector('.chart-area');
+  if (chartArea) {
+    chartArea.scrollLeft = Math.max(0, todayOffset - chartArea.clientWidth / 2);
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+// Sync theme with parent window via postMessage
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'theme') {
+    document.documentElement.classList.toggle('dark', e.data.theme === 'dark');
+  }
+});
+
+init();
+</script>
+</body>
+</html>

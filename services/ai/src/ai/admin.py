@@ -67,14 +67,20 @@ async def fetch_admin_chat_data(chat_id: str) -> dict | None:
 
 
 async def _stop_other_admin_sessions(
-    project_id: str, exclude_chat_id: str, redis_client: aioredis.Redis,
+    project_id: str,
+    exclude_chat_id: str,
+    redis_client: aioredis.Redis,
 ) -> None:
     """Stop any other active admin session for the same project."""
     for session_key, session in list(_sessions.items()):
         if session.get("session_type") != "admin":
             continue
         if session.get("project_id") == project_id and session_key != exclude_chat_id:
-            logger.info("Stopping previous admin session %s for project %s", session_key[:8], project_id[:8])
+            logger.info(
+                "Stopping previous admin session %s for project %s",
+                session_key[:8],
+                project_id[:8],
+            )
             await stop_session(session_key, "completed", redis_client)
 
 
@@ -92,31 +98,38 @@ async def start_admin_session(
     project_id = chat_data.get("project_id", "")
 
     if chat_id in _sessions:
-        logger.warning("Session already active for admin chat %s, skipping", chat_id[:8])
+        logger.warning(
+            "Session already active for admin chat %s, skipping", chat_id[:8]
+        )
         return
 
     # One active admin session per project
     await _stop_other_admin_sessions(project_id, chat_id, redis_client)
 
     await update_chat_status(chat_id, "running")
-    await publish_status_event(redis_client, chat_id, "running", room_id, chat_type="admin")
+    await publish_status_event(
+        redis_client, chat_id, "running", room_id, chat_type="admin"
+    )
 
     # Pre-register session
     is_resume = bool(chat_data.get("session_id"))
 
-    register_session(chat_id, {
-        "session_type": "admin",
-        "client": None,
-        "task": None,
-        "chat_id": chat_id,
-        "member_id": chat_data["member_id"],
-        "display_name": chat_data["display_name"],
-        "room_id": room_id,
-        "clone_path": clone_path,
-        "project_id": project_id,
-        "session_approvals": set(),
-        "pending_approvals": {},
-    })
+    register_session(
+        chat_id,
+        {
+            "session_type": "admin",
+            "client": None,
+            "task": None,
+            "chat_id": chat_id,
+            "member_id": chat_data["member_id"],
+            "display_name": chat_data["display_name"],
+            "room_id": room_id,
+            "clone_path": clone_path,
+            "project_id": project_id,
+            "session_approvals": set(),
+            "pending_approvals": {},
+        },
+    )
 
     can_use_tool = make_can_use_tool(
         session_key=chat_id,
@@ -131,7 +144,9 @@ async def start_admin_session(
 
     # Load coordinator profile for system prompt
     coordinator_name = chat_data["display_name"]
-    profile_path = Path(clone_path) / ".team-agent" / "agents" / f"{coordinator_name.lower()}.md"
+    profile_path = (
+        Path(clone_path) / ".team-agent" / "agents" / f"{coordinator_name.lower()}.md"
+    )
     agent_profile = profile_path.read_text() if profile_path.exists() else ""
 
     system_prompt = {"type": "preset", "preset": "claude_code"}
@@ -153,7 +168,7 @@ async def start_admin_session(
     options = ClaudeAgentOptions(
         cwd=clone_path,
         resume=chat_data.get("session_id") if is_resume else None,
-        system_prompt=system_prompt,
+        system_prompt=system_prompt,  # type: ignore[reportArgumentType]
         permission_mode=permission_mode,
         can_use_tool=can_use_tool,
         setting_sources=["project", "user"],
@@ -166,10 +181,14 @@ async def start_admin_session(
         client = ClaudeSDKClient(options)
         await client.connect()
     except Exception:
-        logger.exception("Failed to connect ClaudeSDKClient for admin chat %s", chat_id[:8])
+        logger.exception(
+            "Failed to connect ClaudeSDKClient for admin chat %s", chat_id[:8]
+        )
         unregister_session(chat_id)
         await update_chat_status(chat_id, "needs_attention")
-        await publish_status_event(redis_client, chat_id, "needs_attention", room_id, chat_type="admin")
+        await publish_status_event(
+            redis_client, chat_id, "needs_attention", room_id, chat_type="admin"
+        )
         return
 
     # Finish registration and start relay
@@ -182,7 +201,9 @@ async def start_admin_session(
     _sessions[chat_id]["task"] = relay_task
 
     if is_resume:
-        logger.info("Resumed admin session %s for chat %s", chat_data["session_id"], chat_id[:8])
+        logger.info(
+            "Resumed admin session %s for chat %s", chat_data["session_id"], chat_id[:8]
+        )
     else:
         logger.info("Started admin session for chat %s", chat_id[:8])
 

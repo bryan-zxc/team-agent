@@ -1,6 +1,13 @@
 FROM python:3.13-slim
 
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y git curl && \
+    # GitHub CLI
+    mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list && \
+    apt-get update && apt-get install -y gh && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -15,7 +22,8 @@ RUN uv sync --frozen --no-dev
 COPY . .
 
 RUN chown -R agent:agent /app && \
-    mkdir -p /data/projects && chown agent:agent /data/projects
+    mkdir -p /data/projects && chown agent:agent /data/projects && \
+    mkdir -p /home/agent/.config/gh && chown agent:agent /home/agent/.config/gh
 
 USER agent
 

@@ -39,12 +39,16 @@ def _profile_path(clone_path: str, display_name: str) -> Path:
 async def list_members(project_id: uuid.UUID):
     async with async_session() as session:
         members = (
-            await session.execute(
-                select(ProjectMember)
-                .where(ProjectMember.project_id == project_id)
-                .order_by(ProjectMember.created_at)
+            (
+                await session.execute(
+                    select(ProjectMember)
+                    .where(ProjectMember.project_id == project_id)
+                    .order_by(ProjectMember.created_at)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return [
             {
                 "id": str(m.id),
@@ -62,23 +66,24 @@ async def available_users(project_id: uuid.UUID):
     """Users not yet added as members of this project."""
     async with async_session() as session:
         existing_user_ids = (
-            await session.execute(
-                select(ProjectMember.user_id).where(
-                    ProjectMember.project_id == project_id,
-                    ProjectMember.user_id.isnot(None),
+            (
+                await session.execute(
+                    select(ProjectMember.user_id).where(
+                        ProjectMember.project_id == project_id,
+                        ProjectMember.user_id.isnot(None),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         query = select(User).order_by(User.display_name)
         if existing_user_ids:
             query = query.where(User.id.notin_(existing_user_ids))
 
         users = (await session.execute(query)).scalars().all()
-        return [
-            {"id": str(u.id), "display_name": u.display_name}
-            for u in users
-        ]
+        return [{"id": str(u.id), "display_name": u.display_name} for u in users]
 
 
 @router.post("/projects/{project_id}/members/human")
@@ -130,7 +135,10 @@ async def generate_ai_member(
             raise HTTPException(status_code=502, detail="AI service unavailable")
 
     if resp.status_code != 200:
-        raise HTTPException(status_code=resp.status_code, detail=resp.json().get("detail", "Agent generation failed"))
+        raise HTTPException(
+            status_code=resp.status_code,
+            detail=resp.json().get("detail", "Agent generation failed"),
+        )
 
     return resp.json()
 

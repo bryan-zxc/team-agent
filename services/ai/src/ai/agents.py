@@ -25,7 +25,9 @@ async def _get_clone_path(project_name: str) -> Path:
             "SELECT clone_path FROM projects WHERE name = $1", project_name
         )
         if not row:
-            raise RuntimeError(f"Project '{project_name}' not found or has no clone_path")
+            raise RuntimeError(
+                f"Project '{project_name}' not found or has no clone_path"
+            )
         return Path(row)
     finally:
         await conn.close()
@@ -55,7 +57,9 @@ async def _get_existing_agent_names(project_name: str) -> list[str]:
 
 
 async def _insert_project_member(
-    project_name: str, agent_name: str, member_type: str = "ai",
+    project_name: str,
+    agent_name: str,
+    member_type: str = "ai",
     avatar: str | None = None,
 ) -> uuid.UUID:
     """Insert a new project member into the database. Returns the member id."""
@@ -131,7 +135,9 @@ async def generate_agent_profile(
         logger.info("Loaded avatar for %s from %s", result.name, avatar_filename)
 
     # Insert into database as project member
-    member_id = await _insert_project_member(project_name, result.name, member_type, avatar=avatar)
+    member_id = await _insert_project_member(
+        project_name, result.name, member_type, avatar=avatar
+    )
 
     # Write markdown file into the project's cloned repo
     clone_path = await _get_clone_path(project_name)
@@ -157,7 +163,8 @@ async def generate_agent_profile(
 
     # Commit and push the profile (and manifest if present) to the remote
     await _git_commit_and_push(
-        clone_path, f"Add agent profile: {result.name}",
+        clone_path,
+        f"Add agent profile: {result.name}",
     )
 
     logger.info("Generated agent profile: %s", file_path)
@@ -172,12 +179,14 @@ async def generate_agent_profile(
 async def _run_git(*args: str, cwd: Path) -> tuple[int, str, str]:
     """Run a git command and return (returncode, stdout, stderr)."""
     proc = await asyncio.create_subprocess_exec(
-        "git", *args,
+        "git",
+        *args,
         cwd=str(cwd),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
     stdout, stderr = await proc.communicate()
+    assert proc.returncode is not None
     return proc.returncode, stdout.decode().strip(), stderr.decode().strip()
 
 
@@ -189,9 +198,13 @@ async def _git_commit_and_push(clone_path: Path, message: str) -> None:
         return
 
     rc, _, err = await _run_git(
-        "-c", "user.name=team-agent",
-        "-c", "user.email=noreply@team-agent",
-        "commit", "-m", message,
+        "-c",
+        "user.name=team-agent",
+        "-c",
+        "user.email=noreply@team-agent",
+        "commit",
+        "-m",
+        message,
         cwd=clone_path,
     )
     if rc != 0:

@@ -30,7 +30,7 @@ Read `docs/adr/adr.md` and all existing ADR files. Check whether the new decisio
 
 - Present the conflict to the user: the new decision vs the existing ADR
 - Ask the user how to proceed: supersede the old ADR, modify the new one, or skip
-- If superseding: delete the old ADR file and its row from `docs/adr/adr.md`
+- If superseding: delete the old ADR file and its row from `docs/adr/adr.md`. The new ADR must stand on its own - do not reference the superseded ADR or describe what changed
 
 ### 4. Determine the next ADR number
 
@@ -45,29 +45,30 @@ Create `docs/adr/NNNN-kebab-case-title.md` with this structure:
 
 ## Context
 
-What prompted this decision. What existed before. What constraints applied.
-Include historical context so the reader understands the full picture without
-needing to find prior ADRs.
+Why this decision exists - the problem space, constraints, and requirements that make this decision necessary. Describe the situation a developer faces when this decision is relevant.
+
+DO NOT describe what existed before, what was changed, or migration history. ADRs are forward-looking rules, not change logs. A developer reading this ADR should understand what rule to follow and why, not what the codebase used to look like.
 
 ## Alternatives Considered
 
 (Optional — only include if alternatives were actually evaluated.)
 
-What other options were considered, with brief pros/cons for each.
+Other approaches that were considered, with brief rationale for why each was not chosen. It is irrelevant whether an alternative is something the project previously used - just articulate why it is not the best choice as an approach.
 
 ## Decision
 
-What was decided and why. Be specific — name technologies, patterns, trade-offs.
+What the decision is and why. Be specific - name technologies, patterns, trade-offs. State the end point outcome (what IS), not the journey (what changed).
 
 ## Consequences
 
-What follows — positive and negative. What becomes easier, what becomes harder.
+What follows from this decision. What it enables, what constraints it imposes.
 ```
 
 Rules:
 - No date inside the ADR file — the date lives only in `docs/adr/adr.md`
 - Alternatives Considered section is optional — omit it entirely if no alternatives were evaluated
 - Use Australian English spelling
+- Never describe history - ADRs state teh current decision, not how we got here. A reader should be able to check compliance against the ADR without landing on content regarding out dated decisions which is important as AI is doing the documentation work.
 
 ### 6. Update the index
 

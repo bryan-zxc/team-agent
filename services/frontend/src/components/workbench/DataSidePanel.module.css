@@ -1,0 +1,163 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.header {
+  padding: 16px 16px 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logoMark {
+  width: 28px;
+  height: 28px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-text);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.logoText {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 16px 8px;
+}
+
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.newQueryBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.newQueryBtn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px;
+}
+
+.emptyState {
+  padding: 12px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.dbItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.dbItem:hover {
+  background: var(--surface-hover);
+}
+
+.chevron {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+  color: var(--text-muted);
+}
+
+.dbIcon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.dbLabel {
+  font-size: 13px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.tableCount {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.tableItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 34px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.tableItem:hover {
+  background: var(--surface-hover);
+}
+
+.tableIcon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.tableName {
+  font-size: 12px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.refreshBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 8px;
+  padding: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.refreshBtn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}

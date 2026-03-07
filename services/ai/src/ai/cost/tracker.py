@@ -28,15 +28,17 @@ class CostTracker:
         try:
             await self._redis.publish(
                 "cost:usage",
-                json.dumps({
-                    "model": model,
-                    "provider": provider,
-                    "input_tokens": input_tokens,
-                    "output_tokens": output_tokens,
-                    "cost": cost,
-                    "request_type": request_type,
-                    "caller": caller,
-                }),
+                json.dumps(
+                    {
+                        "model": model,
+                        "provider": provider,
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "cost": cost,
+                        "request_type": request_type,
+                        "caller": caller,
+                    }
+                ),
             )
         except Exception:
             logger.exception("Failed to publish LLM cost")
@@ -64,18 +66,20 @@ class CostTracker:
         try:
             await self._redis.publish(
                 "cost:usage",
-                json.dumps({
-                    "model": model,
-                    "provider": "claude_sdk",
-                    "input_tokens": input_tokens,
-                    "output_tokens": output_tokens,
-                    "cost": total_cost_usd,
-                    "request_type": "agent_query",
-                    "caller": caller,
-                    "session_id": session_id,
-                    "num_turns": num_turns,
-                    "duration_ms": duration_ms,
-                }),
+                json.dumps(
+                    {
+                        "model": model,
+                        "provider": "claude_sdk",
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "cost": total_cost_usd,
+                        "request_type": "agent_query",
+                        "caller": caller,
+                        "session_id": session_id,
+                        "num_turns": num_turns,
+                        "duration_ms": duration_ms,
+                    }
+                ),
             )
         except Exception:
             logger.exception("Failed to publish SDK cost")

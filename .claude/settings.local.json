@@ -89,7 +89,11 @@
       "WebFetch(domain:docs.github.com)",
       "Bash(echo === Labubu Wikipedia ===:*)",
       "Bash(PLAYWRIGHT_MCP_SANDBOX=false npx:*)",
-      "Bash(PLAYWRIGHT_MCP_SANDBOX=false playwright-cli:*)"
+      "Bash(PLAYWRIGHT_MCP_SANDBOX=false playwright-cli:*)",
+      "Bash(psql:*)",
+      "Bash(gh pr:*)",
+      "Bash(ruff check:*)",
+      "Bash(ruff format:*)"
     ],
     "deny": [
       "AskUserQuestion"

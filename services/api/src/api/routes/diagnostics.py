@@ -19,9 +19,13 @@ router = APIRouter(prefix="/diagnostics")
 
 @router.get("/logs")
 async def get_logs(
-    level: Optional[str] = Query(None, description="Filter by log level (e.g. ERROR, WARNING)"),
+    level: Optional[str] = Query(
+        None, description="Filter by log level (e.g. ERROR, WARNING)"
+    ),
     limit: int = Query(100, ge=1, le=1000),
-    since: Optional[datetime] = Query(None, description="ISO 8601 timestamp lower bound"),
+    since: Optional[datetime] = Query(
+        None, description="ISO 8601 timestamp lower bound"
+    ),
 ):
     """Return recent application logs from the in-memory ring buffer."""
     return memory_handler.get_records(level=level, limit=limit, since=since)
@@ -57,10 +61,14 @@ async def list_rooms(
 
 @router.get("/chats")
 async def list_chats(
-    status: Optional[str] = Query(None, description="Filter by status (e.g. running, investigating, completed)"),
+    status: Optional[str] = Query(
+        None, description="Filter by status (e.g. running, investigating, completed)"
+    ),
     room_id: Optional[uuid.UUID] = Query(None, description="Filter by room ID"),
     project_id: Optional[uuid.UUID] = Query(None, description="Filter by project ID"),
-    type: Optional[str] = Query(None, description="Filter by chat type (e.g. primary, workload, admin)"),
+    type: Optional[str] = Query(
+        None, description="Filter by chat type (e.g. primary, workload, admin)"
+    ),
     limit: int = Query(50, ge=1, le=200),
 ):
     """List chats with filtering. Returns chat records with room name, owner name, and workload title."""
@@ -129,7 +137,9 @@ async def get_chat_diagnostics(
         project = None
         if room:
             project = (
-                await session.execute(select(Project).where(Project.id == room.project_id))
+                await session.execute(
+                    select(Project).where(Project.id == room.project_id)
+                )
             ).scalar_one_or_none()
 
         owner = None
@@ -189,7 +199,9 @@ async def get_chat_diagnostics(
             "name": room.name,
             "type": room.type,
             "created_at": room.created_at.isoformat(),
-        } if room else None,
+        }
+        if room
+        else None,
         "project": {
             "id": str(project.id),
             "name": project.name,
@@ -197,12 +209,16 @@ async def get_chat_diagnostics(
             "clone_path": project.clone_path,
             "default_branch": project.default_branch,
             "is_locked": project.is_locked,
-        } if project else None,
+        }
+        if project
+        else None,
         "owner": {
             "id": str(owner.id),
             "display_name": owner.display_name,
             "type": owner.type,
-        } if owner else None,
+        }
+        if owner
+        else None,
         "workload": {
             "id": str(workload.id),
             "main_chat_id": str(workload.main_chat_id),
@@ -213,7 +229,9 @@ async def get_chat_diagnostics(
             "dispatch_id": workload.dispatch_id,
             "permission_mode": workload.permission_mode,
             "created_at": workload.created_at.isoformat(),
-        } if workload else None,
+        }
+        if workload
+        else None,
         "messages": messages,
         "message_count": len(messages),
     }

@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 def _get_redis():
     from ..main import redis_client
+
     return redis_client
 
 
@@ -60,7 +61,9 @@ async def terminal_websocket(websocket: WebSocket, session_id: str):
         except asyncio.CancelledError:
             pass
         except Exception:
-            logger.exception("Terminal output relay error for session %s", session_id[:8])
+            logger.exception(
+                "Terminal output relay error for session %s", session_id[:8]
+            )
 
     async def relay_input():
         """Read from WebSocket → publish to Redis terminal:input."""
@@ -76,7 +79,9 @@ async def terminal_websocket(websocket: WebSocket, session_id: str):
         except asyncio.CancelledError:
             pass
         except Exception:
-            logger.exception("Terminal input relay error for session %s", session_id[:8])
+            logger.exception(
+                "Terminal input relay error for session %s", session_id[:8]
+            )
 
     # Run both relays concurrently — when either stops, cancel the other
     output_task = asyncio.create_task(relay_output())

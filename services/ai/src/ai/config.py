@@ -8,7 +8,9 @@ from .memory_log_handler import MemoryLogHandler
 
 class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379"
-    database_url: str = "postgresql+asyncpg://teamagent:teamagent_dev@postgres:5432/teamagent"
+    database_url: str = (
+        "postgresql+asyncpg://teamagent:teamagent_dev@postgres:5432/teamagent"
+    )
     model: str = "claude-opus-4-6"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3-pro-preview"
@@ -37,25 +39,29 @@ def setup_logging() -> None:
             "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
         }
 
-    logging.config.dictConfig({
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "default": formatter_config,
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "default",
+    logging.config.dictConfig(
+        {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "default": formatter_config,
             },
-        },
-        "root": {
-            "level": settings.log_level,
-            "handlers": ["console"],
-        },
-    })
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "default",
+                },
+            },
+            "root": {
+                "level": settings.log_level,
+                "handlers": ["console"],
+            },
+        }
+    )
 
-    memory_handler.setFormatter(logging.Formatter(
-        "%(asctime)s %(levelname)s %(name)s %(message)s",
-    ))
+    memory_handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s %(message)s",
+        )
+    )
     logging.getLogger().addHandler(memory_handler)

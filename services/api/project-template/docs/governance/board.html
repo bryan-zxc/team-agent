@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Board</title>
+<style>
+:root {
+  --bg: #F5F2ED;
+  --surface: #FFFFFF;
+  --surface-hover: #F8F6F2;
+  --surface-active: #F0EDE8;
+  --accent: #7B9E87;
+  --accent-hover: #6A8B75;
+  --accent-light: #E4EDE7;
+  --warm: #C4956A;
+  --warm-light: #F5EDE4;
+  --text-primary: #2C2A27;
+  --text-secondary: #7A756D;
+  --text-muted: #B0AAA0;
+  --border: #E4E0D8;
+  --border-light: #EEEAE4;
+  --error: #c44;
+  --overlay: rgba(44,42,39,0.3);
+  --shadow-sm: 0 1px 3px rgba(44,42,39,0.04);
+  --shadow-md: 0 4px 12px rgba(44,42,39,0.06);
+  --shadow-lg: 0 8px 24px rgba(44,42,39,0.08);
+  --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+}
+html.dark {
+  --bg: #161514;
+  --surface: #222120;
+  --surface-hover: #2A2928;
+  --surface-active: #323130;
+  --accent: #8FB39A;
+  --accent-hover: #A3C4AE;
+  --accent-light: rgba(143,179,154,0.12);
+  --warm: #D4A574;
+  --warm-light: rgba(212,165,116,0.12);
+  --text-primary: #E0DCD6;
+  --text-secondary: #8E8983;
+  --text-muted: #555250;
+  --border: #2E2D2B;
+  --border-light: #262524;
+  --error: #d66;
+  --overlay: rgba(0,0,0,0.5);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.15);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.2);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.25);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.header h1 { font-size: 15px; font-weight: 600; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn:hover { background: var(--surface-hover); }
+.btn-icon {
+  padding: 6px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+}
+.btn-icon:hover { background: var(--surface-hover); color: var(--text-primary); }
+
+/* Filters */
+.filters {
+  display: flex;
+  gap: 8px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--surface);
+}
+.filter-select {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 12px;
+}
+
+/* Board */
+.board {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  height: calc(100vh - 90px);
+  overflow: hidden;
+}
+.column {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border-light);
+  overflow: hidden;
+}
+.column:last-child { border-right: none; }
+.column-header {
+  padding: 10px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.column-count {
+  background: var(--bg);
+  color: var(--text-muted);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+}
+.column-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* Cards */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--accent);
+}
+.card-title {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.badge-epic { background: var(--accent-light); color: var(--accent); }
+.badge-task { background: var(--warm-light); color: var(--warm); }
+.card-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.card-assignee {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.card-assignee img {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+/* Drawer */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  z-index: 100;
+  display: none;
+}
+.drawer-overlay.open { display: block; }
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(480px, 90vw);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  z-index: 101;
+  transform: translateX(100%);
+  transition: transform 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+.drawer.open { transform: translateX(0); }
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.drawer-header h2 { font-size: 16px; font-weight: 600; }
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+.drawer-field {
+  margin-bottom: 16px;
+}
+.drawer-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.drawer-value {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.drawer-body-text {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+.drawer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 12px;
+}
+.drawer-link:hover { text-decoration: underline; }
+
+/* Loading / Empty */
+.loading, .empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.error-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--error);
+  font-size: 14px;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="loading" id="loading">Loading board...</div>
+</div>
+
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <h2 id="drawerTitle"></h2>
+    <button class="btn-icon" onclick="closeDrawer()" title="Close">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</div>
+
+<script>
+const STATUSES = ['Backlog', 'Ready', 'In progress', 'In review', 'Done'];
+let boardData = null;
+let allItems = [];
+
+async function init() {
+  try {
+    const manifestResp = await fetch('../../.team-agent/manifest.json');
+    if (!manifestResp.ok) throw new Error('Could not load manifest');
+    const manifest = await manifestResp.json();
+    const projectId = manifest.project_id;
+
+    const boardResp = await fetch(`/projects/${projectId}/board`);
+    if (!boardResp.ok) throw new Error('Could not load board data');
+    boardData = await boardResp.json();
+    allItems = boardData.items || [];
+
+    render();
+  } catch (err) {
+    document.getElementById('app').innerHTML =
+      `<div class="error-state">${err.message}</div>`;
+  }
+}
+
+function getType(item) {
+  if (item.labels && item.labels.includes('epic')) return 'epic';
+  return 'task';
+}
+
+function getAssignees() {
+  const set = new Set();
+  allItems.forEach(item => {
+    (item.assignees || []).forEach(a => set.add(a.login));
+  });
+  return [...set].sort();
+}
+
+function render() {
+  const assignees = getAssignees();
+
+  let html = `
+    <div class="header">
+      <h1>Board</h1>
+      <div class="header-actions">
+        <button class="btn" onclick="refresh()" title="Refresh">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+    <div class="filters">
+      <select class="filter-select" id="filterAssignee" onchange="applyFilters()">
+        <option value="">All assignees</option>
+        ${assignees.map(a => `<option value="${a}">${a}</option>`).join('')}
+      </select>
+      <select class="filter-select" id="filterType" onchange="applyFilters()">
+        <option value="">All types</option>
+        <option value="epic">Epics</option>
+        <option value="task">Tasks</option>
+      </select>
+    </div>
+    <div class="board">
+      ${STATUSES.map(status => {
+        const items = allItems.filter(i => i.status === status);
+        return `
+          <div class="column" data-status="${status}">
+            <div class="column-header">
+              ${status}
+              <span class="column-count" data-count-for="${status}">${items.length}</span>
+            </div>
+            <div class="column-body">
+              ${items.map(item => renderCard(item)).join('')}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>`;
+
+  document.getElementById('app').innerHTML = html;
+}
+
+function renderCard(item) {
+  const type = getType(item);
+  const assignee = (item.assignees || [])[0];
+  const date = item.targetDate || '';
+  return `
+    <div class="card" data-type="${type}" data-assignees="${(item.assignees||[]).map(a=>a.login).join(',')}" onclick='openDrawer(${JSON.stringify(item).replace(/'/g, "&#39;")})'>
+      <div class="card-title">${escapeHtml(item.title)}</div>
+      <div class="card-meta">
+        <span class="badge badge-${type}">${type}</span>
+        ${assignee ? `<span class="card-assignee"><img src="${assignee.avatarUrl}&s=32" alt="${assignee.login}">${assignee.login}</span>` : ''}
+        ${date ? `<span class="card-date">${date}</span>` : ''}
+      </div>
+    </div>`;
+}
+
+function applyFilters() {
+  const assignee = document.getElementById('filterAssignee').value;
+  const type = document.getElementById('filterType').value;
+
+  document.querySelectorAll('.card').forEach(card => {
+    let show = true;
+    if (assignee && !card.dataset.assignees.split(',').includes(assignee)) show = false;
+    if (type && card.dataset.type !== type) show = false;
+    card.style.display = show ? '' : 'none';
+  });
+
+  // Update counts
+  STATUSES.forEach(status => {
+    const col = document.querySelector(`.column[data-status="${status}"]`);
+    if (!col) return;
+    const visible = col.querySelectorAll('.card:not([style*="display: none"])').length;
+    const counter = document.querySelector(`[data-count-for="${status}"]`);
+    if (counter) counter.textContent = visible;
+  });
+}
+
+function openDrawer(item) {
+  const type = getType(item);
+  document.getElementById('drawerTitle').textContent = item.title;
+
+  let bodyHtml = '';
+  bodyHtml += `<div class="drawer-field"><div class="drawer-label">Status</div><div class="drawer-value">${item.status || 'None'}</div></div>`;
+  bodyHtml += `<div class="drawer-field"><div class="drawer-label">Type</div><div class="drawer-value"><span class="badge badge-${type}">${type}</span></div></div>`;
+
+  if (item.assignees && item.assignees.length) {
+    bodyHtml += `<div class="drawer-field"><div class="drawer-label">Assignees</div><div class="drawer-value">${item.assignees.map(a => `<span class="card-assignee"><img src="${a.avatarUrl}&s=32" alt="${a.login}">${a.login}</span>`).join(' ')}</div></div>`;
+  }
+  if (item.startDate) {
+    bodyHtml += `<div class="drawer-field"><div class="drawer-label">Start date</div><div class="drawer-value">${item.startDate}</div></div>`;
+  }
+  if (item.targetDate) {
+    bodyHtml += `<div class="drawer-field"><div class="drawer-label">Target date</div><div class="drawer-value">${item.targetDate}</div></div>`;
+  }
+  if (item.url) {
+    bodyHtml += `<div class="drawer-field"><a class="drawer-link" href="${item.url}" target="_blank" rel="noopener">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      View on GitHub</a></div>`;
+  }
+  if (item.body) {
+    bodyHtml += `<div class="drawer-field"><div class="drawer-label">Description</div><div class="drawer-body-text">${escapeHtml(item.body)}</div></div>`;
+  }
+
+  document.getElementById('drawerBody').innerHTML = bodyHtml;
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
+
+document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);
+
+async function refresh() {
+  document.getElementById('app').innerHTML = '<div class="loading">Refreshing...</div>';
+  await init();
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+// Sync theme with parent window via postMessage
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'theme') {
+    document.documentElement.classList.toggle('dark', e.data.theme === 'dark');
+  }
+});
+
+init();
+</script>
+</body>
+</html>

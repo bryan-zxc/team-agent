@@ -40,12 +40,14 @@ class ManifestCheckResult:
 async def _run_git(*args: str, cwd: str) -> tuple[int, str, str]:
     """Run a git command and return (returncode, stdout, stderr)."""
     proc = await asyncio.create_subprocess_exec(
-        "git", *args,
+        "git",
+        *args,
         cwd=cwd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
     stdout, stderr = await proc.communicate()
+    assert proc.returncode is not None
     return proc.returncode, stdout.decode().strip(), stderr.decode().strip()
 
 
@@ -77,9 +79,18 @@ def write_manifest(
     }
     manifest_dir = Path(clone_path) / MANIFEST_DIR
     manifest_dir.mkdir(parents=True, exist_ok=True)
-    (manifest_dir / "manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n"
-    )
+    (manifest_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    return manifest
+
+
+def update_manifest_board(clone_path: str | Path, board: dict) -> dict | None:
+    """Add or update the board section of an existing manifest."""
+    manifest = read_manifest(clone_path)
+    if manifest is None:
+        return None
+    manifest["board"] = board
+    manifest_file = Path(clone_path) / MANIFEST_PATH
+    manifest_file.write_text(json.dumps(manifest, indent=2) + "\n")
     return manifest
 
 
@@ -92,9 +103,13 @@ async def git_commit_and_push(clone_path: str | Path, message: str) -> tuple[boo
         return False, f"git add failed: {stderr}"
 
     rc, _, stderr = await _run_git(
-        "-c", "user.name=team-agent",
-        "-c", "user.email=noreply@team-agent",
-        "commit", "-m", message,
+        "-c",
+        "user.name=team-agent",
+        "-c",
+        "user.email=noreply@team-agent",
+        "commit",
+        "-m",
+        message,
         cwd=cwd,
     )
     if rc != 0 and "nothing to commit" not in stderr:
@@ -174,7 +189,8 @@ async def validate_manifest(
     if env == "prod":
         new_manifest = write_manifest(clone_path, project_id, project_name, env)
         success, error = await git_commit_and_push(
-            clone_path, "fix: correct manifest ownership",
+            clone_path,
+            "fix: correct manifest ownership",
         )
         if success:
             return ManifestCheckResult(

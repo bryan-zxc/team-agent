@@ -3,10 +3,12 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
+from sqlalchemy import select
 
 from .database import async_session
 from .models.project import Project
+from .models.project_member import ProjectMember
 from .models.session import Session
 from .models.user import User
 
@@ -22,7 +24,11 @@ async def get_current_user(request: Request) -> User:
 
     internal_key = request.headers.get("x-internal-key")
     if internal_key and internal_key == settings.internal_api_key:
-        return User(id=uuid.UUID("00000000-0000-0000-0000-000000000000"), email="internal@team-agent.local", display_name="Internal Service")
+        return User(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            email="internal@team-agent.local",
+            display_name="Internal Service",
+        )
 
     session_id = request.cookies.get("session_id")
     if not session_id:
@@ -59,3 +65,26 @@ async def get_unlocked_project(project_id: uuid.UUID) -> Project:
                 detail=f"Project is locked: {project.lock_reason}",
             )
         return project
+
+
+async def require_project_member(
+    project_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+) -> User:
+    """Verify the current user is a member of the project.
+
+    The internal service user (all-zero UUID) bypasses the check so that
+    AI-service calls via X-Internal-Key still work.
+    """
+    if user.id == uuid.UUID("00000000-0000-0000-0000-000000000000"):
+        return user
+
+    async with async_session() as session:
+        stmt = select(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user.id,
+        )
+        member = (await session.execute(stmt)).scalar_one_or_none()
+        if not member:
+            raise HTTPException(status_code=403, detail="Not a member of this project")
+    return user

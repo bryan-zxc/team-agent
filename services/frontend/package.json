@@ -23,14 +23,16 @@
     "react-arborist": "^3.4.3",
     "react-dom": "^19",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
-    "seti-icons": "^0.0.4"
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@types/node": "^25",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.1.6",
+    "knip": "^5.85.0",
     "typescript": "^5.9.3"
   }
 }

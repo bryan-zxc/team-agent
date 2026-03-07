@@ -1,12 +1,10 @@
 """Workload session management — worktree creation, SDK client lifecycle."""
 
 import asyncio
-import json
 import logging
 import os
 import re
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 
 import asyncpg
@@ -135,7 +133,12 @@ async def _ensure_worktree(clone_path: str, slug: str) -> Path:
     worktree_dir.mkdir(parents=True, exist_ok=True)
 
     proc = await asyncio.create_subprocess_exec(
-        "git", "worktree", "add", str(worktree_path), "-b", branch_name,
+        "git",
+        "worktree",
+        "add",
+        str(worktree_path),
+        "-b",
+        branch_name,
         cwd=clone_path,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -146,14 +149,20 @@ async def _ensure_worktree(clone_path: str, slug: str) -> Path:
         error_msg = stderr.decode().strip()
         if "already exists" in error_msg:
             proc2 = await asyncio.create_subprocess_exec(
-                "git", "worktree", "add", str(worktree_path), branch_name,
+                "git",
+                "worktree",
+                "add",
+                str(worktree_path),
+                branch_name,
                 cwd=clone_path,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
             _, stderr2 = await proc2.communicate()
             if proc2.returncode != 0:
-                raise RuntimeError(f"Failed to create worktree: {stderr2.decode().strip()}")
+                raise RuntimeError(
+                    f"Failed to create worktree: {stderr2.decode().strip()}"
+                )
         else:
             raise RuntimeError(f"Failed to create worktree: {error_msg}")
 
@@ -201,12 +210,16 @@ def _build_initial_prompt(workload_data: dict) -> str:
     ]
 
     if workload_data.get("background_context"):
-        parts.extend(["", "## Background Context", "", workload_data["background_context"]])
+        parts.extend(
+            ["", "## Background Context", "", workload_data["background_context"]]
+        )
 
     if workload_data.get("problem"):
         parts.extend(["", "## Problem", "", workload_data["problem"]])
 
-    parts.extend(["", "Please work through this task. Commit your changes when appropriate."])
+    parts.extend(
+        ["", "Please work through this task. Commit your changes when appropriate."]
+    )
     return "\n".join(parts)
 
 
@@ -236,34 +249,48 @@ def _make_stop_hook(
     merge_state: dict = {"succeeded": None, "target_branch": target_branch}
 
     async def stop_hook(
-        input_data: HookInput,
+        _input_data: HookInput,
         tool_use_id: str | None,
         context: HookContext,
     ) -> HookJSONOutput:
         # If worktree is already gone, nothing to merge — let agent stop
         if not worktree_path.exists():
-            logger.info("Workload %s: worktree already removed, skipping merge", workload_id[:8])
+            logger.info(
+                "Workload %s: worktree already removed, skipping merge", workload_id[:8]
+            )
             merge_state["succeeded"] = True
             return {"continue_": False}
 
         # Auto-commit any uncommitted changes in the worktree
         await run_git("add", "-A", cwd=str(worktree_path))
-        status_rc, status_out, _ = await run_git("status", "--porcelain", cwd=str(worktree_path))
+        status_rc, status_out, _ = await run_git(
+            "status", "--porcelain", cwd=str(worktree_path)
+        )
         if status_rc == 0 and status_out.strip():
             commit_rc, _, commit_err = await run_git(
-                "-c", f"user.name={display_name}",
-                "-c", f"user.email={display_name.lower()}@team-agent",
-                "commit", "-m", f"Workload {workload_id[:8]}: auto-commit changes",
+                "-c",
+                f"user.name={display_name}",
+                "-c",
+                f"user.email={display_name.lower()}@team-agent",
+                "commit",
+                "-m",
+                f"Workload {workload_id[:8]}: auto-commit changes",
                 cwd=str(worktree_path),
             )
             if commit_rc == 0:
-                logger.info("Workload %s: auto-committed uncommitted changes", workload_id[:8])
+                logger.info(
+                    "Workload %s: auto-committed uncommitted changes", workload_id[:8]
+                )
             else:
-                logger.warning("Workload %s: auto-commit failed: %s", workload_id[:8], commit_err)
+                logger.warning(
+                    "Workload %s: auto-commit failed: %s", workload_id[:8], commit_err
+                )
 
         # Attempt merge into main
         rc, stdout, stderr = await run_git(
-            "merge", branch_name, "--no-edit",
+            "merge",
+            branch_name,
+            "--no-edit",
             cwd=clone_path,
         )
 
@@ -277,10 +304,16 @@ def _make_stop_hook(
             push_rc, _, push_err = await run_git("push", cwd=clone_path)
             if push_rc != 0:
                 # Push failure — escalate to admin room
-                logger.warning("Workload %s: push failed, escalating: %s", workload_id[:8], push_err)
+                logger.warning(
+                    "Workload %s: push failed, escalating: %s",
+                    workload_id[:8],
+                    push_err,
+                )
                 merge_state["succeeded"] = False
                 admin_id = await escalate_to_admin(
-                    redis_client, project_id, clone_path,
+                    redis_client,
+                    project_id,
+                    clone_path,
                     workload_chat_id=chat_id,
                     workload_title=workload_title,
                     main_chat_id=main_chat_id,
@@ -301,12 +334,16 @@ def _make_stop_hook(
             return {"continue_": False}
 
         # Merge conflict — abort and escalate to admin room
-        logger.warning("Workload %s: merge conflict, escalating: %s", workload_id[:8], stderr)
+        logger.warning(
+            "Workload %s: merge conflict, escalating: %s", workload_id[:8], stderr
+        )
         await run_git("merge", "--abort", cwd=clone_path)
         merge_state["succeeded"] = False
 
         admin_id = await escalate_to_admin(
-            redis_client, project_id, clone_path,
+            redis_client,
+            project_id,
+            clone_path,
             workload_chat_id=chat_id,
             workload_title=workload_title,
             main_chat_id=main_chat_id,
@@ -342,7 +379,11 @@ async def start_workload_session(
     room_id = workload_data.get("room_id", "")
 
     if chat_id in _sessions:
-        logger.warning("Session already active for workload %s (chat %s), skipping", workload_id[:8], chat_id[:8])
+        logger.warning(
+            "Session already active for workload %s (chat %s), skipping",
+            workload_id[:8],
+            chat_id[:8],
+        )
         return
 
     slug = _slugify(workload_data["title"], workload_id)
@@ -373,21 +414,32 @@ async def start_workload_session(
     try:
         await conn.execute(
             "UPDATE workloads SET worktree_branch = $1 WHERE id = $2",
-            branch_name, uuid.UUID(workload_id),
+            branch_name,
+            uuid.UUID(workload_id),
         )
     finally:
         await conn.close()
 
     await update_chat_status(chat_id, "running")
-    await publish_status_event(redis_client, chat_id, "running", room_id, chat_type="workload")
+    await publish_status_event(
+        redis_client, chat_id, "running", room_id, chat_type="workload"
+    )
 
     # 3. Load agent profile for system prompt
-    profile_path = Path(clone_path) / ".team-agent" / "agents" / f"{workload_data['display_name'].lower()}.md"
+    profile_path = (
+        Path(clone_path)
+        / ".team-agent"
+        / "agents"
+        / f"{workload_data['display_name'].lower()}.md"
+    )
     agent_profile = profile_path.read_text() if profile_path.exists() else ""
 
     # 4. Read target branch from clone (whatever is checked out)
     _, target_branch_out, _ = await run_git(
-        "symbolic-ref", "--short", "HEAD", cwd=clone_path,
+        "symbolic-ref",
+        "--short",
+        "HEAD",
+        cwd=clone_path,
     )
     target_branch = target_branch_out.strip() if target_branch_out.strip() else "main"
 
@@ -410,23 +462,26 @@ async def start_workload_session(
     # 6. Pre-register session so tool_approval can access it
     is_resume = bool(workload_data.get("session_id"))
 
-    register_session(chat_id, {
-        "session_type": "workload",
-        "client": None,
-        "task": None,
-        "chat_id": chat_id,
-        "member_id": workload_data["member_id"],
-        "display_name": workload_data["display_name"],
-        "room_id": room_id,
-        "clone_path": clone_path,
-        "project_id": workload_data.get("project_id", ""),
-        "merge_state": merge_state,
-        "branch_name": branch_name,
-        "main_chat_id": workload_data.get("main_chat_id", ""),
-        "workload_data": workload_data,
-        "session_approvals": set(),
-        "pending_approvals": {},
-    })
+    register_session(
+        chat_id,
+        {
+            "session_type": "workload",
+            "client": None,
+            "task": None,
+            "chat_id": chat_id,
+            "member_id": workload_data["member_id"],
+            "display_name": workload_data["display_name"],
+            "room_id": room_id,
+            "clone_path": clone_path,
+            "project_id": workload_data.get("project_id", ""),
+            "merge_state": merge_state,
+            "branch_name": branch_name,
+            "main_chat_id": workload_data.get("main_chat_id", ""),
+            "workload_data": workload_data,
+            "session_approvals": set(),
+            "pending_approvals": {},
+        },
+    )
 
     can_use_tool = make_can_use_tool(
         session_key=chat_id,
@@ -454,7 +509,7 @@ async def start_workload_session(
     options = ClaudeAgentOptions(
         cwd=str(worktree_path),
         resume=workload_data.get("session_id") if is_resume else None,
-        system_prompt=_build_system_prompt(agent_profile, workload_data),
+        system_prompt=_build_system_prompt(agent_profile, workload_data),  # type: ignore[reportArgumentType]
         permission_mode=workload_data.get("permission_mode", "default"),
         can_use_tool=can_use_tool,
         hooks={"Stop": [HookMatcher(hooks=[stop_hook])]},
@@ -468,17 +523,23 @@ async def start_workload_session(
         client = ClaudeSDKClient(options)
         await client.connect()
     except Exception:
-        logger.exception("Failed to connect ClaudeSDKClient for workload %s", workload_id[:8])
+        logger.exception(
+            "Failed to connect ClaudeSDKClient for workload %s", workload_id[:8]
+        )
         unregister_session(chat_id)
         await update_chat_status(chat_id, "needs_attention")
-        await publish_status_event(redis_client, chat_id, "needs_attention", room_id, chat_type="workload")
+        await publish_status_event(
+            redis_client, chat_id, "needs_attention", room_id, chat_type="workload"
+        )
         return
 
     # 8. Finish registration and start relay
     _sessions[chat_id]["client"] = client
 
     relay_task = asyncio.create_task(
-        relay_messages(chat_id, client, redis_client, completion_status="needs_attention"),
+        relay_messages(
+            chat_id, client, redis_client, completion_status="needs_attention"
+        ),
         name=f"workload-relay-{chat_id[:8]}",
     )
     _sessions[chat_id]["task"] = relay_task
@@ -491,7 +552,8 @@ async def start_workload_session(
     else:
         logger.info(
             "Resumed session %s for workload %s",
-            workload_data["session_id"], workload_id[:8],
+            workload_data["session_id"],
+            workload_id[:8],
         )
 
 
