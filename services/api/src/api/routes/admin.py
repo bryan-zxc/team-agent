@@ -56,7 +56,9 @@ async def get_admin_room(project_id: uuid.UUID):
                 "has_session": chat.session_id is not None,
                 "owner_name": display_name,
                 "created_at": chat.created_at.isoformat(),
-                "updated_at": chat.updated_at.isoformat() if chat.updated_at else chat.created_at.isoformat(),
+                "updated_at": chat.updated_at.isoformat()
+                if chat.updated_at
+                else chat.created_at.isoformat(),
             }
             for chat, display_name in rows
         ]
@@ -69,7 +71,9 @@ async def get_admin_room(project_id: uuid.UUID):
 
 
 @router.post("/projects/{project_id}/admin-room/chats", status_code=201)
-async def create_admin_chat(project_id: uuid.UUID, req: CreateAdminChatRequest = CreateAdminChatRequest()):
+async def create_admin_chat(
+    project_id: uuid.UUID, req: CreateAdminChatRequest = CreateAdminChatRequest()
+):
     """Create a new admin chat in the project's admin room."""
     async with async_session() as session:
         room = (
@@ -93,7 +97,9 @@ async def create_admin_chat(project_id: uuid.UUID, req: CreateAdminChatRequest =
         ).scalar_one_or_none()
 
         if not coordinator:
-            raise HTTPException(status_code=404, detail="No coordinator found for project")
+            raise HTTPException(
+                status_code=404, detail="No coordinator found for project"
+            )
 
         now = datetime.now(timezone.utc)
         chat = Chat(
@@ -116,5 +122,3 @@ async def create_admin_chat(project_id: uuid.UUID, req: CreateAdminChatRequest =
             "permission_mode": chat.permission_mode,
             "created_at": chat.created_at.isoformat(),
         }
-
-

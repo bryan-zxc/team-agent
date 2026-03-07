@@ -64,7 +64,8 @@ async def _discover_cdp_port() -> int | None:
         # Method 2: Fall back to scanning process list
         try:
             proc = await asyncio.create_subprocess_exec(
-                "ps", "aux",
+                "ps",
+                "aux",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
@@ -76,7 +77,11 @@ async def _discover_cdp_port() -> int | None:
                     match = re.search(r"--remote-debugging-port=(\d+)", line)
                     if match:
                         port = int(match.group(1))
-                        logger.info("Discovered CDP port %d from ps (attempt %d)", port, attempt + 1)
+                        logger.info(
+                            "Discovered CDP port %d from ps (attempt %d)",
+                            port,
+                            attempt + 1,
+                        )
                         return port
         except Exception:
             logger.debug("Port discovery attempt %d failed", attempt + 1, exc_info=True)
@@ -115,7 +120,9 @@ async def start_screencast(
     Publishes a screencast_started notification via chat:status (room-scoped),
     then streams frames to screencast:frames:{chat_id}.
     """
-    logger.info("start_screencast entered for chat %s, room %s", chat_id[:8], room_id[:8])
+    logger.info(
+        "start_screencast entered for chat %s, room %s", chat_id[:8], room_id[:8]
+    )
 
     # NOTE: duplicate-launch guard lives in launch_screencast() which registers
     # the session BEFORE this coroutine runs. Do NOT check _screencast_sessions
@@ -133,34 +140,45 @@ async def start_screencast(
         # 2. Find page target
         page_ws_url = await _get_page_ws_url(port)
         if not page_ws_url:
-            logger.warning("No page target found on CDP port %d for chat %s", port, chat_id[:8])
+            logger.warning(
+                "No page target found on CDP port %d for chat %s", port, chat_id[:8]
+            )
             return
 
         # 3. Connect to page via CDP WebSocket
         ws = await websockets.connect(page_ws_url, max_size=10 * 1024 * 1024)
 
         # 4. Start screencast
-        await ws.send(json.dumps({
-            "id": _cdp_id(),
-            "method": "Page.startScreencast",
-            "params": {
-                "format": "jpeg",
-                "quality": 50,
-                "maxWidth": 1280,
-                "maxHeight": 720,
-                "everyNthFrame": 2,
-            },
-        }))
+        await ws.send(
+            json.dumps(
+                {
+                    "id": _cdp_id(),
+                    "method": "Page.startScreencast",
+                    "params": {
+                        "format": "jpeg",
+                        "quality": 50,
+                        "maxWidth": 1280,
+                        "maxHeight": 720,
+                        "everyNthFrame": 2,
+                    },
+                }
+            )
+        )
 
         logger.info("Screencast started for chat %s on CDP port %d", chat_id[:8], port)
 
         # 5. Notify frontend via room-scoped event
-        await redis_client.publish("chat:status", json.dumps({
-            "chat_id": chat_id,
-            "room_id": room_id,
-            "screencast_started": True,
-            "owner_name": owner_name,
-        }))
+        await redis_client.publish(
+            "chat:status",
+            json.dumps(
+                {
+                    "chat_id": chat_id,
+                    "room_id": room_id,
+                    "screencast_started": True,
+                    "owner_name": owner_name,
+                }
+            ),
+        )
 
         # 6. Frame receive loop
         async for raw_msg in ws:
@@ -186,25 +204,35 @@ async def start_screencast(
             )
 
             # Acknowledge frame so CDP sends the next one
-            await ws.send(json.dumps({
-                "id": _cdp_id(),
-                "method": "Page.screencastFrameAck",
-                "params": {"sessionId": session_id},
-            }))
+            await ws.send(
+                json.dumps(
+                    {
+                        "id": _cdp_id(),
+                        "method": "Page.screencastFrameAck",
+                        "params": {"sessionId": session_id},
+                    }
+                )
+            )
 
     except asyncio.CancelledError:
         # Graceful shutdown — send stop command if still connected
         if ws:
             try:
-                await ws.send(json.dumps({
-                    "id": _cdp_id(),
-                    "method": "Page.stopScreencast",
-                }))
+                await ws.send(
+                    json.dumps(
+                        {
+                            "id": _cdp_id(),
+                            "method": "Page.stopScreencast",
+                        }
+                    )
+                )
             except Exception:
                 pass
         raise
     except websockets.exceptions.ConnectionClosed:
-        logger.info("CDP connection closed for chat %s (browser shut down)", chat_id[:8])
+        logger.info(
+            "CDP connection closed for chat %s (browser shut down)", chat_id[:8]
+        )
     except Exception:
         logger.exception("Screencast error for chat %s", chat_id[:8])
     finally:
@@ -257,7 +285,9 @@ def _on_screencast_task_done(task: asyncio.Task) -> None:
     """Log exceptions from fire-and-forget screencast tasks."""
     exc = task.exception() if not task.cancelled() else None
     if exc:
-        logger.error("Screencast task %s failed: %s", task.get_name(), exc, exc_info=exc)
+        logger.error(
+            "Screencast task %s failed: %s", task.get_name(), exc, exc_info=exc
+        )
 
 
 def launch_screencast(

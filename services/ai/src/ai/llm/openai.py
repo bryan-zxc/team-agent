@@ -108,7 +108,7 @@ class OpenAIProvider(BaseLLMProvider):
             response = await self.client.responses.create(
                 model=model,
                 instructions=system_instruction,
-                input=self._convert_messages_for_api(messages),
+                input=self._convert_messages_for_api(messages),  # type: ignore[reportArgumentType]
             )
 
             # Track usage
@@ -119,17 +119,21 @@ class OpenAIProvider(BaseLLMProvider):
             message_list = []
             for item in response.output:
                 if item.type == "reasoning":
-                    message_list.append({
-                        "technical_message": item.model_dump(exclude_none=True),
-                        "display_message": None,
-                        "message_from": "Zimomo",
-                    })
+                    message_list.append(
+                        {
+                            "technical_message": item.model_dump(exclude_none=True),
+                            "display_message": None,
+                            "message_from": "Zimomo",
+                        }
+                    )
                 elif item.type == "text":
-                    message_list.append({
-                        "technical_message": item.model_dump(exclude_none=True),
-                        "display_message": response.output_text,
-                        "message_from": "Zimomo",
-                    })
+                    message_list.append(
+                        {
+                            "technical_message": item.model_dump(exclude_none=True),
+                            "display_message": response.output_text,
+                            "message_from": "Zimomo",
+                        }
+                    )
 
             # Return TextResponse with native OpenAI output_text field
             return TextResponse(
@@ -162,7 +166,7 @@ class OpenAIProvider(BaseLLMProvider):
                 response = await self.client.responses.parse(
                     model=model,
                     instructions=system_instruction,
-                    input=self._convert_messages_for_api(messages),
+                    input=self._convert_messages_for_api(messages),  # type: ignore[reportArgumentType]
                     text_format=response_format,
                 )
 
@@ -180,7 +184,7 @@ class OpenAIProvider(BaseLLMProvider):
                     response = await self.client.responses.create(
                         model=model,
                         instructions=system_instruction,
-                        input=input_messages,
+                        input=input_messages,  # type: ignore[reportArgumentType]
                         text={"format": {"type": "json_object"}},
                     )
 
@@ -206,15 +210,17 @@ class OpenAIProvider(BaseLLMProvider):
                     except Exception as e:
                         if attempt < MAX_LLM_RETRIES - 1:
                             # Add error feedback for retry
-                            input_messages.append({
-                                "role": "developer",
-                                "content": (
-                                    f"The JSON returned is:\n{json_str}\n\n"
-                                    f"It cannot be converted by json.loads with "
-                                    f"the following error:\n{e}\n\n"
-                                    f"Generate a new JSON without the error."
-                                ),
-                            })
+                            input_messages.append(
+                                {
+                                    "role": "developer",
+                                    "content": (
+                                        f"The JSON returned is:\n{json_str}\n\n"
+                                        f"It cannot be converted by json.loads with "
+                                        f"the following error:\n{e}\n\n"
+                                        f"Generate a new JSON without the error."
+                                    ),
+                                }
+                            )
                             logger.warning(
                                 f"JSON validation failed, attempt {attempt + 1}: {e}"
                             )

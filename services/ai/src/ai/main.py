@@ -12,7 +12,12 @@ from .agents import generate_agent_profile
 from .config import memory_handler, settings, setup_logging
 from .cost import init_cost_tracker
 from .admin import shutdown_all_admin_sessions
-from .listener import listen, listen_chat_messages, listen_dispatch_confirmations, listen_tool_approvals
+from .listener import (
+    listen,
+    listen_chat_messages,
+    listen_dispatch_confirmations,
+    listen_tool_approvals,
+)
 from .screencast import shutdown_all_screencasts
 from .session import (
     get_coordinator_for_chat,
@@ -21,8 +26,16 @@ from .session import (
     stop_session,
     update_chat_status,
 )
-from .terminal import create_terminal_session, destroy_terminal_session, shutdown_all_terminal_sessions
-from .workload import fetch_workload_data_for_retry, start_workload_session, shutdown_all_workload_sessions
+from .terminal import (
+    create_terminal_session,
+    destroy_terminal_session,
+    shutdown_all_terminal_sessions,
+)
+from .workload import (
+    fetch_workload_data_for_retry,
+    start_workload_session,
+    shutdown_all_workload_sessions,
+)
 from .terminal_listener import listen_terminal_input
 
 setup_logging()
@@ -49,7 +62,7 @@ async def lifespan(app: FastAPI):
     client = aioredis.from_url(settings.redis_url)
 
     try:
-        await client.ping()
+        await client.ping()  # type: ignore[reportGeneralTypeIssues]
         logger.info("AI service connected to Redis")
     except Exception as e:
         logger.error("Failed to connect to Redis: %s", e)
@@ -128,7 +141,9 @@ async def get_logs(
 async def generate_agent(req: GenerateAgentRequest):
     """Generate an AI agent profile via LLM."""
     try:
-        result = await generate_agent_profile(req.project_name, name=req.name, member_type=req.member_type)
+        result = await generate_agent_profile(
+            req.project_name, name=req.name, member_type=req.member_type
+        )
     except Exception as e:
         logger.error("Agent creation failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -144,7 +159,9 @@ async def generate_agent(req: GenerateAgentRequest):
 @app.post("/terminals")
 async def create_terminal(req: CreateTerminalRequest):
     """Create a terminal session with a PTY."""
-    session_id = await create_terminal_session(cwd=req.cwd, redis_client=app.state.redis)
+    session_id = await create_terminal_session(
+        cwd=req.cwd, redis_client=app.state.redis
+    )
     return {"session_id": session_id}
 
 
@@ -169,7 +186,9 @@ async def resolve_workload(chat_id: str, req: ResolveRequest):
     room_id = data.get("room_id", "")
 
     await update_chat_status(chat_id, "needs_attention")
-    await publish_status_event(redis, chat_id, "needs_attention", room_id, chat_type="workload")
+    await publish_status_event(
+        redis, chat_id, "needs_attention", room_id, chat_type="workload"
+    )
 
     try:
         coordinator = await get_coordinator_for_chat(chat_id)
@@ -177,13 +196,21 @@ async def resolve_workload(chat_id: str, req: ResolveRequest):
 
         if main_chat_id:
             if req.outcome == "success":
-                text = req.message or "I've resolved the issue. The workload is ready for review."
+                text = (
+                    req.message
+                    or "I've resolved the issue. The workload is ready for review."
+                )
             else:
-                text = req.message or "I wasn't able to resolve the issue automatically. Manual intervention needed."
+                text = (
+                    req.message
+                    or "I wasn't able to resolve the issue automatically. Manual intervention needed."
+                )
 
             await publish_message(
-                redis, main_chat_id,
-                coordinator["id"], coordinator["display_name"],
+                redis,
+                main_chat_id,
+                coordinator["id"],
+                coordinator["display_name"],
                 "coordinator",
                 [{"type": "text", "value": text}],
             )

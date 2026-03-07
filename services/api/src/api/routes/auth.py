@@ -32,7 +32,7 @@ async def _get_google_metadata() -> dict:
             resp = await http.get(GOOGLE_DISCOVERY_URL)
             resp.raise_for_status()
             _google_metadata = resp.json()
-    return _google_metadata
+    return _google_metadata  # type: ignore[reportReturnType]
 
 
 def _set_session_cookie(response, session_id: str) -> None:
@@ -82,8 +82,12 @@ async def login():
 
     response = RedirectResponse(url=uri)
     response.set_cookie(
-        "oauth_state", state, httponly=True, max_age=600,
-        samesite="lax", secure=settings.cookie_secure,
+        "oauth_state",
+        state,
+        httponly=True,
+        max_age=600,
+        samesite="lax",
+        secure=settings.cookie_secure,
     )
     return response
 
@@ -106,13 +110,13 @@ async def callback(request: Request):
         state=stored_state,
     )
     metadata = await _get_google_metadata()
-    token = await client.fetch_token(
+    await client.fetch_token(
         metadata["token_endpoint"],
         authorization_response=str(request.url),
     )
 
     # Get user info
-    resp = await client.get(metadata["userinfo_endpoint"])
+    resp = await client.get(metadata["userinfo_endpoint"])  # type: ignore[reportAttributeAccessIssue]
     userinfo = resp.json()
 
     email = userinfo["email"]
@@ -213,12 +217,11 @@ if settings.team_agent_env == "dev":
         """List all users for the dev login picker."""
         async with async_session() as db:
             users = (
-                await db.execute(select(User).order_by(User.display_name))
-            ).scalars().all()
-            return [
-                {"id": str(u.id), "display_name": u.display_name}
-                for u in users
-            ]
+                (await db.execute(select(User).order_by(User.display_name)))
+                .scalars()
+                .all()
+            )
+            return [{"id": str(u.id), "display_name": u.display_name} for u in users]
 
     @router.post("/dev-login")
     async def dev_login(req: DevLoginRequest):
@@ -230,11 +233,13 @@ if settings.team_agent_env == "dev":
 
         session_id = await _create_session(user.id)
 
-        response = JSONResponse({
-            "id": str(user.id),
-            "display_name": user.display_name,
-            "email": user.email,
-            "avatar_url": user.avatar_url,
-        })
+        response = JSONResponse(
+            {
+                "id": str(user.id),
+                "display_name": user.display_name,
+                "email": user.email,
+                "avatar_url": user.avatar_url,
+            }
+        )
         _set_session_cookie(response, session_id)
         return response

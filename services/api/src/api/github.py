@@ -27,7 +27,9 @@ async def create_repo(name: str, description: str = "") -> str:
     """
     token = settings.github_token
     if not token:
-        raise GitHubError(500, "GitHub token not available. Check gh_auth volume mount.")
+        raise GitHubError(
+            500, "GitHub token not available. Check gh_auth volume mount."
+        )
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(

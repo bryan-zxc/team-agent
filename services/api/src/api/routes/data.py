@@ -88,23 +88,23 @@ async def execute_query(
 
                 # DML (INSERT/UPDATE/DELETE/CREATE) won't have columns
                 if not rel.description:
-                    results.append(ResultSet(
-                        columns=[],
-                        rows=[],
-                        total_rows=0,
-                        offset=0,
-                        limit=body.limit,
-                        statement_index=idx,
-                    ))
+                    results.append(
+                        ResultSet(
+                            columns=[],
+                            rows=[],
+                            total_rows=0,
+                            offset=0,
+                            limit=body.limit,
+                            statement_index=idx,
+                        )
+                    )
                     continue
 
                 columns = [desc[0] for desc in rel.description]
 
                 # Only the last statement gets pagination and sorting
                 if idx == len(statements) - 1:
-                    conn.execute(
-                        "CREATE OR REPLACE TEMP VIEW __last_result AS " + stmt
-                    )
+                    conn.execute("CREATE OR REPLACE TEMP VIEW __last_result AS " + stmt)
 
                     count_result = conn.execute(
                         "SELECT COUNT(*) FROM __last_result"
@@ -114,9 +114,9 @@ async def execute_query(
                     if body.sort_column and body.sort_column in columns:
                         direction = body.sort_direction.upper()
                         paginated = conn.execute(
-                            f'SELECT * FROM __last_result '
+                            f"SELECT * FROM __last_result "
                             f'ORDER BY "{body.sort_column}" {direction} '
-                            f'LIMIT {body.limit} OFFSET {body.offset}'
+                            f"LIMIT {body.limit} OFFSET {body.offset}"
                         )
                     else:
                         paginated = conn.execute(
@@ -126,24 +126,28 @@ async def execute_query(
 
                     raw_rows = paginated.fetchall()
                     rows = [list(row) for row in raw_rows]
-                    results.append(ResultSet(
-                        columns=columns,
-                        rows=rows,
-                        total_rows=total,
-                        offset=body.offset,
-                        limit=body.limit,
-                        statement_index=idx,
-                    ))
+                    results.append(
+                        ResultSet(
+                            columns=columns,
+                            rows=rows,
+                            total_rows=total,
+                            offset=body.offset,
+                            limit=body.limit,
+                            statement_index=idx,
+                        )
+                    )
                 else:
                     # Non-final SELECT: execute but don't paginate
-                    results.append(ResultSet(
-                        columns=columns,
-                        rows=[],
-                        total_rows=0,
-                        offset=0,
-                        limit=body.limit,
-                        statement_index=idx,
-                    ))
+                    results.append(
+                        ResultSet(
+                            columns=columns,
+                            rows=[],
+                            total_rows=0,
+                            offset=0,
+                            limit=body.limit,
+                            statement_index=idx,
+                        )
+                    )
 
             except duckdb.Error as e:
                 return QueryResponse(
@@ -180,10 +184,12 @@ async def list_tables(project_id: uuid.UUID) -> list[DatabaseInfo]:
                     "WHERE table_name = ? AND table_schema = 'main'",
                     [table_name],
                 ).fetchone()
-                tables.append(TableInfo(
-                    name=table_name,
-                    column_count=col_count[0] if col_count else 0,
-                ))
+                tables.append(
+                    TableInfo(
+                        name=table_name,
+                        column_count=col_count[0] if col_count else 0,
+                    )
+                )
             databases.append(DatabaseInfo(name=db_name, tables=tables))
         finally:
             conn.close()

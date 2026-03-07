@@ -25,10 +25,10 @@ async def _load_all_agent_profiles(project_name: str) -> str:
 
 def _build_response_format(agent_names: list[str]):
     """Build a dynamic AgentResponse model with owner constrained to available agents."""
-    OwnerLiteral = Literal.__getitem__(tuple(agent_names))
+    OwnerLiteral = Literal.__getitem__(tuple(agent_names))  # type: ignore[reportAttributeAccessIssue]
 
     class Workload(BaseModel):
-        owner: OwnerLiteral
+        owner: OwnerLiteral  # type: ignore[reportInvalidTypeForm]
         title: str
         description: str
         background_context: str
@@ -55,9 +55,7 @@ async def run_agent(
     Returns a model instance with .response and optional .workloads.
     """
     # Build transcript for context
-    transcript = "\n".join(
-        f"{m['display_name']}: {m['content']}" for m in conversation
-    )
+    transcript = "\n".join(f"{m['display_name']}: {m['content']}" for m in conversation)
 
     # Load all agent profiles for context
     all_profiles = await _load_all_agent_profiles(project_name)
@@ -106,4 +104,6 @@ async def run_agent(
 
     except Exception:
         logger.exception("Agent query failed")
-        return ResponseFormat(response="Sorry, I encountered an error processing your request.")
+        return ResponseFormat(
+            response="Sorry, I encountered an error processing your request."
+        )

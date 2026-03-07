@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 
 def _get_redis():
     from ..main import redis_client
+
     return redis_client
+
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -75,7 +77,9 @@ async def submit_tool_approval(chat_id: str, req: ToolApprovalRequest):
     await _get_redis().publish("tool:approvals", json.dumps(payload))
     logger.info(
         "Published tool approval %s → %s (chat %s)",
-        req.approval_request_id[:8], req.decision, chat_id[:8],
+        req.approval_request_id[:8],
+        req.decision,
+        chat_id[:8],
     )
 
     return {"status": "accepted"}
@@ -145,13 +149,15 @@ async def cancel_session(chat_id: str):
     if room_id:
         await redis.publish(
             "chat:status",
-            json.dumps({
-                "chat_id": chat_id,
-                "status": "cancelled",
-                "room_id": room_id,
-                "chat_type": chat_type,
-                "updated_at": updated_at.isoformat(),
-            }),
+            json.dumps(
+                {
+                    "chat_id": chat_id,
+                    "status": "cancelled",
+                    "room_id": room_id,
+                    "chat_type": chat_type,
+                    "updated_at": updated_at.isoformat(),
+                }
+            ),
         )
 
     # If the workload was being investigated, notify the admin session to clean up
@@ -171,29 +177,40 @@ async def cancel_session(chat_id: str):
                 if admin_room:
                     admin_chat = (
                         await session.execute(
-                            select(Chat).where(
+                            select(Chat)
+                            .where(
                                 Chat.room_id == admin_room.id,
                                 Chat.type == "admin",
                                 Chat.status == "running",
-                            ).order_by(Chat.created_at.desc())
+                            )
+                            .order_by(Chat.created_at.desc())
                         )
-                    ).scalar_first()
+                    ).scalar_first()  # type: ignore[reportAttributeAccessIssue]
 
                     if admin_chat:
                         title = workload_title or "Unknown workload"
-                        branch_info = f" Remove worktree and delete branch `{branch_name}`." if branch_name else ""
+                        branch_info = (
+                            f" Remove worktree and delete branch `{branch_name}`."
+                            if branch_name
+                            else ""
+                        )
                         await redis.publish(
                             "chat:messages",
-                            json.dumps({
-                                "chat_id": str(admin_chat.id),
-                                "content": (
-                                    f"Workload **{title}** was cancelled by the user. "
-                                    f"Please clean up — no further resolution needed.{branch_info}"
-                                ),
-                            }),
+                            json.dumps(
+                                {
+                                    "chat_id": str(admin_chat.id),
+                                    "content": (
+                                        f"Workload **{title}** was cancelled by the user. "
+                                        f"Please clean up — no further resolution needed.{branch_info}"
+                                    ),
+                                }
+                            ),
                         )
         except Exception:
-            logger.warning("Failed to notify admin session about cancelled investigation", exc_info=True)
+            logger.warning(
+                "Failed to notify admin session about cancelled investigation",
+                exc_info=True,
+            )
 
     return {"status": "cancelled"}
 
@@ -227,13 +244,15 @@ async def update_chat_status(chat_id: str, req: StatusUpdateRequest):
     if room_id:
         await _get_redis().publish(
             "chat:status",
-            json.dumps({
-                "chat_id": chat_id,
-                "status": req.status,
-                "room_id": room_id,
-                "chat_type": chat_type,
-                "updated_at": updated_at.isoformat(),
-            }),
+            json.dumps(
+                {
+                    "chat_id": chat_id,
+                    "status": req.status,
+                    "room_id": room_id,
+                    "chat_type": chat_type,
+                    "updated_at": updated_at.isoformat() if updated_at else None,
+                }
+            ),
         )
 
     return {"status": req.status}
@@ -288,9 +307,7 @@ async def dispatch_workloads(req: DispatchRequest):
         if not chat:
             raise HTTPException(status_code=404, detail="Chat not found")
 
-        room_result = await session.execute(
-            select(Room).where(Room.id == chat.room_id)
-        )
+        room_result = await session.execute(select(Room).where(Room.id == chat.room_id))
         room = room_result.scalar_one_or_none()
         if not room:
             raise HTTPException(status_code=404, detail="Room not found")
@@ -316,7 +333,8 @@ async def dispatch_workloads(req: DispatchRequest):
             member = member_result.scalar_one_or_none()
             if not member:
                 raise HTTPException(
-                    status_code=422, detail=f"Agent '{w.owner}' not found",
+                    status_code=422,
+                    detail=f"Agent '{w.owner}' not found",
                 )
 
             workload_id = uuid.uuid4()
@@ -347,23 +365,25 @@ async def dispatch_workloads(req: DispatchRequest):
             )
             session.add(workload_chat)
 
-            results.append({
-                "id": str(workload_id),
-                "project_id": str(project.id),
-                "room_id": str(room.id),
-                "main_chat_id": req.chat_id,
-                "chat_id": str(chat_id),
-                "member_id": str(member.id),
-                "display_name": w.owner,
-                "title": w.title,
-                "description": w.description,
-                "background_context": w.background_context,
-                "problem": w.problem,
-                "permission_mode": w.permission_mode,
-                "status": "assigned",
-                "worktree_branch": None,
-                "session_id": None,
-            })
+            results.append(
+                {
+                    "id": str(workload_id),
+                    "project_id": str(project.id),
+                    "room_id": str(room.id),
+                    "main_chat_id": req.chat_id,
+                    "chat_id": str(chat_id),
+                    "member_id": str(member.id),
+                    "display_name": w.owner,
+                    "title": w.title,
+                    "description": w.description,
+                    "background_context": w.background_context,
+                    "problem": w.problem,
+                    "permission_mode": w.permission_mode,
+                    "status": "assigned",
+                    "worktree_branch": None,
+                    "session_id": None,
+                }
+            )
 
         await session.commit()
 
@@ -375,7 +395,8 @@ async def dispatch_workloads(req: DispatchRequest):
 
     logger.info(
         "Dispatched %d workload(s) for chat %s",
-        len(results), req.chat_id[:8],
+        len(results),
+        req.chat_id[:8],
     )
 
     return {"workloads": [{"id": r["id"], "title": r["title"]} for r in results]}
@@ -417,12 +438,13 @@ async def switch_mode(chat_id: str, req: SwitchModeRequest):
                 )
                 if resp.status_code >= 400 and resp.status_code != 404:
                     raise HTTPException(
-                        status_code=resp.status_code, detail=resp.text,
+                        status_code=resp.status_code,
+                        detail=resp.text,
                     )
 
         # 2. Update permission_mode
         if chat_type == "workload":
-            workload.permission_mode = req.permission_mode
+            workload.permission_mode = req.permission_mode  # type: ignore[reportPossiblyUnboundVariable]
         else:
             chat.permission_mode = req.permission_mode
 
@@ -436,29 +458,34 @@ async def switch_mode(chat_id: str, req: SwitchModeRequest):
     if room_id and updated_at:
         await _get_redis().publish(
             "chat:status",
-            json.dumps({
-                "chat_id": chat_id,
-                "status": "needs_attention",
-                "permission_mode": req.permission_mode,
-                "room_id": room_id,
-                "chat_type": chat_type,
-                "updated_at": updated_at.isoformat(),
-            }),
+            json.dumps(
+                {
+                    "chat_id": chat_id,
+                    "status": "needs_attention",
+                    "permission_mode": req.permission_mode,
+                    "room_id": room_id,
+                    "chat_type": chat_type,
+                    "updated_at": updated_at.isoformat(),
+                }
+            ),
         )
 
     # 5. Auto-resume with a system message
     mode_label = "vibe coding" if req.permission_mode == "acceptEdits" else "standard"
     await _get_redis().publish(
         "chat:messages",
-        json.dumps({
-            "chat_id": chat_id,
-            "content": f"Session restarted with {mode_label} mode. Continue where you left off.",
-        }),
+        json.dumps(
+            {
+                "chat_id": chat_id,
+                "content": f"Session restarted with {mode_label} mode. Continue where you left off.",
+            }
+        ),
     )
 
     logger.info(
         "Switched chat %s to %s mode",
-        chat_id[:8], req.permission_mode,
+        chat_id[:8],
+        req.permission_mode,
     )
 
     return {"status": "switching", "permission_mode": req.permission_mode}

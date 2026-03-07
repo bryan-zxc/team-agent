@@ -29,12 +29,16 @@ class RenameRoomRequest(BaseModel):
 async def list_rooms(project_id: uuid.UUID):
     async with async_session() as session:
         rooms = (
-            await session.execute(
-                select(Room)
-                .where(Room.project_id == project_id, Room.type == "standard")
-                .order_by(Room.created_at)
+            (
+                await session.execute(
+                    select(Room)
+                    .where(Room.project_id == project_id, Room.type == "standard")
+                    .order_by(Room.created_at)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         result = []
         for room in rooms:
@@ -44,12 +48,14 @@ async def list_rooms(project_id: uuid.UUID):
                 )
             ).scalar_one_or_none()
 
-            result.append({
-                "id": str(room.id),
-                "name": room.name,
-                "primary_chat_id": str(primary_chat.id) if primary_chat else None,
-                "created_at": room.created_at.isoformat(),
-            })
+            result.append(
+                {
+                    "id": str(room.id),
+                    "name": room.name,
+                    "primary_chat_id": str(primary_chat.id) if primary_chat else None,
+                    "created_at": room.created_at.isoformat(),
+                }
+            )
 
         return result
 
@@ -153,7 +159,9 @@ async def list_workloads(room_id: uuid.UUID):
                 "owner_name": display_name,
                 "owner_id": str(workload.member_id),
                 "created_at": chat.created_at.isoformat(),
-                "updated_at": chat.updated_at.isoformat() if chat.updated_at else chat.created_at.isoformat(),
+                "updated_at": chat.updated_at.isoformat()
+                if chat.updated_at
+                else chat.created_at.isoformat(),
             }
             for chat, workload, display_name in rows
         ]

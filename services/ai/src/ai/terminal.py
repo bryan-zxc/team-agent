@@ -106,7 +106,9 @@ async def create_terminal_session(
     # Auto-launch Claude Code
     os.write(master_fd, b"claude\n")
 
-    logger.info("Terminal session %s created (pid=%d, cwd=%s)", session_id[:8], pid, cwd)
+    logger.info(
+        "Terminal session %s created (pid=%d, cwd=%s)", session_id[:8], pid, cwd
+    )
     return session_id
 
 

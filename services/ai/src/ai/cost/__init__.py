@@ -16,5 +16,7 @@ def init_cost_tracker(redis_client) -> None:
 def get_cost_tracker() -> CostTracker:
     """Get the singleton CostTracker instance."""
     if _cost_tracker is None:
-        raise RuntimeError("CostTracker not initialised — call init_cost_tracker() first")
+        raise RuntimeError(
+            "CostTracker not initialised — call init_cost_tracker() first"
+        )
     return _cost_tracker

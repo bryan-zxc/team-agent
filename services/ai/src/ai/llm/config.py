@@ -14,10 +14,10 @@ PROVIDER_MODELS = {
 PROVIDER_PRICING = {
     "google": {
         "gemini-3-pro-preview": {
-            "input_low": 2.00,    # ≤200k tokens
+            "input_low": 2.00,  # ≤200k tokens
             "output_low": 12.00,  # ≤200k tokens
-            "input_high": 4.00,   # >200k tokens
-            "output_high": 18.00, # >200k tokens
+            "input_high": 4.00,  # >200k tokens
+            "output_high": 18.00,  # >200k tokens
             "threshold": 200_000,
         },
     },

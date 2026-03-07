@@ -24,7 +24,11 @@ async def get_current_user(request: Request) -> User:
 
     internal_key = request.headers.get("x-internal-key")
     if internal_key and internal_key == settings.internal_api_key:
-        return User(id=uuid.UUID("00000000-0000-0000-0000-000000000000"), email="internal@team-agent.local", display_name="Internal Service")
+        return User(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            email="internal@team-agent.local",
+            display_name="Internal Service",
+        )
 
     session_id = request.cookies.get("session_id")
     if not session_id:

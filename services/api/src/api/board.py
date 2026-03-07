@@ -42,11 +42,13 @@ class BoardConfig:
 async def _run_gh(*args: str) -> tuple[int, str, str]:
     """Run a gh CLI command and return (returncode, stdout, stderr)."""
     proc = await asyncio.create_subprocess_exec(
-        GH_BIN, *args,
+        GH_BIN,
+        *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
     stdout, stderr = await proc.communicate()
+    assert proc.returncode is not None
     return proc.returncode, stdout.decode().strip(), stderr.decode().strip()
 
 
@@ -60,10 +62,14 @@ async def provision_board(project_name: str, repo_name: str) -> BoardConfig | No
 
     # 1. Create the project
     rc, stdout, stderr = await _run_gh(
-        "project", "create",
-        "--title", project_name,
-        "--owner", "@me",
-        "--format", "json",
+        "project",
+        "create",
+        "--title",
+        project_name,
+        "--owner",
+        "@me",
+        "--format",
+        "json",
     )
     if rc != 0:
         logger.warning("Board creation failed: %s", stderr)
@@ -75,9 +81,13 @@ async def provision_board(project_name: str, repo_name: str) -> BoardConfig | No
 
     # 2. Read existing fields to get Status field ID
     rc, stdout, stderr = await _run_gh(
-        "project", "field-list", str(project_number),
-        "--owner", "@me",
-        "--format", "json",
+        "project",
+        "field-list",
+        str(project_number),
+        "--owner",
+        "@me",
+        "--format",
+        "json",
     )
     if rc != 0:
         logger.warning("Field list failed: %s", stderr)
@@ -104,9 +114,9 @@ async def provision_board(project_name: str, repo_name: str) -> BoardConfig | No
 
     mutation = (
         "mutation {"
-        f'  updateProjectV2Field(input: {{'
+        f"  updateProjectV2Field(input: {{"
         f'    fieldId: "{status_field_id}"'
-        f'    singleSelectOptions: [{options_graphql}]'
+        f"    singleSelectOptions: [{options_graphql}]"
         "  }) {"
         "    projectV2Field {"
         "      ... on ProjectV2SingleSelectField {"
@@ -134,11 +144,17 @@ async def provision_board(project_name: str, repo_name: str) -> BoardConfig | No
 
     # 4. Add Start date field
     rc, stdout, stderr = await _run_gh(
-        "project", "field-create", str(project_number),
-        "--owner", "@me",
-        "--name", "Start date",
-        "--data-type", "DATE",
-        "--format", "json",
+        "project",
+        "field-create",
+        str(project_number),
+        "--owner",
+        "@me",
+        "--name",
+        "Start date",
+        "--data-type",
+        "DATE",
+        "--format",
+        "json",
     )
     if rc != 0:
         logger.warning("Start date field creation failed: %s", stderr)
@@ -147,11 +163,17 @@ async def provision_board(project_name: str, repo_name: str) -> BoardConfig | No
 
     # 5. Add Target date field
     rc, stdout, stderr = await _run_gh(
-        "project", "field-create", str(project_number),
-        "--owner", "@me",
-        "--name", "Target date",
-        "--data-type", "DATE",
-        "--format", "json",
+        "project",
+        "field-create",
+        str(project_number),
+        "--owner",
+        "@me",
+        "--name",
+        "Target date",
+        "--data-type",
+        "DATE",
+        "--format",
+        "json",
     )
     if rc != 0:
         logger.warning("Target date field creation failed: %s", stderr)
@@ -160,9 +182,13 @@ async def provision_board(project_name: str, repo_name: str) -> BoardConfig | No
 
     # 6. Link board to repo
     rc, _, stderr = await _run_gh(
-        "project", "link", str(project_number),
-        "--owner", "@me",
-        "--repo", f"{owner}/{repo_name}",
+        "project",
+        "link",
+        str(project_number),
+        "--owner",
+        "@me",
+        "--repo",
+        f"{owner}/{repo_name}",
     )
     if rc != 0:
         logger.warning("Board-repo link failed (non-fatal): %s", stderr)

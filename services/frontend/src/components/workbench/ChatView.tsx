@@ -16,7 +16,7 @@ import { SlashCommandDropdown, filterSkills } from "./SlashCommandDropdown";
 import { RichInput, type RichInputHandle, type TriggerState } from "./RichInput";
 import styles from "./ChatTab.module.css";
 
-export function getMessageText(content: string): string {
+function getMessageText(content: string): string {
   try {
     const data = JSON.parse(content);
     if (data?.blocks) {
@@ -68,7 +68,7 @@ function renderMessageContent(content: string): React.ReactNode {
   return content;
 }
 
-export function truncate(text: string, max: number): string {
+function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}...` : text;
 }
 
@@ -156,7 +156,7 @@ function toolUseSummary(name: string, input: Record<string, unknown>): string {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function renderRichBlocks(blocks: any[], onLinkClick?: (url: string) => void): React.ReactNode {
   return blocks.map((block, i) => {
     switch (block.type) {
@@ -256,7 +256,7 @@ function extractTodos(messages: Message[]): TodoItem[] {
 
 /* ── ChatView: reusable messages + input for any chat ── */
 
-export type ChatViewProps = {
+type ChatViewProps = {
   chatId: string | null;
   memberId: string | null;
   members: Member[];

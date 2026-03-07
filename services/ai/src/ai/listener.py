@@ -129,7 +129,9 @@ async def _ensure_delegate_exists(project_name: str) -> None:
             project_name,
         )
         if count == 0:
-            logger.info("No delegate agents for project '%s', creating one", project_name)
+            logger.info(
+                "No delegate agents for project '%s', creating one", project_name
+            )
             await generate_agent_profile(project_name)
     finally:
         await conn.close()
@@ -151,7 +153,9 @@ async def _get_agent_names(project_name: str) -> list[str]:
 
 
 async def _resolve_member(
-    conn: asyncpg.Connection, project_name: str, owner_name: str,
+    conn: asyncpg.Connection,
+    project_name: str,
+    owner_name: str,
 ) -> uuid.UUID:
     """Resolve an agent name to a project_members.id.
 
@@ -162,7 +166,8 @@ async def _resolve_member(
         "SELECT pm.id FROM project_members pm "
         "JOIN projects p ON p.id = pm.project_id "
         "WHERE pm.display_name = $1 AND p.name = $2 AND pm.type = 'ai'",
-        owner_name, project_name,
+        owner_name,
+        project_name,
     )
     if not row:
         raise ValueError(f"Agent '{owner_name}' not found in project '{project_name}'")
@@ -174,7 +179,8 @@ async def _get_clone_path(project_name: str) -> str:
     conn = await asyncpg.connect(_dsn)
     try:
         row = await conn.fetchval(
-            "SELECT clone_path FROM projects WHERE name = $1", project_name,
+            "SELECT clone_path FROM projects WHERE name = $1",
+            project_name,
         )
         if not row:
             raise ValueError(f"No project found with name '{project_name}'")
@@ -209,9 +215,19 @@ async def _persist_workloads(
             owner = w["owner"] if isinstance(w, dict) else w.owner
             title = w["title"] if isinstance(w, dict) else w.title
             description = w["description"] if isinstance(w, dict) else w.description
-            bg_context = w.get("background_context") if isinstance(w, dict) else w.background_context
-            problem = w.get("problem") if isinstance(w, dict) else getattr(w, "problem", None)
-            perm_mode = w.get("permission_mode", "default") if isinstance(w, dict) else "default"
+            bg_context = (
+                w.get("background_context")
+                if isinstance(w, dict)
+                else w.background_context
+            )
+            problem = (
+                w.get("problem") if isinstance(w, dict) else getattr(w, "problem", None)
+            )
+            perm_mode = (
+                w.get("permission_mode", "default")
+                if isinstance(w, dict)
+                else "default"
+            )
 
             member_id = await _resolve_member(conn, project_name, owner)
 
@@ -223,34 +239,46 @@ async def _persist_workloads(
                 "INSERT INTO workloads "
                 "(id, main_chat_id, member_id, title, description, permission_mode, created_at) "
                 "VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                workload_id, uuid.UUID(main_chat_id), member_id,
-                title, description, perm_mode, now,
+                workload_id,
+                uuid.UUID(main_chat_id),
+                member_id,
+                title,
+                description,
+                perm_mode,
+                now,
             )
 
             await conn.execute(
                 "INSERT INTO chats "
                 "(id, room_id, type, title, owner_id, workload_id, status, updated_at, created_at) "
                 "VALUES ($1, $2, 'workload', $3, $4, $5, 'assigned', $6, $6)",
-                chat_id, room_id, title, member_id, workload_id, now,
+                chat_id,
+                room_id,
+                title,
+                member_id,
+                workload_id,
+                now,
             )
 
-            results.append({
-                "id": str(workload_id),
-                "project_id": project_id,
-                "room_id": str(room_id),
-                "main_chat_id": main_chat_id,
-                "chat_id": str(chat_id),
-                "member_id": str(member_id),
-                "display_name": owner,
-                "title": title,
-                "description": description,
-                "background_context": bg_context,
-                "problem": problem,
-                "permission_mode": perm_mode,
-                "status": "assigned",
-                "worktree_branch": None,
-                "session_id": None,
-            })
+            results.append(
+                {
+                    "id": str(workload_id),
+                    "project_id": project_id,
+                    "room_id": str(room_id),
+                    "main_chat_id": main_chat_id,
+                    "chat_id": str(chat_id),
+                    "member_id": str(member_id),
+                    "display_name": owner,
+                    "title": title,
+                    "description": description,
+                    "background_context": bg_context,
+                    "problem": problem,
+                    "permission_mode": perm_mode,
+                    "status": "assigned",
+                    "worktree_branch": None,
+                    "session_id": None,
+                }
+            )
 
         return results
     finally:
@@ -296,12 +324,15 @@ async def listen(redis_client: aioredis.Redis):
         logger.info("Loaded %d messages from database", len(conversation))
 
         agent_response = await run_agent(
-            conversation, project_name, agent_names, orchestrator["display_name"],
+            conversation,
+            project_name,
+            agent_names,
+            orchestrator["display_name"],
         )
-        content = agent_response.response
+        content = agent_response.response  # type: ignore[reportAttributeAccessIssue]
         logger.info("Agent returned %d chars", len(content))
 
-        if agent_response.workloads:
+        if agent_response.workloads:  # type: ignore[reportAttributeAccessIssue]
             dispatch_items = [
                 {
                     "owner": w.owner,
@@ -310,7 +341,7 @@ async def listen(redis_client: aioredis.Redis):
                     "background_context": w.background_context,
                     "problem": w.problem,
                 }
-                for w in agent_response.workloads
+                for w in agent_response.workloads  # type: ignore[reportAttributeAccessIssue]
             ]
             blocks = [
                 {"type": "text", "value": content},
@@ -330,10 +361,12 @@ async def listen(redis_client: aioredis.Redis):
             blocks = [{"type": "text", "value": content}]
 
         # Wrap response in structured format for consistency
-        structured_content = json.dumps({
-            "blocks": blocks,
-            "mentions": [],
-        })
+        structured_content = json.dumps(
+            {
+                "blocks": blocks,
+                "mentions": [],
+            }
+        )
 
         response = {
             "id": str(uuid.uuid4()),
@@ -369,29 +402,39 @@ async def _resume_and_deliver(
             if admin_data:
                 await start_admin_session(admin_data, redis_client)
             else:
-                logger.warning("Cannot resume chat %s — not found or no session_id", chat_id[:8])
+                logger.warning(
+                    "Cannot resume chat %s — not found or no session_id", chat_id[:8]
+                )
                 return
 
         delivered = await route_message(chat_id, content)
         if delivered:
             logger.info("Resumed and delivered message to chat %s", chat_id[:8])
         else:
-            logger.warning("Resume succeeded but delivery failed for chat %s", chat_id[:8])
+            logger.warning(
+                "Resume succeeded but delivery failed for chat %s", chat_id[:8]
+            )
     except Exception:
         logger.exception("Resume failed for chat %s", chat_id[:8])
     finally:
         _resuming.discard(chat_id)
 
 
-async def _retry_route(chat_id: str, content: str, retries: int = 3, delay: float = 2.0) -> None:
+async def _retry_route(
+    chat_id: str, content: str, retries: int = 3, delay: float = 2.0
+) -> None:
     """Retry routing a message to a session that is being resumed."""
     for attempt in range(retries):
         await asyncio.sleep(delay)
         delivered = await route_message(chat_id, content)
         if delivered:
-            logger.info("Retry-routed message to chat %s (attempt %d)", chat_id[:8], attempt + 1)
+            logger.info(
+                "Retry-routed message to chat %s (attempt %d)", chat_id[:8], attempt + 1
+            )
             return
-    logger.warning("Failed to route message to chat %s after %d retries", chat_id[:8], retries)
+    logger.warning(
+        "Failed to route message to chat %s after %d retries", chat_id[:8], retries
+    )
 
 
 async def listen_chat_messages(redis_client: aioredis.Redis):
@@ -452,12 +495,15 @@ async def listen_tool_approvals(redis_client: aioredis.Redis):
         if resolved:
             logger.info(
                 "Resolved tool approval %s → %s (session %s)",
-                approval_request_id[:8], msg["decision"], session_key[:8],
+                approval_request_id[:8],
+                msg["decision"],
+                session_key[:8],
             )
         else:
             logger.warning(
                 "Failed to resolve tool approval %s (session %s)",
-                approval_request_id[:8], session_key[:8],
+                approval_request_id[:8],
+                session_key[:8],
             )
 
 

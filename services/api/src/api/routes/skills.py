@@ -1,5 +1,4 @@
 import re
-import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends
@@ -78,11 +77,13 @@ def _scan_skills(clone_path: Path) -> list[dict]:
             continue
 
         rel_path = str(skill_dir.relative_to(clone_path))
-        results.append({
-            "name": name,
-            "description": description,
-            "path": rel_path,
-        })
+        results.append(
+            {
+                "name": name,
+                "description": description,
+                "path": rel_path,
+            }
+        )
 
     return results
 

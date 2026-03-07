@@ -131,15 +131,6 @@ export function LandingTerminal({ open, onClose }: LandingTerminalProps) {
     }
   }, [open]);
 
-  const handleCloseRequest = useCallback(() => {
-    const skip = localStorage.getItem("terminal_close_no_confirm") === "true";
-    if (skip) {
-      doClose();
-    } else {
-      setShowConfirm(true);
-    }
-  }, []);
-
   const doClose = useCallback(() => {
     setShowConfirm(false);
     if (sessionId) {
@@ -153,6 +144,15 @@ export function LandingTerminal({ open, onClose }: LandingTerminalProps) {
     setStatus("idle");
     onClose();
   }, [sessionId, onClose]);
+
+  const handleCloseRequest = useCallback(() => {
+    const skip = localStorage.getItem("terminal_close_no_confirm") === "true";
+    if (skip) {
+      doClose();
+    } else {
+      setShowConfirm(true);
+    }
+  }, [doClose]);
 
   return (
     <>

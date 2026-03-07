@@ -6,9 +6,7 @@ from .base import Base, UUIDPrimaryKey, TimestampMixin
 
 class LLMUsage(UUIDPrimaryKey, TimestampMixin, Base):
     __tablename__ = "llm_usage"
-    __table_args__ = (
-        Index("ix_llm_usage_caller_created_at", "caller", "created_at"),
-    )
+    __table_args__ = (Index("ix_llm_usage_caller_created_at", "caller", "created_at"),)
 
     model: Mapped[str] = mapped_column(String, nullable=False)
     provider: Mapped[str] = mapped_column(String, nullable=False)

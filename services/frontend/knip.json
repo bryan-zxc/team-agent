@@ -1,0 +1,9 @@
+{
+  "ignoreDependencies": [
+    "dockview-core"
+  ],
+  "ignoreExportsUsedInFile": true,
+  "ignore": [
+    "src/types/index.ts"
+  ]
+}

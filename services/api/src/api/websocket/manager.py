@@ -23,7 +23,9 @@ class ConnectionManager:
         for ws in self._connections.get(chat_id, []):
             await ws.send_json(data)
 
-    async def broadcast_except(self, chat_id: uuid.UUID, data: dict, exclude: WebSocket):
+    async def broadcast_except(
+        self, chat_id: uuid.UUID, data: dict, exclude: WebSocket
+    ):
         for ws in self._connections.get(chat_id, []):
             if ws is not exclude:
                 await ws.send_json(data)

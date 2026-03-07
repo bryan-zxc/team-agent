@@ -51,8 +51,10 @@ class UpdateProjectRequest(BaseModel):
 async def list_projects():
     async with async_session() as session:
         projects = (
-            await session.execute(select(Project).order_by(Project.created_at))
-        ).scalars().all()
+            (await session.execute(select(Project).order_by(Project.created_at)))
+            .scalars()
+            .all()
+        )
 
         result = []
         for p in projects:
@@ -61,26 +63,28 @@ async def list_projects():
                     await session.execute(
                         select(ProjectMember).where(ProjectMember.project_id == p.id)
                     )
-                ).scalars().all()
+                )
+                .scalars()
+                .all()
             )
             room_count = len(
-                (
-                    await session.execute(
-                        select(Room).where(Room.project_id == p.id)
-                    )
-                ).scalars().all()
+                (await session.execute(select(Room).where(Room.project_id == p.id)))
+                .scalars()
+                .all()
             )
-            result.append({
-                "id": str(p.id),
-                "name": p.name,
-                "git_repo_url": p.git_repo_url,
-                "default_branch": p.default_branch,
-                "member_count": member_count,
-                "room_count": room_count,
-                "is_locked": p.is_locked,
-                "lock_reason": p.lock_reason,
-                "created_at": p.created_at.isoformat(),
-            })
+            result.append(
+                {
+                    "id": str(p.id),
+                    "name": p.name,
+                    "git_repo_url": p.git_repo_url,
+                    "default_branch": p.default_branch,
+                    "member_count": member_count,
+                    "room_count": room_count,
+                    "is_locked": p.is_locked,
+                    "lock_reason": p.lock_reason,
+                    "created_at": p.created_at.isoformat(),
+                }
+            )
 
         return result
 
@@ -116,8 +120,16 @@ async def _init_and_push_repo(clone_path: str, clone_url: str) -> None:
     cmds = [
         ["git", "init"],
         ["git", "add", "."],
-        ["git", "-c", "user.name=Team Agent", "-c", "user.email=agent@team-agent",
-         "commit", "-m", "Initial project scaffold"],
+        [
+            "git",
+            "-c",
+            "user.name=Team Agent",
+            "-c",
+            "user.email=agent@team-agent",
+            "commit",
+            "-m",
+            "Initial project scaffold",
+        ],
         ["git", "branch", "-M", "main"],
         ["git", "remote", "add", "origin", push_url],
         ["git", "push", "-u", "origin", "main"],
@@ -138,7 +150,11 @@ async def _init_and_push_repo(clone_path: str, clone_url: str) -> None:
 
     # Reset remote URL to clean version (no token)
     await asyncio.create_subprocess_exec(
-        "git", "remote", "set-url", "origin", clone_url,
+        "git",
+        "remote",
+        "set-url",
+        "origin",
+        clone_url,
         cwd=clone_path,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -146,7 +162,9 @@ async def _init_and_push_repo(clone_path: str, clone_url: str) -> None:
 
 
 @router.post("/projects")
-async def create_project(req: CreateProjectRequest, creator: User = Depends(get_current_user)):
+async def create_project(
+    req: CreateProjectRequest, creator: User = Depends(get_current_user)
+):
     async with async_session() as session:
         # Check name uniqueness
         existing = (
@@ -180,6 +198,7 @@ async def create_project(req: CreateProjectRequest, creator: User = Depends(get_
         db_dir = Path(clone_path).parent / "databases"
         db_dir.mkdir(parents=True, exist_ok=True)
         import duckdb as _duckdb
+
         _conn = _duckdb.connect(db_dir / "data.duckdb")
         _conn.close()
 
@@ -188,7 +207,9 @@ async def create_project(req: CreateProjectRequest, creator: User = Depends(get_
             shutil.copytree(str(PROJECT_TEMPLATE), clone_path)
 
             # Create .team-agent/agents/ directory and write manifest
-            (Path(clone_path) / ".team-agent" / "agents").mkdir(parents=True, exist_ok=True)
+            (Path(clone_path) / ".team-agent" / "agents").mkdir(
+                parents=True, exist_ok=True
+            )
             write_manifest(
                 clone_path,
                 project_id=str(project.id),
@@ -196,6 +217,7 @@ async def create_project(req: CreateProjectRequest, creator: User = Depends(get_
                 env=settings.team_agent_env,
             )
 
+            assert git_repo_url
             await _init_and_push_repo(clone_path, git_repo_url)
             project.clone_path = clone_path
             project.default_branch = "main"
@@ -207,15 +229,18 @@ async def create_project(req: CreateProjectRequest, creator: User = Depends(get_
                 if board_config:
                     update_manifest_board(clone_path, board_config.to_dict())
                     await git_commit_and_push(
-                        clone_path, "chore: add board configuration",
+                        clone_path,
+                        "chore: add board configuration",
                     )
                     logger.info(
                         "Provisioned board %d for project %s",
-                        board_config.project_number, req.name,
+                        board_config.project_number,
+                        req.name,
                     )
             except Exception:
                 logger.warning(
-                    "Board provisioning failed (non-critical)", exc_info=True,
+                    "Board provisioning failed (non-critical)",
+                    exc_info=True,
                 )
         else:
             # Clone existing repo
@@ -240,7 +265,10 @@ async def create_project(req: CreateProjectRequest, creator: User = Depends(get_
 
             # Read the actual checked-out branch and store it
             branch_proc = await asyncio.create_subprocess_exec(
-                "git", "symbolic-ref", "--short", "HEAD",
+                "git",
+                "symbolic-ref",
+                "--short",
+                "HEAD",
                 cwd=clone_path,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -249,7 +277,12 @@ async def create_project(req: CreateProjectRequest, creator: User = Depends(get_
             if branch_proc.returncode == 0:
                 project.default_branch = branch_out.decode().strip()
 
-            logger.info("Cloned %s to %s (branch: %s)", git_repo_url, clone_path, project.default_branch)
+            logger.info(
+                "Cloned %s to %s (branch: %s)",
+                git_repo_url,
+                clone_path,
+                project.default_branch,
+            )
 
             # Check if repo is already claimed by another project
             claim_check = check_unclaimed(clone_path)
@@ -261,7 +294,9 @@ async def create_project(req: CreateProjectRequest, creator: User = Depends(get_
                 raise HTTPException(status_code=409, detail=claim_check.reason)
 
             # Create .team-agent/agents/ directory and write manifest
-            (Path(clone_path) / ".team-agent" / "agents").mkdir(parents=True, exist_ok=True)
+            (Path(clone_path) / ".team-agent" / "agents").mkdir(
+                parents=True, exist_ok=True
+            )
             write_manifest(
                 clone_path,
                 project_id=str(project.id),
@@ -295,7 +330,11 @@ async def create_project(req: CreateProjectRequest, creator: User = Depends(get_
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
                 f"{settings.ai_service_url}/generate-agent",
-                json={"project_name": req.name, "name": "Zimomo", "member_type": "coordinator"},
+                json={
+                    "project_name": req.name,
+                    "name": "Zimomo",
+                    "member_type": "coordinator",
+                },
             )
         if resp.status_code == 200:
             zimomo_member = resp.json()
@@ -330,7 +369,9 @@ async def update_project(project_id: uuid.UUID, req: UpdateProjectRequest):
 
         # Fetch latest refs from remote
         fetch_proc = await asyncio.create_subprocess_exec(
-            "git", "fetch", "origin",
+            "git",
+            "fetch",
+            "origin",
             cwd=clone_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -339,7 +380,11 @@ async def update_project(project_id: uuid.UUID, req: UpdateProjectRequest):
 
         # Validate branch exists on remote
         check_proc = await asyncio.create_subprocess_exec(
-            "git", "branch", "-r", "--list", f"origin/{req.default_branch}",
+            "git",
+            "branch",
+            "-r",
+            "--list",
+            f"origin/{req.default_branch}",
             cwd=clone_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -353,7 +398,9 @@ async def update_project(project_id: uuid.UUID, req: UpdateProjectRequest):
 
         # Checkout the branch
         checkout_proc = await asyncio.create_subprocess_exec(
-            "git", "checkout", req.default_branch,
+            "git",
+            "checkout",
+            req.default_branch,
             cwd=clone_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -367,7 +414,10 @@ async def update_project(project_id: uuid.UUID, req: UpdateProjectRequest):
 
         # Pull latest changes for the branch
         pull_proc = await asyncio.create_subprocess_exec(
-            "git", "pull", "origin", req.default_branch,
+            "git",
+            "pull",
+            "origin",
+            req.default_branch,
             cwd=clone_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -378,7 +428,9 @@ async def update_project(project_id: uuid.UUID, req: UpdateProjectRequest):
         await session.commit()
         await session.refresh(project)
 
-        logger.info("Switched project %s to branch %s", project.name, req.default_branch)
+        logger.info(
+            "Switched project %s to branch %s", project.name, req.default_branch
+        )
 
         return {
             "id": str(project.id),
@@ -403,7 +455,10 @@ async def list_branches(project_id: uuid.UUID):
 
         # Fetch latest refs and prune stale tracking branches
         fetch_proc = await asyncio.create_subprocess_exec(
-            "git", "fetch", "--prune", "origin",
+            "git",
+            "fetch",
+            "--prune",
+            "origin",
             cwd=clone_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -412,7 +467,10 @@ async def list_branches(project_id: uuid.UUID):
 
         # List remote branches
         proc = await asyncio.create_subprocess_exec(
-            "git", "branch", "-r", "--format=%(refname:short)",
+            "git",
+            "branch",
+            "-r",
+            "--format=%(refname:short)",
             cwd=clone_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -427,7 +485,10 @@ async def list_branches(project_id: uuid.UUID):
 
         # Current branch
         head_proc = await asyncio.create_subprocess_exec(
-            "git", "symbolic-ref", "--short", "HEAD",
+            "git",
+            "symbolic-ref",
+            "--short",
+            "HEAD",
             cwd=clone_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -490,7 +551,8 @@ async def get_board(project_id: uuid.UUID):
     manifest = read_manifest(project.clone_path)
     if not manifest or not manifest.get("board"):
         raise HTTPException(
-            status_code=404, detail="No board configured for this project",
+            status_code=404,
+            detail="No board configured for this project",
         )
 
     board = manifest["board"]
@@ -535,7 +597,11 @@ async def get_board(project_id: uuid.UUID):
     )
 
     proc = await asyncio.create_subprocess_exec(
-        GH_BIN, "api", "graphql", "-f", f"query={query}",
+        GH_BIN,
+        "api",
+        "graphql",
+        "-f",
+        f"query={query}",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -574,24 +640,26 @@ async def get_board(project_id: uuid.UUID):
             elif field_name == "Target date":
                 target_date = fv.get("date", "")
 
-        labels = [l["name"] for l in content.get("labels", {}).get("nodes", [])]
+        labels = [label["name"] for label in content.get("labels", {}).get("nodes", [])]
         assignees = [
             {"login": a["login"], "avatarUrl": a.get("avatarUrl", "")}
             for a in content.get("assignees", {}).get("nodes", [])
         ]
 
-        items.append({
-            "id": raw["id"],
-            "title": content.get("title", ""),
-            "number": content.get("number"),
-            "url": content.get("url", ""),
-            "body": content.get("body", ""),
-            "status": status,
-            "startDate": start_date,
-            "targetDate": target_date,
-            "labels": labels,
-            "assignees": assignees,
-        })
+        items.append(
+            {
+                "id": raw["id"],
+                "title": content.get("title", ""),
+                "number": content.get("number"),
+                "url": content.get("url", ""),
+                "body": content.get("body", ""),
+                "status": status,
+                "startDate": start_date,
+                "targetDate": target_date,
+                "labels": labels,
+                "assignees": assignees,
+            }
+        )
 
     return {
         "board": {

@@ -101,6 +101,7 @@ def _build_permission_key(
     if tool_name == "WebFetch" and "url" in tool_input:
         try:
             from urllib.parse import urlparse
+
             domain = urlparse(tool_input["url"]).netloc
             if domain:
                 return f"WebFetch(domain:{domain})"
@@ -156,7 +157,7 @@ def _summarise_tool_input(tool_name: str, tool_input: dict[str, Any]) -> str:
     if tool_name == "Glob" and "pattern" in tool_input:
         return tool_input["pattern"]
     if tool_name == "Grep" and "pattern" in tool_input:
-        return f'/{tool_input["pattern"]}/'
+        return f"/{tool_input['pattern']}/"
     if tool_name == "WebFetch" and "url" in tool_input:
         return tool_input["url"][:200]
     # Generic fallback
@@ -181,7 +182,11 @@ def _read_original_content(
         return None
 
     # Resolve relative to worktree
-    resolved = Path(worktree_path) / file_path if not Path(file_path).is_absolute() else Path(file_path)
+    resolved = (
+        Path(worktree_path) / file_path
+        if not Path(file_path).is_absolute()
+        else Path(file_path)
+    )
     if not resolved.exists():
         return ""  # New file — empty original
 
@@ -249,25 +254,31 @@ def make_can_use_tool(
             "member_id": member_id,
             "display_name": display_name,
             "type": "tool_approval_request",
-            "content": json.dumps({
-                "blocks": [{
-                    "type": "tool_approval_request",
-                    "approval_request_id": approval_request_id,
-                    "chat_id": session_key,
-                    "tool_name": tool_name,
-                    "tool_input": tool_input,
-                    "input_summary": input_summary,
-                    "permission_key": permission_key,
-                    "original_content": original_content,
-                }],
-                "mentions": [],
-            }),
+            "content": json.dumps(
+                {
+                    "blocks": [
+                        {
+                            "type": "tool_approval_request",
+                            "approval_request_id": approval_request_id,
+                            "chat_id": session_key,
+                            "tool_name": tool_name,
+                            "tool_input": tool_input,
+                            "input_summary": input_summary,
+                            "permission_key": permission_key,
+                            "original_content": original_content,
+                        }
+                    ],
+                    "mentions": [],
+                }
+            ),
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await redis_client.publish("chat:responses", json.dumps(request_msg))
         logger.info(
             "Tool approval request %s for %s (session %s)",
-            approval_request_id[:8], tool_name, session_key[:8],
+            approval_request_id[:8],
+            tool_name,
+            session_key[:8],
         )
 
         # 4b. Transition status to awaiting_approval so badges appear
@@ -276,7 +287,10 @@ def make_can_use_tool(
         await update_chat_status(chat_id, "awaiting_approval")
         if room_id:
             await publish_status_event(
-                redis_client, chat_id, "awaiting_approval", room_id,
+                redis_client,
+                chat_id,
+                "awaiting_approval",
+                room_id,
                 chat_type=chat_type,
             )
 
@@ -290,7 +304,10 @@ def make_can_use_tool(
         await update_chat_status(chat_id, "running")
         if room_id:
             await publish_status_event(
-                redis_client, chat_id, "running", room_id,
+                redis_client,
+                chat_id,
+                "running",
+                room_id,
                 chat_type=chat_type,
             )
         restart_hb = session_state.get("restart_heartbeat")
@@ -340,7 +357,8 @@ def resolve_tool_approval(
     if not future or future.done():
         logger.warning(
             "No pending approval %s for session %s",
-            approval_request_id[:8], session_key[:8],
+            approval_request_id[:8],
+            session_key[:8],
         )
         return False
 

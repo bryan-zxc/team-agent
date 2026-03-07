@@ -79,8 +79,8 @@ export function SqlTab({ params, api: panelApi }: IDockviewPanelProps<SqlTabPara
   const [sort, setSort] = useState<SortState>(null);
   const [dividerY, setDividerY] = useState(300);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const runRef = useRef<() => void>();
-  const saveRef = useRef<() => void>();
+  const runRef = useRef<() => void>(undefined);
+  const saveRef = useRef<() => void>(undefined);
 
   // Load .sql file content if opened from a file
   useEffect(() => {

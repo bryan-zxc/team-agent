@@ -113,7 +113,11 @@ async def _run_migrations() -> None:
     """Run Alembic migrations on startup."""
     logger.info("Running database migrations...")
     proc = await asyncio.create_subprocess_exec(
-        "uv", "run", "alembic", "upgrade", "head",
+        "uv",
+        "run",
+        "alembic",
+        "upgrade",
+        "head",
         cwd="/app",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -214,13 +218,15 @@ async def health():
         pass
 
     try:
-        await redis_client.ping()
+        await redis_client.ping()  # type: ignore[reportGeneralTypeIssues]
         redis_status = "connected"
     except Exception:
         pass
 
     return {
-        "status": "ok" if pg_status == "connected" and redis_status == "connected" else "degraded",
+        "status": "ok"
+        if pg_status == "connected" and redis_status == "connected"
+        else "degraded",
         "postgres": pg_status,
         "redis": redis_status,
     }

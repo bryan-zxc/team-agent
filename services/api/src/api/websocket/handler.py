@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 def _get_redis():
     from ..main import redis_client
+
     return redis_client
 
 
@@ -87,11 +88,14 @@ async def _notify_ai_if_mentioned(mentions: list[str], chat_id: str):
                         coordinator = (await session.execute(stmt)).scalar_one_or_none()
                         if coordinator:
                             # Typing indicator with coordinator identity
-                            await manager.broadcast(uuid.UUID(chat_id), {
-                                "_event": "typing",
-                                "member_id": str(coordinator.id),
-                                "display_name": coordinator.display_name,
-                            })
+                            await manager.broadcast(
+                                uuid.UUID(chat_id),
+                                {
+                                    "_event": "typing",
+                                    "member_id": str(coordinator.id),
+                                    "display_name": coordinator.display_name,
+                                },
+                            )
 
                 await _get_redis().publish(
                     "ai:respond", json.dumps({"chat_id": chat_id})
@@ -153,11 +157,15 @@ async def websocket_endpoint(
 
             # Typing indicator — ephemeral, no persistence
             if data.get("_event") == "typing":
-                await manager.broadcast_except(chat_id, {
-                    "_event": "typing",
-                    "member_id": str(member_id),
-                    "display_name": display_name,
-                }, exclude=websocket)
+                await manager.broadcast_except(
+                    chat_id,
+                    {
+                        "_event": "typing",
+                        "member_id": str(member_id),
+                        "display_name": display_name,
+                    },
+                    exclude=websocket,
+                )
                 continue
 
             # Check project lockdown before processing each message
@@ -165,10 +173,12 @@ async def websocket_endpoint(
                 async with async_session() as session:
                     project = await session.get(Project, project_id)
                     if project and project.is_locked:
-                        await websocket.send_json({
-                            "error": "project_locked",
-                            "detail": f"Project is locked: {project.lock_reason}",
-                        })
+                        await websocket.send_json(
+                            {
+                                "error": "project_locked",
+                                "detail": f"Project is locked: {project.lock_reason}",
+                            }
+                        )
                         continue
 
             # Expect structured format: {"blocks": [...], "mentions": [...], "reply_to_id": ...}
@@ -180,7 +190,9 @@ async def websocket_endpoint(
                 continue
 
             # Store full structured JSON as content
-            content = json.dumps({"blocks": blocks, "mentions": mentions, "reply_to_id": reply_to_id})
+            content = json.dumps(
+                {"blocks": blocks, "mentions": mentions, "reply_to_id": reply_to_id}
+            )
 
             # Persist message
             message = Message(
@@ -215,7 +227,9 @@ async def websocket_endpoint(
                     "chat:messages",
                     json.dumps({"chat_id": str(chat_id), "content": enriched}),
                 )
-                logger.info("Published %s message for chat %s", chat_type, str(chat_id)[:8])
+                logger.info(
+                    "Published %s message for chat %s", chat_type, str(chat_id)[:8]
+                )
             elif mentions:
                 await _notify_ai_if_mentioned(mentions, str(chat_id))
 

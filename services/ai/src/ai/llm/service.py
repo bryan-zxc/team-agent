@@ -31,14 +31,10 @@ class LLM:
         self._providers: dict[str, BaseLLMProvider] = {}
 
         if settings.gemini_api_key:
-            self._providers["google"] = GoogleProvider(
-                api_key=settings.gemini_api_key
-            )
+            self._providers["google"] = GoogleProvider(api_key=settings.gemini_api_key)
 
         if settings.openai_api_key:
-            self._providers["openai"] = OpenAIProvider(
-                api_key=settings.openai_api_key
-            )
+            self._providers["openai"] = OpenAIProvider(api_key=settings.openai_api_key)
 
     def _get_provider(self, model: str) -> BaseLLMProvider:
         """Get the provider for a given model.
@@ -56,8 +52,7 @@ class LLM:
         provider = self._providers.get(provider_name)
         if not provider:
             raise ValueError(
-                f"No provider configured for model {model} "
-                f"(provider: {provider_name})"
+                f"No provider configured for model {model} (provider: {provider_name})"
             )
         return provider
 
@@ -86,8 +81,11 @@ class LLM:
         for retry in range(MAX_LLM_RETRIES):
             try:
                 result = await self._call_provider(
-                    self.model, messages, temperature,
-                    response_format, system_instruction,
+                    self.model,
+                    messages,
+                    temperature,
+                    response_format,
+                    system_instruction,
                 )
 
                 if result is not None and result != "":
@@ -108,8 +106,11 @@ class LLM:
                     )
                     try:
                         result = await self._call_provider(
-                            self.backup_model, messages, temperature,
-                            response_format, system_instruction,
+                            self.backup_model,
+                            messages,
+                            temperature,
+                            response_format,
+                            system_instruction,
                         )
 
                         if result is not None and result != "":
@@ -126,14 +127,12 @@ class LLM:
                         )
                 else:
                     logger.error(
-                        "Primary model returned 503 but no backup provider "
-                        "configured"
+                        "Primary model returned 503 but no backup provider configured"
                     )
 
             except Exception as e:
                 logger.error(
-                    f"Attempt {retry + 1}/{MAX_LLM_RETRIES} failed "
-                    f"with exception: {e}"
+                    f"Attempt {retry + 1}/{MAX_LLM_RETRIES} failed with exception: {e}"
                 )
 
             # Exponential backoff before next retry (except on last iteration)

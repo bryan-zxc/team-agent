@@ -59,19 +59,23 @@ def convert_blocks(content_blocks: list) -> list[dict]:
         elif isinstance(block, ThinkingBlock):
             blocks.append({"type": "thinking", "thinking": block.thinking})
         elif isinstance(block, ToolUseBlock):
-            blocks.append({
-                "type": "tool_use",
-                "tool_use_id": block.id,
-                "name": block.name,
-                "input": block.input,
-            })
+            blocks.append(
+                {
+                    "type": "tool_use",
+                    "tool_use_id": block.id,
+                    "name": block.name,
+                    "input": block.input,
+                }
+            )
         elif isinstance(block, ToolResultBlock):
-            blocks.append({
-                "type": "tool_result",
-                "tool_use_id": block.tool_use_id,
-                "content": block.content,
-                "is_error": block.is_error,
-            })
+            blocks.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": block.tool_use_id,
+                    "content": block.content,
+                    "is_error": block.is_error,
+                }
+            )
     return blocks
 
 
@@ -102,10 +106,12 @@ async def publish_message(
     blocks: list[dict],
 ) -> str:
     """Format and publish a message to chat:responses. Returns the message ID."""
-    structured_content = json.dumps({
-        "blocks": blocks,
-        "mentions": [],
-    })
+    structured_content = json.dumps(
+        {
+            "blocks": blocks,
+            "mentions": [],
+        }
+    )
 
     msg_id = str(uuid_mod.uuid4())
     response = {
@@ -128,8 +134,8 @@ def create_heartbeat(
     redis_client: aioredis.Redis,
     chat_id: str,
     session_key: str,
-    get_tokens: callable,
-) -> tuple[callable, callable, callable]:
+    get_tokens: callable,  # type: ignore[reportGeneralTypeIssues]
+) -> tuple[callable, callable, callable]:  # type: ignore[reportGeneralTypeIssues]
     """Create heartbeat management functions.
 
     Returns (start, stop, restart) callables.
@@ -142,12 +148,17 @@ def create_heartbeat(
         try:
             while True:
                 await asyncio.sleep(1)
-                await redis_client.publish("chat:responses", json.dumps({
-                    "_event": "agent_activity",
-                    "chat_id": session_key,
-                    "phase": "processing",
-                    "tokens": get_tokens(),
-                }))
+                await redis_client.publish(
+                    "chat:responses",
+                    json.dumps(
+                        {
+                            "_event": "agent_activity",
+                            "chat_id": session_key,
+                            "phase": "processing",
+                            "tokens": get_tokens(),
+                        }
+                    ),
+                )
         except asyncio.CancelledError:
             pass
 
@@ -186,12 +197,17 @@ async def update_chat_status(
         if session_id is not None:
             await conn.execute(
                 "UPDATE chats SET status = $1, updated_at = $2, session_id = $3 WHERE id = $4",
-                status, datetime.now(timezone.utc), session_id, uuid_mod.UUID(chat_id),
+                status,
+                datetime.now(timezone.utc),
+                session_id,
+                uuid_mod.UUID(chat_id),
             )
         else:
             await conn.execute(
                 "UPDATE chats SET status = $1, updated_at = $2 WHERE id = $3",
-                status, datetime.now(timezone.utc), uuid_mod.UUID(chat_id),
+                status,
+                datetime.now(timezone.utc),
+                uuid_mod.UUID(chat_id),
             )
     finally:
         await conn.close()
@@ -231,7 +247,9 @@ async def cleanup_worktree(clone_path: str, branch_name: str) -> None:
     worktree_path = Path(clone_path).parent / "worktrees" / slug
 
     if worktree_path.exists():
-        rc, _, err = await run_git("worktree", "remove", str(worktree_path), "--force", cwd=clone_path)
+        rc, _, err = await run_git(
+            "worktree", "remove", str(worktree_path), "--force", cwd=clone_path
+        )
         if rc != 0:
             logger.warning("Failed to remove worktree %s: %s", worktree_path, err)
         else:
@@ -244,9 +262,13 @@ async def cleanup_worktree(clone_path: str, branch_name: str) -> None:
         logger.info("Deleted branch %s", branch_name)
 
     # Delete the remote branch (best-effort — it may not have been pushed)
-    rc, _, err = await run_git("push", "origin", "--delete", branch_name, cwd=clone_path)
+    rc, _, err = await run_git(
+        "push", "origin", "--delete", branch_name, cwd=clone_path
+    )
     if rc != 0:
-        logger.info("Remote branch %s not deleted (may not exist): %s", branch_name, err)
+        logger.info(
+            "Remote branch %s not deleted (may not exist): %s", branch_name, err
+        )
     else:
         logger.info("Deleted remote branch %s", branch_name)
 
@@ -301,7 +323,9 @@ async def stop_session(
                     "will be purged and all uncommitted work is lost."
                 )
             except Exception:
-                logger.debug("Could not send cancellation notice to session %s", chat_id[:8])
+                logger.debug(
+                    "Could not send cancellation notice to session %s", chat_id[:8]
+                )
 
         try:
             await client.interrupt()
@@ -318,7 +342,10 @@ async def stop_session(
         try:
             await client.disconnect()
         except Exception:
-            logger.debug("Expected disconnect error for session %s (cross-task scope)", chat_id[:8])
+            logger.debug(
+                "Expected disconnect error for session %s (cross-task scope)",
+                chat_id[:8],
+            )
 
     # 3. Purge worktree + branch if requested
     if purge:
@@ -331,13 +358,19 @@ async def stop_session(
 
     if room_id:
         await publish_status_event(
-            redis_client, chat_id, target_status, room_id,
+            redis_client,
+            chat_id,
+            target_status,
+            room_id,
             chat_type=session.get("session_type"),
         )
 
     logger.info(
         "Stopped session %s → %s (session_id: %s, purged: %s)",
-        chat_id[:8], target_status, session_id or "none", purge,
+        chat_id[:8],
+        target_status,
+        session_id or "none",
+        purge,
     )
     return True
 
@@ -370,12 +403,14 @@ async def get_coordinator_for_chat(chat_id: str) -> dict:
 async def run_git(*args: str, cwd: str) -> tuple[int, str, str]:
     """Run a git command and return (returncode, stdout, stderr)."""
     proc = await asyncio.create_subprocess_exec(
-        "git", *args,
+        "git",
+        *args,
         cwd=cwd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
     stdout, stderr = await proc.communicate()
+    assert proc.returncode is not None
     return proc.returncode, stdout.decode().strip(), stderr.decode().strip()
 
 
@@ -433,7 +468,10 @@ async def relay_messages(
         return total_tokens
 
     start_heartbeat, stop_heartbeat, restart_heartbeat = create_heartbeat(
-        redis_client, chat_id, session_key, get_tokens,
+        redis_client,
+        chat_id,
+        session_key,
+        get_tokens,
     )
 
     # Track tool_use_ids of playwright-cli open commands for screencast triggering
@@ -456,11 +494,16 @@ async def relay_messages(
                 # Detect playwright-cli open commands for live view
                 for block in msg.content:
                     if isinstance(block, ToolUseBlock) and block.name == "Bash":
-                        cmd = block.input.get("command", "") if isinstance(block.input, dict) else ""
+                        cmd = (
+                            block.input.get("command", "")
+                            if isinstance(block.input, dict)
+                            else ""
+                        )
                         if "playwright-cli open" in cmd:
                             logger.info(
                                 "Detected playwright-cli open for session %s: %s",
-                                session_key[:8], cmd[:100],
+                                session_key[:8],
+                                cmd[:100],
                             )
                             pending_playwright_opens.add(block.id)
 
@@ -468,10 +511,12 @@ async def relay_messages(
                     start_heartbeat()
                     continue
 
-                structured_content = json.dumps({
-                    "blocks": blocks,
-                    "mentions": [],
-                })
+                structured_content = json.dumps(
+                    {
+                        "blocks": blocks,
+                        "mentions": [],
+                    }
+                )
 
                 response = {
                     "id": str(uuid_mod.uuid4()),
@@ -499,20 +544,25 @@ async def relay_messages(
                             if not block.is_error:
                                 logger.info(
                                     "Launching screencast for session %s, room_id=%s",
-                                    session_key[:8], room_id,
+                                    session_key[:8],
+                                    room_id,
                                 )
                                 screencast.launch_screencast(
-                                    chat_id, room_id, redis_client,
+                                    chat_id,
+                                    room_id,
+                                    redis_client,
                                     owner_name=display_name,
                                 )
 
                     blocks = convert_blocks(msg.content)
                     result_blocks = [b for b in blocks if b["type"] == "tool_result"]
                     if result_blocks:
-                        structured_content = json.dumps({
-                            "blocks": result_blocks,
-                            "mentions": [],
-                        })
+                        structured_content = json.dumps(
+                            {
+                                "blocks": result_blocks,
+                                "mentions": [],
+                            }
+                        )
                         response = {
                             "id": str(uuid_mod.uuid4()),
                             "chat_id": chat_id,
@@ -522,33 +572,47 @@ async def relay_messages(
                             "content": structured_content,
                             "created_at": datetime.now(timezone.utc).isoformat(),
                         }
-                        await redis_client.publish("chat:responses", json.dumps(response))
+                        await redis_client.publish(
+                            "chat:responses", json.dumps(response)
+                        )
 
             elif isinstance(msg, ResultMessage):
                 stop_heartbeat()
 
                 logger.info(
                     "Session %s completed (session_id: %s, error: %s, turns: %d)",
-                    session_key[:8], msg.session_id, msg.is_error, msg.num_turns,
+                    session_key[:8],
+                    msg.session_id,
+                    msg.is_error,
+                    msg.num_turns,
                 )
 
                 # Update chat status and session_id
                 # If escalation already set "investigating", preserve it
                 merge_state = session.get("merge_state")
-                escalated = merge_state is not None and merge_state.get("succeeded") is False
+                escalated = (
+                    merge_state is not None and merge_state.get("succeeded") is False
+                )
                 final_status = "investigating" if escalated else completion_status
 
-                await update_chat_status(chat_id, final_status, session_id=msg.session_id)
+                await update_chat_status(
+                    chat_id, final_status, session_id=msg.session_id
+                )
 
                 await publish_status_event(
-                    redis_client, chat_id, final_status, room_id,
+                    redis_client,
+                    chat_id,
+                    final_status,
+                    room_id,
                     chat_type=session.get("session_type"),
                 )
 
                 # Workload-only: post merge summary to main chat
                 if merge_state is not None:
                     main_chat_id = session.get("main_chat_id", "")
-                    workload_title = session.get("workload_data", {}).get("title", "Workload")
+                    workload_title = session.get("workload_data", {}).get(
+                        "title", "Workload"
+                    )
                     merge_succeeded = merge_state.get("succeeded")
 
                     if merge_succeeded is True:
@@ -580,16 +644,20 @@ async def relay_messages(
 
                     blocks: list[dict] = [{"type": "text", "value": summary}]
                     if admin_chat_id:
-                        blocks.append({
-                            "type": "link",
-                            "url": f"/admin/chats/{admin_chat_id}",
-                            "label": "View \u2192",
-                        })
+                        blocks.append(
+                            {
+                                "type": "link",
+                                "url": f"/admin/chats/{admin_chat_id}",
+                                "label": "View \u2192",
+                            }
+                        )
 
                     coordinator = await get_coordinator_for_chat(main_chat_id)
                     await publish_message(
-                        redis_client, main_chat_id,
-                        coordinator["id"], coordinator["display_name"],
+                        redis_client,
+                        main_chat_id,
+                        coordinator["id"],
+                        coordinator["display_name"],
                         "coordinator",
                         blocks,
                     )
@@ -599,7 +667,9 @@ async def relay_messages(
                     try:
                         pull = "false" if merge_state else "true"
                         _headers = {"x-internal-key": settings.internal_api_key}
-                        async with httpx.AsyncClient(timeout=10.0, headers=_headers) as http:
+                        async with httpx.AsyncClient(
+                            timeout=10.0, headers=_headers
+                        ) as http:
                             resp = await http.post(
                                 f"{settings.api_service_url}/projects/"
                                 f"{project_id}/check-manifest?pull={pull}",
@@ -614,12 +684,14 @@ async def relay_messages(
                             else:
                                 logger.warning(
                                     "Session %s: manifest check returned %d",
-                                    session_key[:8], resp.status_code,
+                                    session_key[:8],
+                                    resp.status_code,
                                 )
                     except Exception:
                         logger.warning(
                             "Session %s: manifest check failed (non-blocking)",
-                            session_key[:8], exc_info=True,
+                            session_key[:8],
+                            exc_info=True,
                         )
 
                 await screencast.stop_screencast(chat_id)
@@ -648,20 +720,27 @@ async def relay_messages(
                     project_id=session.get("project_id", ""),
                     clone_path=session.get("clone_path", ""),
                     workload_chat_id=chat_id,
-                    workload_title=session.get("workload_data", {}).get("title", "Workload"),
+                    workload_title=session.get("workload_data", {}).get(
+                        "title", "Workload"
+                    ),
                     main_chat_id=session.get("main_chat_id", ""),
                     room_id=room_id,
                     error_type="relay_crash",
                     error_details=tb_mod.format_exc(),
                 )
             except Exception:
-                logger.exception("Failed to escalate relay crash for session %s", session_key[:8])
+                logger.exception(
+                    "Failed to escalate relay crash for session %s", session_key[:8]
+                )
         else:
             # Non-workload (admin) relay crash — just set needs_attention
             try:
                 await update_chat_status(chat_id, "needs_attention")
                 await publish_status_event(
-                    redis_client, chat_id, "needs_attention", room_id,
+                    redis_client,
+                    chat_id,
+                    "needs_attention",
+                    room_id,
                     chat_type=session_type,
                 )
             except Exception:

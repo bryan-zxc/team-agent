@@ -5,7 +5,6 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
-from sqlalchemy import select
 
 from ..database import async_session
 from ..guards import get_current_user, get_unlocked_project
@@ -18,7 +17,9 @@ async def _get_clone_path(project_id: uuid.UUID) -> Path:
     async with async_session() as session:
         project = await session.get(Project, project_id)
         if not project or not project.clone_path:
-            raise HTTPException(status_code=404, detail="Project not found or has no cloned repo")
+            raise HTTPException(
+                status_code=404, detail="Project not found or has no cloned repo"
+            )
     return Path(project.clone_path)
 
 
@@ -45,9 +46,21 @@ def _is_gitignored(clone_path: Path, file_path: Path) -> bool:
     rel = file_path.relative_to(clone_path)
     parts = rel.parts
     ignored_dirs = {
-        "node_modules", ".git", "__pycache__", ".next", ".venv",
-        "venv", "env", ".tox", ".pytest_cache", ".mypy_cache",
-        "dist", "build", ".eggs", ".ruff_cache", ".pixi",
+        "node_modules",
+        ".git",
+        "__pycache__",
+        ".next",
+        ".venv",
+        "venv",
+        "env",
+        ".tox",
+        ".pytest_cache",
+        ".mypy_cache",
+        "dist",
+        "build",
+        ".eggs",
+        ".ruff_cache",
+        ".pixi",
     }
     for part in parts:
         if part in ignored_dirs:
@@ -65,19 +78,23 @@ async def list_files(project_id: uuid.UUID, path: str = ""):
 
     entries = []
     try:
-        for item in sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
+        for item in sorted(
+            target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())
+        ):
             if item.name.startswith(".") and item.name in {".git"}:
                 continue
             if _is_gitignored(clone_path, item):
                 continue
 
             rel_path = str(item.relative_to(clone_path))
-            entries.append({
-                "name": item.name,
-                "type": "dir" if item.is_dir() else "file",
-                "path": rel_path,
-                "size": item.stat().st_size if item.is_file() else None,
-            })
+            entries.append(
+                {
+                    "name": item.name,
+                    "type": "dir" if item.is_dir() else "file",
+                    "path": rel_path,
+                    "size": item.stat().st_size if item.is_file() else None,
+                }
+            )
     except PermissionError:
         raise HTTPException(status_code=403, detail="Permission denied")
 

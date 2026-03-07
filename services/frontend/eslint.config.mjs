@@ -1,14 +1,17 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/compat";
+import nextConfig from "eslint-config-next";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({ baseDirectory: __dirname });
-
-const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+export default [
+  ...nextConfig,
+  {
+    rules: {
+      // React 19 compiler rules — downgrade to warn while we incrementally
+      // migrate patterns like ref-sync-during-render and setState-in-effects.
+      "react-hooks/refs": "warn",
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/immutability": "warn",
+      // We use <img> for external avatar URLs and data URIs where next/image
+      // optimisation isn't applicable.
+      "@next/next/no-img-element": "warn",
+    },
+  },
 ];
-
-export default eslintConfig;

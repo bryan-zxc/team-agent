@@ -117,15 +117,17 @@ class GoogleProvider(BaseLLMProvider):
 
             # Return TextResponse with native Google extraction
             return TextResponse(
-                messages=[{
-                    "technical_message": {
-                        "role": "assistant",
-                        "content": text_content,
-                    },
-                    "display_message": text_content,
-                    "message_from": "Zimomo",
-                }],
-                output_text=text_content,
+                messages=[
+                    {
+                        "technical_message": {
+                            "role": "assistant",
+                            "content": text_content,
+                        },
+                        "display_message": text_content,
+                        "message_from": "Zimomo",
+                    }
+                ],
+                output_text=text_content,  # type: ignore[reportArgumentType]
             )
 
         except Exception as e:
@@ -179,13 +181,13 @@ class GoogleProvider(BaseLLMProvider):
                         model, response.usage_metadata, RequestType.STRUCTURED
                     )
 
-                json_content = response.text
+                json_content = response.text or ""
 
                 # First validation attempt
                 try:
                     if is_pydantic:
                         json_data = json.loads(json_content)
-                        return response_format.model_validate(json_data)
+                        return response_format.model_validate(json_data)  # type: ignore[reportAttributeAccessIssue]
                     else:
                         json.loads(json_content)
                         return json_content
@@ -196,7 +198,7 @@ class GoogleProvider(BaseLLMProvider):
                 try:
                     if is_pydantic:
                         json_data = json.loads(json_content)
-                        return response_format.model_validate(json_data)
+                        return response_format.model_validate(json_data)  # type: ignore[reportAttributeAccessIssue]
                     else:
                         json.loads(json_content)
                         return json_content

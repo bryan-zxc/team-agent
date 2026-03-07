@@ -2,7 +2,6 @@
 
 import json
 import logging
-import traceback as tb_mod
 from pathlib import Path
 
 import httpx
@@ -29,9 +28,15 @@ async def _dump_chat_messages(chat_id: str) -> str | None:
     headers = {"x-internal-key": settings.internal_api_key}
     try:
         async with httpx.AsyncClient(timeout=10.0, headers=headers) as http:
-            resp = await http.get(f"{settings.api_service_url}/chats/{chat_id}/messages")
+            resp = await http.get(
+                f"{settings.api_service_url}/chats/{chat_id}/messages"
+            )
             if resp.status_code != 200:
-                logger.warning("Failed to fetch messages for chat %s: %d", chat_id[:8], resp.status_code)
+                logger.warning(
+                    "Failed to fetch messages for chat %s: %d",
+                    chat_id[:8],
+                    resp.status_code,
+                )
                 return None
 
         messages = resp.json()
@@ -70,7 +75,9 @@ async def _dump_chat_messages(chat_id: str) -> str | None:
         return str(md_path)
 
     except Exception:
-        logger.warning("Failed to dump chat messages for %s", chat_id[:8], exc_info=True)
+        logger.warning(
+            "Failed to dump chat messages for %s", chat_id[:8], exc_info=True
+        )
         return None
 
 
@@ -86,41 +93,53 @@ def _build_context_prompt(
     if error_type == "merge_conflict":
         parts.append(
             f"I need to resolve a merge conflict for workload "
-            f"\"{extra_context.get('workload_title', 'Unknown')}\"."
+            f'"{extra_context.get("workload_title", "Unknown")}".'
         )
         parts.append(f"\n**Error:**\n```\n{error_details}\n```")
-        parts.append(f"**Worktree:** `{extra_context.get('worktree_path', '?')}` "
-                      f"(branch: `{extra_context.get('branch_name', '?')}`)")
-        parts.append(f"**Target branch:** `{extra_context.get('target_branch', 'main')}`")
+        parts.append(
+            f"**Worktree:** `{extra_context.get('worktree_path', '?')}` "
+            f"(branch: `{extra_context.get('branch_name', '?')}`)"
+        )
+        parts.append(
+            f"**Target branch:** `{extra_context.get('target_branch', 'main')}`"
+        )
         parts.append(f"**Clone path:** `{extra_context.get('clone_path', '?')}`")
-        parts.append(f"**Workload chat ID:** `{extra_context.get('workload_chat_id', '?')}`")
+        parts.append(
+            f"**Workload chat ID:** `{extra_context.get('workload_chat_id', '?')}`"
+        )
 
     elif error_type == "push_failure":
         parts.append(
             f"I need to resolve a push failure for workload "
-            f"\"{extra_context.get('workload_title', 'Unknown')}\"."
+            f'"{extra_context.get("workload_title", "Unknown")}".'
         )
         parts.append(f"\n**Error:**\n```\n{error_details}\n```")
         parts.append(f"**Clone path:** `{extra_context.get('clone_path', '?')}`")
-        parts.append(f"**Workload chat ID:** `{extra_context.get('workload_chat_id', '?')}`")
+        parts.append(
+            f"**Workload chat ID:** `{extra_context.get('workload_chat_id', '?')}`"
+        )
 
     elif error_type == "worktree_failure":
         parts.append(
             f"I couldn't create a worktree for workload "
-            f"\"{extra_context.get('workload_title', 'Unknown')}\"."
+            f'"{extra_context.get("workload_title", "Unknown")}".'
         )
         parts.append(f"\n**Error:**\n```\n{error_details}\n```")
         parts.append(f"**Clone path:** `{extra_context.get('clone_path', '?')}`")
         parts.append(f"**Attempted branch:** `{extra_context.get('branch_name', '?')}`")
-        parts.append(f"**Workload chat ID:** `{extra_context.get('workload_chat_id', '?')}`")
+        parts.append(
+            f"**Workload chat ID:** `{extra_context.get('workload_chat_id', '?')}`"
+        )
 
     elif error_type == "relay_crash":
         parts.append(
             f"The relay task crashed for workload "
-            f"\"{extra_context.get('workload_title', 'Unknown')}\"."
+            f'"{extra_context.get("workload_title", "Unknown")}".'
         )
         parts.append(f"\n**Traceback:**\n```\n{error_details}\n```")
-        parts.append(f"**Workload chat ID:** `{extra_context.get('workload_chat_id', '?')}`")
+        parts.append(
+            f"**Workload chat ID:** `{extra_context.get('workload_chat_id', '?')}`"
+        )
 
     if md_file_path:
         parts.append(f"\n**Chat transcript:** `{md_file_path}`")
@@ -161,7 +180,10 @@ async def escalate_to_admin(
         # 2. Transition workload to investigating
         await update_chat_status(workload_chat_id, "investigating")
         await publish_status_event(
-            redis_client, workload_chat_id, "investigating", room_id,
+            redis_client,
+            workload_chat_id,
+            "investigating",
+            room_id,
             chat_type="workload",
         )
 
@@ -170,18 +192,24 @@ async def escalate_to_admin(
         async with httpx.AsyncClient(timeout=10.0, headers=headers) as http:
             resp = await http.post(
                 f"{settings.api_service_url}/projects/{project_id}/admin-room/chats",
-                json={"permission_mode": "acceptEdits", "title": f"Escalation: {workload_title}"},
+                json={
+                    "permission_mode": "acceptEdits",
+                    "title": f"Escalation: {workload_title}",
+                },
             )
             if resp.status_code not in (200, 201):
                 logger.error(
                     "Failed to create admin chat for escalation: %d %s",
-                    resp.status_code, resp.text,
+                    resp.status_code,
+                    resp.text,
                 )
                 return None
 
         admin_chat = resp.json()
         admin_chat_id = admin_chat["id"]
-        logger.info("Created admin chat %s for escalation (%s)", admin_chat_id[:8], error_type)
+        logger.info(
+            "Created admin chat %s for escalation (%s)", admin_chat_id[:8], error_type
+        )
 
         # 4. Start admin session
         chat_data = await fetch_admin_chat_data(admin_chat_id)
@@ -192,17 +220,28 @@ async def escalate_to_admin(
         await start_admin_session(chat_data, redis_client)
 
         # 5. Send context prompt to the admin session
-        context_prompt = _build_context_prompt(error_type, error_details, extra, md_file_path)
+        context_prompt = _build_context_prompt(
+            error_type, error_details, extra, md_file_path
+        )
         delivered = await route_message(admin_chat_id, context_prompt)
         if not delivered:
-            logger.warning("Failed to deliver context prompt to admin session %s", admin_chat_id[:8])
+            logger.warning(
+                "Failed to deliver context prompt to admin session %s",
+                admin_chat_id[:8],
+            )
 
         logger.info(
             "Escalated %s to admin room (admin chat %s, workload chat %s)",
-            error_type, admin_chat_id[:8], workload_chat_id[:8],
+            error_type,
+            admin_chat_id[:8],
+            workload_chat_id[:8],
         )
         return admin_chat_id
 
     except Exception:
-        logger.exception("Failed to escalate %s for workload chat %s", error_type, workload_chat_id[:8])
+        logger.exception(
+            "Failed to escalate %s for workload chat %s",
+            error_type,
+            workload_chat_id[:8],
+        )
         return None
