@@ -35,7 +35,7 @@ function getMessageText(content: string): string {
   return content;
 }
 
-function renderMessageContent(content: string): React.ReactNode {
+function renderMessageContent(content: string, onLinkClick?: (url: string) => void): React.ReactNode {
   try {
     const data = JSON.parse(content);
     if (data?.blocks) {
@@ -56,7 +56,14 @@ function renderMessageContent(content: string): React.ReactNode {
             );
           }
           if (block.type === "link") {
-            return <span key={i}>{block.label || block.url}</span>;
+            return (
+              <button
+                key={i}
+                className={styles.inlineLink}
+                onClick={() => onLinkClick?.(block.url!)}
+              >{block.label || block.url}
+              </button>
+            );
           }
           return <span key={i}>{block.value}</span>;
         },
@@ -232,7 +239,7 @@ function renderRichBlocks(blocks: any[], onLinkClick?: (url: string) => void): R
 }
 
 function renderMsgContent(msg: Message, onLinkClick?: (url: string) => void): React.ReactNode {
-  if (msg.type === "human") return renderMessageContent(msg.content);
+  if (msg.type === "human") return renderMessageContent(msg.content, onLinkClick);
   try {
     const data = JSON.parse(msg.content);
     if (data?.blocks) return renderRichBlocks(data.blocks, onLinkClick);

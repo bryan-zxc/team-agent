@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
+from ..blocks import convert_text_blocks
 from ..database import async_session
 from ..models.chat import Chat
 from ..models.message import Message
@@ -188,6 +189,12 @@ async def websocket_endpoint(
 
             if not blocks:
                 continue
+
+            # Auto-convert @mentions, /skills, and [links] in text blocks
+            if project_id:
+                blocks, mentions = await convert_text_blocks(
+                    blocks, project_id, mentions
+                )
 
             # Store full structured JSON as content
             content = json.dumps(

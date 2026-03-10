@@ -9,10 +9,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from .blocks import convert_text_blocks
 from .config import settings, setup_logging
 from .database import async_session, engine
+from .models.chat import Chat
 from .models.llm_usage import LLMUsage
 from .models.message import Message
+from .models.room import Room
 from .routes.files import router as files_router
 from .routes.members import router as members_router
 from .routes.projects import router as projects_router
@@ -68,6 +71,16 @@ async def _listen_for_chat_status():
         await sub_client.aclose()
 
 
+async def _resolve_project_id(chat_id: str) -> uuid.UUID | None:
+    """Resolve project_id from chat_id via chat → room → project."""
+    async with async_session() as session:
+        chat = await session.get(Chat, uuid.UUID(chat_id))
+        if not chat:
+            return None
+        room = await session.get(Room, chat.room_id)
+        return room.project_id if room else None
+
+
 async def _listen_for_ai_responses():
     """Subscribe to chat:responses and broadcast AI messages to WebSocket clients."""
     sub_client = aioredis.from_url(settings.redis_url)
@@ -87,6 +100,23 @@ async def _listen_for_ai_responses():
                 if chat_id:
                     await manager.broadcast(uuid.UUID(chat_id), msg_data)
                 continue
+
+            # Auto-convert @mentions, /skills, and [links] in text blocks
+            try:
+                content_data = json.loads(msg_data["content"])
+                if isinstance(content_data, dict) and "blocks" in content_data:
+                    pid = await _resolve_project_id(msg_data["chat_id"])
+                    if pid:
+                        content_data["blocks"], content_data["mentions"] = (
+                            await convert_text_blocks(
+                                content_data["blocks"],
+                                pid,
+                                content_data.get("mentions", []),
+                            )
+                        )
+                        msg_data["content"] = json.dumps(content_data)
+            except (json.JSONDecodeError, KeyError, TypeError):
+                pass  # Non-JSON or legacy content — skip conversion
 
             # Persist to PostgreSQL
             message = Message(
