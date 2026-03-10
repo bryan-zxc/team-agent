@@ -2,7 +2,7 @@ import mimetypes
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -250,3 +250,60 @@ async def serve_raw(project_id: uuid.UUID, file_path: str):
         mime_type = "application/octet-stream"
 
     return Response(content=content, media_type=mime_type)
+
+
+MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100 MB per file
+CHUNK_SIZE = 8192
+
+
+@router.post("/projects/{project_id}/files/upload")
+async def upload_files(
+    directory: str = Form("data/raw/"),
+    files: list[UploadFile] = File(...),
+    project: Project = Depends(get_unlocked_project),
+):
+    """Upload one or more files to a directory in the project repo."""
+    if not project.clone_path:
+        raise HTTPException(status_code=404, detail="Project has no cloned repo")
+    clone_path = Path(project.clone_path)
+
+    dest_dir = _validate_path(clone_path, directory)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    uploaded = []
+    errors = []
+
+    for file in files:
+        filename = file.filename or "unnamed"
+
+        # Reject unsafe filenames
+        if ".." in filename or "/" in filename or "\x00" in filename:
+            errors.append({"filename": filename, "detail": "Invalid filename"})
+            continue
+
+        file_path = _validate_path(clone_path, f"{directory}/{filename}")
+        total_size = 0
+
+        try:
+            with open(file_path, "wb") as f:
+                while chunk := await file.read(CHUNK_SIZE):
+                    total_size += len(chunk)
+                    if total_size > MAX_UPLOAD_SIZE:
+                        break
+                    f.write(chunk)
+
+            if total_size > MAX_UPLOAD_SIZE:
+                file_path.unlink(missing_ok=True)
+                errors.append(
+                    {"filename": filename, "detail": "File exceeds 100 MB limit"}
+                )
+                continue
+
+            rel_path = str(file_path.relative_to(clone_path))
+            uploaded.append({"path": rel_path, "size": total_size})
+        except PermissionError:
+            errors.append({"filename": filename, "detail": "Permission denied"})
+        finally:
+            await file.close()
+
+    return {"uploaded": uploaded, "errors": errors}
