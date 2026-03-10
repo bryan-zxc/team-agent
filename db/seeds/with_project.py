@@ -2,13 +2,14 @@
 
 Drops/recreates all tables. Inserts users, a fully-formed project with:
 - Real git clone of https://github.com/bryan-zxc/popmart.git
+- Project template overlaid onto the clone (skills, scripts, config)
 - Zimomo coordinator agent (profile written to {clone_path}/.team-agent/agents/zimomo.md)
 - Molly worker agent — presentations and visual storytelling
 - Pucky worker agent — data analysis and visualisation
 - Manifest file written to {clone_path}/.team-agent/manifest.json
 - Alice and Bob as human members
 - No rooms — rooms are created through the UI
-- Initial commit with manifest + agent profiles (not pushed — local dev only)
+- Initial commit with template + manifest + agent profiles (pushed to remote)
 
 No LLM calls — all agent profiles are written directly by the seed.
 
@@ -18,6 +19,7 @@ Usage: docker compose exec api .venv/bin/python db/seeds/with_project.py
 import asyncio
 import base64
 import json
+import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +27,7 @@ from pathlib import Path
 from base import connect, reset_schema
 
 REFERENCES_DIR = Path("/app/references")
+PROJECT_TEMPLATE_DIR = Path("/app/project-template")
 
 
 def _load_avatar(name: str) -> str | None:
@@ -122,6 +125,15 @@ async def seed():
             raise RuntimeError(f"Git clone failed: {stderr.decode().strip()}")
         print(f"Cloned {GIT_REPO_URL} to {clone_path}")
 
+        # Overlay project template onto the clone (overwrites matching files,
+        # leaves other repo files in place). This ensures the seed always has
+        # the latest skills, scripts, and config from the template.
+        if PROJECT_TEMPLATE_DIR.is_dir():
+            shutil.copytree(
+                PROJECT_TEMPLATE_DIR, clone_path, dirs_exist_ok=True
+            )
+            print("Overlaid project template onto clone")
+
         await conn.execute(
             "INSERT INTO projects (id, name, git_repo_url, clone_path, created_at) "
             "VALUES ($1, $2, $3, $4, $5)",
@@ -163,13 +175,14 @@ async def seed():
             if proc.returncode != 0:
                 print(f"  git {' '.join(args)} failed: {stderr.decode().strip()}")
 
-        await _run_git("add", ".team-agent/")
+        await _run_git("add", ".")
         await _run_git(
             "-c", "user.name=seed",
             "-c", "user.email=seed@team-agent",
-            "commit", "-m", "Initial seed: manifest + agent profiles",
+            "commit", "-m", "Initial seed: template + manifest + agent profiles",
         )
-        print("Committed .team-agent/ to local repo")
+        await _run_git("push")
+        print("Committed and pushed template + .team-agent/ to repo")
 
         # --- Members ---
         alice_member_id = uuid.uuid4()

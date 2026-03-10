@@ -35,24 +35,23 @@ If the user provides a file but no table name, suggest one based on the file con
 
 ### 2. Sample and infer types
 
-Run the diagnostic script to sample the file and get DuckDB's type inferences:
+Run the diagnostic script to sample the file and get DuckDB's type inferences. Use `--output-rows 100` to include sample data rows for the type review page:
 
 ```bash
 python .claude/skills/create-work-table/scripts/sample_file.py \
   --file-path <path-to-file> \
-  --limit 10000
+  --limit 10000 \
+  --output-rows 100
 ```
 
-This outputs JSON with column names, DuckDB-inferred types, and sample values for each column.
+This outputs JSON with column names, DuckDB-inferred types, sample values for each column, `total_rows`, and `sample_rows` (first 100 rows as arrays).
 
 ### 3. Assess types and classify columns
 
 DuckDB's automatic type inference is a good starting point but not always correct. Review each column critically and make two decisions:
 
-**SQL type** — the DuckDB storage type:
-- **ID columns** (e.g. `customer_id`, `order_id`, `sku`) — often inferred as `BIGINT` but should be `INTEGER` for faster querying. IDs are for joining and filtering, not arithmetic.
+**SQL type** — the DuckDB storage type. Trust DuckDB's inference in most cases, but watch for:
 - **Date columns** — sometimes wrongly read as integers (e.g. `20210315` → `BIGINT`) or strings (e.g. `04sep26` → `VARCHAR`). Check the sample values and recognise date patterns.
-- **Boolean columns** — may be inferred as `VARCHAR` if values are `Y/N`, `yes/no`, `true/false`, `1/0`.
 
 **Stats classification** — how the column should be profiled:
 - **categorical** — VARCHAR columns, and integer columns that are identifiers (IDs, codes, categories). These get distinct counts and value distributions.
@@ -63,22 +62,41 @@ The classification is a judgement call that DuckDB cannot make. A column like `c
 
 Also propose SQL-friendly column names: lowercase, alphanumeric and underscores only. Rename any columns with spaces, special characters, or mixed case.
 
-### 4. Present type mapping for confirmation
+### 4. Generate interactive type review
 
-Show the proposed mapping as a table:
+Generate an interactive HTML page where the user can review and adjust the type mapping in the browser, then approve it with a single click.
 
-```
-| # | Original Column | SQL Name     | Inferred | Recommended | Classification | Notes              |
-|---|-----------------|--------------|----------|-------------|----------------|--------------------|
-| 1 | Customer ID     | customer_id  | BIGINT   | INTEGER     | categorical    | ID column          |
-| 2 | Revenue         | revenue      | DOUBLE   | DOUBLE      | numeric        |                    |
-| 3 | Receipt Date    | receipt_date | BIGINT   | DATE        | date           | Read as integer    |
-| 4 | Region          | region       | VARCHAR  | VARCHAR     | categorical    |                    |
-```
+1. **Read the HTML template** from `.claude/skills/create-work-table/assets/type-review-template.html`
 
-End with: "Reply with any changes or approve to proceed."
+2. **Build the review data JSON** and substitute it into the template. The template has a single placeholder `{{REVIEW_DATA}}` inside a `<script type="application/json">` tag. Prepare a JSON object with these keys and use Python `str.replace` to inject it:
 
-Wait for the user to respond. They may say "approve", suggest changes ("change 2 to VARCHAR"), or ask questions. Apply any requested changes and re-present if needed.
+   ```python
+   import json
+   review_data = {
+       "table_name": "l10wrk_<tablename>",
+       "columns": [{"original": "Customer ID", "sql_name": "customer_id", "recommended": "INTEGER", "classification": "categorical"}, ...],
+       "sample_rows": sample_output["sample_rows"],  # from step 2
+       "total_rows": sample_output["total_rows"],     # from step 2
+       "total_cols": len(columns)
+   }
+   html = template.replace("{{REVIEW_DATA}}", json.dumps(review_data))
+   ```
+
+   **Important:** Do not modify any JavaScript code in the template — only replace the `{{REVIEW_DATA}}` placeholder. The JS reads from the JSON block at runtime.
+
+3. **Write the review file** to `data/reviews/<table_name>.html` (create the `data/reviews/` directory if needed)
+
+4. **Commit** the review file. The link in the next step only works if the file has been committed — the application's file browser only shows committed files. No push is required.
+
+5. **Send a link in chat**: `[Review type mapping for <table_name>](data/reviews/<table_name>.html)`
+
+6. **Wait for the user's response.** The user opens the link in the workbench, sees an interactive table with editable SQL names, type dropdowns, classification dropdowns, and 100 rows of sample data. When they click Approve, the page posts the finalised JSON back into this chat as a message, which arrives as a follow-up to you.
+
+7. **Parse the approved JSON** from the follow-up message. The message contains a JSON code block with the structure:
+   ```json
+   {"status": "approved", "table_name": "...", "columns": [{"original": "...", "sql_name": "...", "recommended": "...", "classification": "..."}, ...]}
+   ```
+   Use this approved mapping for all subsequent steps.
 
 ### 5. Create the ingestion script
 

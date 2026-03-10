@@ -5,10 +5,13 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
+from sqlalchemy import select
 
 from ..database import async_session
 from ..guards import get_current_user, get_unlocked_project
+from ..models.chat import Chat
 from ..models.project import Project
+from ..models.workload import Workload
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -21,6 +24,33 @@ async def _get_clone_path(project_id: uuid.UUID) -> Path:
                 status_code=404, detail="Project not found or has no cloned repo"
             )
     return Path(project.clone_path)
+
+
+async def _resolve_repo_path(
+    project_id: uuid.UUID, chat_id: uuid.UUID | None = None
+) -> Path:
+    """Return the repo root, resolving to a worktree if chat_id maps to one."""
+    clone_path = await _get_clone_path(project_id)
+
+    if chat_id is None:
+        return clone_path
+
+    async with async_session() as session:
+        chat = await session.get(Chat, chat_id)
+        if not chat or not chat.workload_id:
+            return clone_path
+
+        workload = await session.get(Workload, chat.workload_id)
+        if not workload or not workload.worktree_branch:
+            return clone_path
+
+    slug = workload.worktree_branch.removeprefix("workload/")
+    worktree_path = clone_path.parent / "worktrees" / slug
+
+    if worktree_path.is_dir():
+        return worktree_path
+
+    return clone_path
 
 
 def _validate_path(clone_path: Path, relative_path: str) -> Path:
@@ -102,8 +132,10 @@ async def list_files(project_id: uuid.UUID, path: str = ""):
 
 
 @router.get("/projects/{project_id}/files/content")
-async def read_file(project_id: uuid.UUID, path: str):
-    clone_path = await _get_clone_path(project_id)
+async def read_file(
+    project_id: uuid.UUID, path: str, chat_id: uuid.UUID | None = None
+):
+    clone_path = await _resolve_repo_path(project_id, chat_id)
     target = _validate_path(clone_path, path)
 
     if not target.is_file():
@@ -232,9 +264,11 @@ async def rename_file(
 
 
 @router.get("/projects/{project_id}/raw/{file_path:path}")
-async def serve_raw(project_id: uuid.UUID, file_path: str):
+async def serve_raw(
+    project_id: uuid.UUID, file_path: str, chat_id: uuid.UUID | None = None
+):
     """Serve a project file with its actual MIME type for iframe previews."""
-    clone_path = await _get_clone_path(project_id)
+    clone_path = await _resolve_repo_path(project_id, chat_id)
     target = _validate_path(clone_path, file_path)
 
     if not target.is_file():

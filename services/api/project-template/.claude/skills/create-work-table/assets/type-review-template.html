@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Type Review</title>
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --surface: #ffffff;
+    --surface-hover: #f0f0f2;
+    --border: #e0e0e5;
+    --text: #1a1a2e;
+    --text-muted: #6b6b80;
+    --text-dim: #9999aa;
+    --accent: #6c63ff;
+    --accent-hover: #5b53ee;
+    --green: #22c55e;
+    --green-hover: #16a34a;
+    --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    --input-bg: #f8f8fa;
+    --stripe: #fafafc;
+  }
+
+  [data-theme="dark"] {
+    --bg: #0f0f1a;
+    --surface: #1a1a2e;
+    --surface-hover: #22223a;
+    --border: #2a2a44;
+    --text: #e2e2f0;
+    --text-muted: #9999bb;
+    --text-dim: #666688;
+    --accent: #7c73ff;
+    --accent-hover: #6c63ff;
+    --green: #22c55e;
+    --green-hover: #16a34a;
+    --input-bg: #22223a;
+    --stripe: #161628;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    padding: 32px;
+    line-height: 1.5;
+  }
+
+  .header {
+    margin-bottom: 24px;
+  }
+
+  .header h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .header .subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .header .stats {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .table-container {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 24px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .table-scroll {
+    overflow: auto;
+    max-height: 70vh;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+  }
+
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--surface);
+  }
+
+  thead th {
+    background: var(--surface-hover);
+    padding: 8px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    min-width: 120px;
+  }
+
+  thead tr.control-row th,
+  thead tr.control-row td {
+    background: var(--surface);
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+
+  thead tr.control-row .row-label {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding: 6px 14px;
+    background: var(--surface-hover);
+    white-space: nowrap;
+    position: sticky;
+    left: 0;
+    z-index: 3;
+  }
+
+  thead tr:first-child th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+  }
+
+  thead tr.separator td {
+    padding: 0;
+    height: 3px;
+    background: var(--accent);
+    border: none;
+  }
+
+  tbody td {
+    padding: 5px 14px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  tbody tr:nth-child(even) td {
+    background: var(--stripe);
+  }
+
+  tbody td:first-child {
+    color: var(--text-dim);
+    font-family: var(--font);
+    font-size: 11px;
+    text-align: right;
+    padding-right: 10px;
+    min-width: 40px;
+    width: 40px;
+    position: sticky;
+    left: 0;
+    background: var(--surface);
+    z-index: 1;
+  }
+
+  tbody tr:nth-child(even) td:first-child {
+    background: var(--stripe);
+  }
+
+  .sql-input {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 4px 8px;
+    outline: none;
+    width: 110px;
+    transition: border-color 0.15s;
+  }
+
+  .sql-input:hover { border-color: var(--accent); }
+  .sql-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108, 99, 255, 0.15); }
+  .changed .sql-input { border-color: var(--accent); background-color: rgba(108, 99, 255, 0.05); }
+
+  select {
+    appearance: none;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 4px 24px 4px 8px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b6b80' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+  }
+
+  select:hover { border-color: var(--accent); }
+  select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108, 99, 255, 0.15); }
+  .changed select { border-color: var(--accent); background-color: rgba(108, 99, 255, 0.05); }
+
+  .footer {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .approve-btn {
+    background: var(--green);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 32px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .approve-btn:hover { background: var(--green-hover); }
+
+  .footer-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .approved-banner {
+    display: none;
+    background: rgba(34, 197, 94, 0.08);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .approved-banner.visible { display: flex; }
+  .approved-banner .check { color: var(--green); font-size: 20px; }
+  .approved-banner p { font-size: 13px; color: var(--text); }
+
+  .json-output {
+    display: none;
+    position: relative;
+    margin-top: 16px;
+  }
+
+  .json-output.visible { display: block; }
+
+  .json-output pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--surface-hover);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-muted);
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .copy-btn:hover { border-color: var(--accent); color: var(--text); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1 id="page-title">Type Review</h1>
+  <p class="subtitle">Review column types and classifications, then click Approve to proceed with ingestion.</p>
+  <p class="stats" id="stats-line"></p>
+</div>
+
+<div id="approved-banner" class="approved-banner">
+  <span class="check">&#10003;</span>
+  <p id="banner-text"><strong>Approved.</strong> The result has been sent to chat — ingestion will continue automatically.</p>
+</div>
+
+<div class="table-container">
+  <div class="table-scroll">
+    <table id="review-table">
+      <thead id="table-head"></thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="footer" id="footer">
+  <button class="approve-btn" onclick="handleApprove()">Approve</button>
+  <span class="footer-hint">Adjust any fields above, then click Approve to confirm the type mapping.</span>
+</div>
+
+<div id="json-output" class="json-output">
+  <button class="copy-btn" onclick="copyJson()">Copy</button>
+  <pre id="json-content"></pre>
+</div>
+
+<script id="review-data" type="application/json">{{REVIEW_DATA}}</script>
+<script>
+// ── Parse injected data ──
+const _d = JSON.parse(document.getElementById("review-data").textContent);
+const TABLE_NAME = _d.table_name;
+const COLUMN_DATA = _d.columns;
+const SAMPLE_ROWS = _d.sample_rows;
+const TOTAL_ROWS = _d.total_rows;
+const TOTAL_COLS = _d.total_cols;
+
+// Chat ID is injected at runtime by the parent iframe host via postMessage
+let chatId = null;
+
+const SQL_TYPES = ["VARCHAR", "INTEGER", "BIGINT", "DOUBLE", "DECIMAL", "BOOLEAN", "DATE", "TIMESTAMP"];
+const CLASSIFICATIONS = ["categorical", "numeric", "date"];
+
+// ── Render ──
+document.getElementById("page-title").textContent = `Type Review \u2014 ${TABLE_NAME}`;
+document.getElementById("stats-line").textContent =
+  `${TOTAL_ROWS.toLocaleString()} rows \u00b7 ${TOTAL_COLS} columns \u00b7 Showing first ${SAMPLE_ROWS.length} rows`;
+
+function buildTable() {
+  const thead = document.getElementById("table-head");
+  const tbody = document.getElementById("table-body");
+
+  // Header row: Original Column names
+  let tr = document.createElement("tr");
+  tr.innerHTML = `<th></th>` + COLUMN_DATA.map(c => `<th>${c.original}</th>`).join("");
+  thead.appendChild(tr);
+
+  // SQL Name row (editable)
+  tr = document.createElement("tr");
+  tr.className = "control-row";
+  tr.innerHTML = `<td class="row-label">SQL Name</td>` + COLUMN_DATA.map((c, i) =>
+    `<td><input class="sql-input" type="text" data-col="${i}" data-original="${c.sql_name}" value="${c.sql_name}" oninput="markInputChanged(this)" /></td>`
+  ).join("");
+  thead.appendChild(tr);
+
+  // Type row (dropdown)
+  tr = document.createElement("tr");
+  tr.className = "control-row";
+  tr.innerHTML = `<td class="row-label">Type</td>` + COLUMN_DATA.map((c, i) => {
+    const opts = SQL_TYPES.map(t => `<option value="${t}" ${t === c.recommended ? "selected" : ""}>${t}</option>`).join("");
+    return `<td><select data-col="${i}" data-field="recommended" data-original="${c.recommended}" onchange="markChanged(this)">${opts}</select></td>`;
+  }).join("");
+  thead.appendChild(tr);
+
+  // Classification row (dropdown)
+  tr = document.createElement("tr");
+  tr.className = "control-row";
+  tr.innerHTML = `<td class="row-label">Classification</td>` + COLUMN_DATA.map((c, i) => {
+    const opts = CLASSIFICATIONS.map(t => `<option value="${t}" ${t === c.classification ? "selected" : ""}>${t}</option>`).join("");
+    return `<td><select data-col="${i}" data-field="classification" data-original="${c.classification}" onchange="markChanged(this)">${opts}</select></td>`;
+  }).join("");
+  thead.appendChild(tr);
+
+  // Accent separator
+  tr = document.createElement("tr");
+  tr.className = "separator";
+  tr.innerHTML = `<td colspan="${COLUMN_DATA.length + 1}"></td>`;
+  thead.appendChild(tr);
+
+  // Data rows
+  SAMPLE_ROWS.forEach((row, ri) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${ri + 1}</td>` + row.map(v => `<td>${v}</td>`).join("");
+    tbody.appendChild(tr);
+  });
+}
+
+function markChanged(select) {
+  const td = select.parentElement;
+  td.classList.toggle("changed", select.value !== select.dataset.original);
+}
+
+function markInputChanged(input) {
+  const td = input.parentElement;
+  td.classList.toggle("changed", input.value !== input.dataset.original);
+}
+
+let approvedJsonStr = null;
+
+async function handleApprove() {
+  const result = COLUMN_DATA.map((c, i) => {
+    const sqlInput = document.querySelector(`input.sql-input[data-col="${i}"]`);
+    const typeSelect = document.querySelector(`select[data-col="${i}"][data-field="recommended"]`);
+    const classSelect = document.querySelector(`select[data-col="${i}"][data-field="classification"]`);
+    return {
+      original: c.original,
+      sql_name: sqlInput.value.trim() || c.sql_name,
+      recommended: typeSelect.value,
+      classification: classSelect.value,
+    };
+  });
+
+  const output = { status: "approved", table_name: TABLE_NAME, columns: result };
+  approvedJsonStr = JSON.stringify(output, null, 2);
+
+  // Show inline JSON and disable controls
+  document.getElementById("footer").style.display = "none";
+  document.querySelectorAll("select").forEach(s => s.disabled = true);
+  document.querySelectorAll("input.sql-input").forEach(s => s.disabled = true);
+
+  const jsonOutput = document.getElementById("json-output");
+  document.getElementById("json-content").textContent = approvedJsonStr;
+  jsonOutput.classList.add("visible");
+
+  // Post approval message back to the chat if we have a chatId
+  if (chatId) {
+    const text = `Type mapping approved for \`${TABLE_NAME}\`.\n\`\`\`json\n${approvedJsonStr}\n\`\`\``;
+    try {
+      const resp = await fetch(`/chats/${chatId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          blocks: [{ type: "text", value: text }],
+          mentions: [],
+        }),
+      });
+      if (resp.ok) {
+        document.getElementById("banner-text").innerHTML =
+          "<strong>Approved.</strong> The result has been sent to chat \u2014 ingestion will continue automatically.";
+      } else {
+        document.getElementById("banner-text").innerHTML =
+          "<strong>Approved.</strong> Could not send to chat (status " + resp.status + "). Copy the JSON below and paste it into chat.";
+      }
+    } catch (err) {
+      console.error("Failed to post approval:", err);
+      document.getElementById("banner-text").innerHTML =
+        "<strong>Approved.</strong> Could not reach the server. Copy the JSON below and paste it into chat.";
+    }
+  } else {
+    document.getElementById("banner-text").innerHTML =
+      "<strong>Approved.</strong> Copy the JSON below and paste it into chat to continue.";
+  }
+
+  document.getElementById("approved-banner").classList.add("visible");
+}
+
+function copyJson() {
+  if (!approvedJsonStr) return;
+  navigator.clipboard.writeText(approvedJsonStr).then(() => {
+    const btn = document.querySelector(".copy-btn");
+    btn.textContent = "Copied!";
+    setTimeout(() => { btn.textContent = "Copy"; }, 2000);
+  });
+}
+
+// ── Theme (controlled by parent) ──
+function applyTheme(theme) {
+  if (theme === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark");
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+  updateSelectArrows();
+}
+
+function updateSelectArrows() {
+  const colour = getComputedStyle(document.documentElement).getPropertyValue("--text-muted").trim();
+  const encoded = encodeURIComponent(colour);
+  const svg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='${encoded}' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`;
+  document.querySelectorAll("select:not(:disabled)").forEach(s => s.style.backgroundImage = svg);
+}
+
+// Listen for messages from the parent FileTab iframe host
+window.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "theme") {
+    applyTheme(e.data.theme);
+  }
+  if (e.data && e.data.type === "context" && e.data.chatId) {
+    chatId = e.data.chatId;
+  }
+});
+
+buildTable();
+</script>
+</body>
+</html>

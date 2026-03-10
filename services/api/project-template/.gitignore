@@ -5,14 +5,9 @@ __pycache__/
 .venv/
 venv/
 
-# Data (large files — track via data receipt register)
-*.csv
-*.xlsx
-*.xls
-*.parquet
-*.json
-!pipeline.yml
-!data/data_receipt_register.md
+# Raw data (large source files — track via data receipt register)
+data/raw/*
+!data/raw/README.md
 
 # OS
 .DS_Store

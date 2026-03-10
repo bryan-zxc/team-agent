@@ -15,7 +15,8 @@ import styles from "./FileTab.module.css";
 type FileTabParams = {
   filePath: string;
   projectId: string;
-  onOpenFile?: (filePath: string) => void;
+  chatId?: string;
+  onOpenFile?: (filePath: string, chatId?: string) => void;
 };
 
 function defineThemes(monaco: Monaco) {
@@ -53,7 +54,7 @@ function defineThemes(monaco: Monaco) {
 }
 
 export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
-  const { filePath, projectId, onOpenFile } = params;
+  const { filePath, projectId, chatId, onOpenFile } = params;
   const { theme } = useTheme();
   const [content, setContent] = useState<string | null>(null);
   const [editContent, setEditContent] = useState<string>("");
@@ -74,6 +75,8 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   const hasPreview = isMarkdown || isHtml || isJson || isSvg || isCsv;
   const previewLabel = isJson ? "Tree" : isCsv ? "Table" : "Preview";
   const monacoTheme = theme === "dark" ? "team-agent-dark" : "team-agent-light";
+  const chatIdParam = chatId ? `&chat_id=${chatId}` : "";
+  const rawUrl = `${API_URL}/projects/${projectId}/raw/${filePath}${chatId ? `?chat_id=${chatId}` : ""}`;
   const [previewMode, setPreviewMode] = useState(hasPreview);
   const [wordWrap, setWordWrap] = useState<"on" | "off">(
     isMarkdown ? "on" : "off",
@@ -81,7 +84,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
 
   useEffect(() => {
     if (isImage) return;
-    apiFetch(`/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`)
+    apiFetch(`/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}${chatIdParam}`)
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load file");
         return r.json();
@@ -132,9 +135,16 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [editing, handleSave]);
 
+  const sendIframeContext = useCallback(() => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    win.postMessage({ type: "theme", theme }, "*");
+    if (chatId) win.postMessage({ type: "context", chatId }, "*");
+  }, [theme, chatId]);
+
   useEffect(() => {
-    iframeRef.current?.contentWindow?.postMessage({ type: "theme", theme }, "*");
-  }, [theme]);
+    sendIframeContext();
+  }, [sendIframeContext]);
 
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     monacoRef.current = monaco;
@@ -149,7 +159,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
         </div>
         <div className={styles.imagePreview}>
           <img
-            src={`${API_URL}/projects/${projectId}/raw/${filePath}`}
+            src={rawUrl}
             alt={fileName}
           />
         </div>
@@ -301,7 +311,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
         ) : isSvg ? (
           <div className={styles.svgPreview}>
             <img
-              src={`${API_URL}/projects/${projectId}/raw/${filePath}`}
+              src={rawUrl}
               alt={fileName}
             />
           </div>
@@ -309,10 +319,10 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
           <div className={styles.htmlPreview}>
             <iframe
               ref={iframeRef}
-              src={`${API_URL}/projects/${projectId}/raw/${filePath}`}
+              src={rawUrl}
               sandbox="allow-scripts allow-same-origin"
               title={fileName}
-              onLoad={() => iframeRef.current?.contentWindow?.postMessage({ type: "theme", theme }, "*")}
+              onLoad={sendIframeContext}
             />
           </div>
         )

@@ -37,6 +37,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Sample a data file and output column info.")
     parser.add_argument("--file-path", required=True, help="Path to the source file")
     parser.add_argument("--limit", type=int, default=10000, help="Max rows to sample")
+    parser.add_argument("--output-rows", type=int, default=0, help="Include first N rows as arrays in output")
     args = parser.parse_args()
 
     file_path = args.file_path
@@ -78,11 +79,26 @@ def main() -> None:
             "null_count": null_count,
         })
 
+    # Total row count from the full file (not just sampled)
+    total_rows = conn.execute(
+        f"SELECT COUNT(*) FROM {reader}('{file_path}')"
+    ).fetchone()[0]
+
     result = {
         "file_path": file_path,
         "rows_sampled": row_count,
+        "total_rows": total_rows,
         "columns": columns,
     }
+
+    # Optionally include first N rows as arrays of string values
+    if args.output_rows > 0:
+        col_names = [c["name"] for c in columns]
+        quoted = ', '.join(f'"{n}"' for n in col_names)
+        rows = conn.execute(
+            f"SELECT {quoted} FROM sample LIMIT {args.output_rows}"
+        ).fetchall()
+        result["sample_rows"] = [[str(v) if v is not None else "" for v in row] for row in rows]
 
     print(json.dumps(result, indent=2))
 
