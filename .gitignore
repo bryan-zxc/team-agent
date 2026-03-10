@@ -231,3 +231,6 @@ certs/
 # Keep the README but ignore all cloned repos
 .external/*
 !.external/README.md
+
+# Sample data (for testing skills, not part of the codebase)
+sample_data/

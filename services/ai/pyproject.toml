@@ -6,6 +6,7 @@ dependencies = [
     "aiohttp>=3.13.3",
     "asyncpg>=0.31.0",
     "claude-agent-sdk>=0.1.36",
+    "duckdb>=1.5.0",
     "fastapi>=0.129.0",
     "google-genai>=1.64.0",
     "httpx>=0.28.1",

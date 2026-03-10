@@ -1,27 +1,16 @@
 # Project Data
 
-This project has a DuckDB analytical database for storing and querying structured data.
+## File Paths
 
-## Accessing the Database
+Source data lives in `data/raw/` inside the main repository. If the relative path doesn't work, you are in a git worktree — use absolute paths derived from the manifest instead:
 
 ```python
-import duckdb, json
+import json
 from pathlib import Path
 
 manifest = json.loads(Path(".team-agent/manifest.json").read_text())
 project_id = manifest["project_id"]
-conn = duckdb.connect(f"/data/projects/{project_id}/databases/data.duckdb")
+repo_root = f"/data/projects/{project_id}/repo"
+data_dir = f"{repo_root}/data/raw"
+db_path = f"/data/projects/{project_id}/databases/data.duckdb"
 ```
-
-## Usage
-
-- Create tables, insert data, and run analytical queries using standard SQL
-- Import CSV: `CREATE TABLE t AS SELECT * FROM read_csv_auto('path/to/file.csv')`
-- Import Parquet: `CREATE TABLE t AS SELECT * FROM read_parquet('path/to/file.parquet')`
-- For complex datasets, load as a pandas DataFrame first, then push into DuckDB:
-  ```python
-  import pandas as pd
-  df = pd.read_excel("data/raw/report.xlsx", sheet_name="Sheet1")
-  conn.execute("CREATE TABLE report AS SELECT * FROM df")
-  ```
-- The database file is outside the git repository — it is not version-controlled

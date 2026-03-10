@@ -43,6 +43,9 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
+# Ensure venv python (with project deps) is found before system python
+ENV PATH="/app/.venv/bin:$PATH"
+
 COPY . .
 
 RUN chown -R agent:agent /app && \

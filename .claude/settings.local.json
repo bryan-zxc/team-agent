@@ -93,7 +93,9 @@
       "Bash(psql:*)",
       "Bash(gh pr:*)",
       "Bash(ruff check:*)",
-      "Bash(ruff format:*)"
+      "Bash(ruff format:*)",
+      "WebFetch(domain:duckdb.org)",
+      "WebFetch(domain:gist.github.com)"
     ],
     "deny": [
       "AskUserQuestion"

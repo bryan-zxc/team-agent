@@ -198,7 +198,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
         title: fileName,
         params: isSql
           ? { filePath, projectId, database: "data", onSavedOverwrite: closeStaleTabsForPath }
-          : { filePath, projectId },
+          : { filePath, projectId, onOpenFile: openFile },
       });
     },
     [projectId, closeStaleTabsForPath],

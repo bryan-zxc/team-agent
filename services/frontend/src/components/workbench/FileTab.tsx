@@ -15,6 +15,7 @@ import styles from "./FileTab.module.css";
 type FileTabParams = {
   filePath: string;
   projectId: string;
+  onOpenFile?: (filePath: string) => void;
 };
 
 function defineThemes(monaco: Monaco) {
@@ -52,7 +53,7 @@ function defineThemes(monaco: Monaco) {
 }
 
 export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
-  const { filePath, projectId } = params;
+  const { filePath, projectId, onOpenFile } = params;
   const { theme } = useTheme();
   const [content, setContent] = useState<string | null>(null);
   const [editContent, setEditContent] = useState<string>("");
@@ -266,7 +267,32 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
       {hasPreview && previewMode ? (
         isMarkdown ? (
           <div className={styles.markdownPreview}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                a: ({ href, children, ...rest }) => {
+                  if (href && onOpenFile && !href.startsWith("http") && !href.startsWith("#")) {
+                    const dir = filePath.substring(0, filePath.lastIndexOf("/"));
+                    const resolved = dir ? `${dir}/${href}` : href;
+                    return (
+                      <a
+                        {...rest}
+                        href={href}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          onOpenFile(resolved);
+                        }}
+                      >
+                        {children}
+                      </a>
+                    );
+                  }
+                  return <a href={href} {...rest} target="_blank" rel="noopener noreferrer">{children}</a>;
+                },
+              }}
+            >
+              {content}
+            </ReactMarkdown>
           </div>
         ) : isJson ? (
           <JsonTreeView data={content} />
