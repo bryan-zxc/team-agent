@@ -1,3 +1,4 @@
+import asyncio
 import mimetypes
 import uuid
 from pathlib import Path
@@ -5,7 +6,6 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
-from sqlalchemy import select
 
 from ..database import async_session
 from ..guards import get_current_user, get_unlocked_project
@@ -160,10 +160,11 @@ async def write_file(
     path: str,
     req: WriteFileRequest,
     project: Project = Depends(get_unlocked_project),
+    chat_id: uuid.UUID | None = None,
 ):
     if not project.clone_path:
         raise HTTPException(status_code=404, detail="Project has no cloned repo")
-    clone_path = Path(project.clone_path)
+    clone_path = await _resolve_repo_path(project.id, chat_id)
     target = _validate_path(clone_path, path)
 
     if not target.parent.exists():
@@ -341,3 +342,67 @@ async def upload_files(
             await file.close()
 
     return {"uploaded": uploaded, "errors": errors}
+
+
+# ── Git operations ──────────────────────────────────────────────────────────
+
+
+async def _run_git(*args: str, cwd: str) -> tuple[int, str, str]:
+    """Run a git command and return (returncode, stdout, stderr)."""
+    proc = await asyncio.create_subprocess_exec(
+        "git",
+        *args,
+        cwd=cwd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    assert proc.returncode is not None
+    return proc.returncode, stdout.decode().strip(), stderr.decode().strip()
+
+
+class CommitRequest(BaseModel):
+    paths: list[str]
+    message: str
+
+
+@router.post("/projects/{project_id}/files/commit")
+async def commit_and_push(
+    req: CommitRequest,
+    project: Project = Depends(get_unlocked_project),
+    chat_id: uuid.UUID | None = None,
+):
+    """Stage specified files, commit, and push."""
+    if not project.clone_path:
+        raise HTTPException(status_code=404, detail="Project has no cloned repo")
+
+    repo_root = await _resolve_repo_path(project.id, chat_id)
+    cwd = str(repo_root)
+
+    # Validate all paths are within the repo
+    for p in req.paths:
+        target = _validate_path(repo_root, p)
+        if not target.exists():
+            raise HTTPException(status_code=404, detail=f"File not found: {p}")
+
+    # Stage
+    rc, _, stderr = await _run_git("add", *req.paths, cwd=cwd)
+    if rc != 0:
+        raise HTTPException(status_code=500, detail=f"git add failed: {stderr}")
+
+    # Commit
+    rc, _, stderr = await _run_git(
+        "-c", "user.name=team-agent",
+        "-c", "user.email=noreply@team-agent",
+        "commit", "-m", req.message,
+        cwd=cwd,
+    )
+    if rc != 0 and "nothing to commit" not in stderr:
+        raise HTTPException(status_code=500, detail=f"git commit failed: {stderr}")
+
+    # Push
+    rc, _, stderr = await _run_git("push", cwd=cwd)
+    if rc != 0:
+        raise HTTPException(status_code=500, detail=f"git push failed: {stderr}")
+
+    return {"ok": True}

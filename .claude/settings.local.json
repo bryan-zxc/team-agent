@@ -96,7 +96,8 @@
       "Bash(ruff format:*)",
       "WebFetch(domain:duckdb.org)",
       "WebFetch(domain:gist.github.com)",
-      "Bash(playwright-cli eval:*)"
+      "Bash(playwright-cli eval:*)",
+      "Bash(kill %1 2>/dev/null; echo \"done\")"
     ],
     "deny": [
       "AskUserQuestion"

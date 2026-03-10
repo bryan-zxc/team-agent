@@ -139,8 +139,8 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
     const win = iframeRef.current?.contentWindow;
     if (!win) return;
     win.postMessage({ type: "theme", theme }, "*");
-    if (chatId) win.postMessage({ type: "context", chatId }, "*");
-  }, [theme, chatId]);
+    win.postMessage({ type: "context", chatId, projectId, filePath }, "*");
+  }, [theme, chatId, projectId, filePath]);
 
   useEffect(() => {
     sendIframeContext();
