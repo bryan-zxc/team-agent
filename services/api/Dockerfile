@@ -21,6 +21,10 @@ RUN uv sync --frozen --no-dev
 
 COPY . .
 
+RUN git config --system credential.helper '!/usr/bin/gh auth git-credential' && \
+    git config --system user.email "agent@team-agent.local" && \
+    git config --system user.name "Team Agent"
+
 RUN chown -R agent:agent /app && \
     mkdir -p /data/projects && chown agent:agent /data/projects && \
     mkdir -p /home/agent/.config/gh && chown agent:agent /home/agent/.config/gh

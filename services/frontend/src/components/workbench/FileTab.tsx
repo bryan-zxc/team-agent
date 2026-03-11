@@ -15,6 +15,8 @@ import styles from "./FileTab.module.css";
 type FileTabParams = {
   filePath: string;
   projectId: string;
+  chatId?: string;
+  onOpenFile?: (filePath: string, chatId?: string) => void;
 };
 
 function defineThemes(monaco: Monaco) {
@@ -52,7 +54,7 @@ function defineThemes(monaco: Monaco) {
 }
 
 export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
-  const { filePath, projectId } = params;
+  const { filePath, projectId, chatId, onOpenFile } = params;
   const { theme } = useTheme();
   const [content, setContent] = useState<string | null>(null);
   const [editContent, setEditContent] = useState<string>("");
@@ -73,6 +75,9 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   const hasPreview = isMarkdown || isHtml || isJson || isSvg || isCsv;
   const previewLabel = isJson ? "Tree" : isCsv ? "Table" : "Preview";
   const monacoTheme = theme === "dark" ? "team-agent-dark" : "team-agent-light";
+  const chatIdParam = chatId ? `&chat_id=${chatId}` : "";
+  const [refreshKey, setRefreshKey] = useState(0);
+  const rawUrl = `${API_URL}/projects/${projectId}/raw/${filePath}${chatId ? `?chat_id=${chatId}` : ""}${refreshKey ? `${chatId ? "&" : "?"}t=${refreshKey}` : ""}`;
   const [previewMode, setPreviewMode] = useState(hasPreview);
   const [wordWrap, setWordWrap] = useState<"on" | "off">(
     isMarkdown ? "on" : "off",
@@ -80,7 +85,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
 
   useEffect(() => {
     if (isImage) return;
-    apiFetch(`/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`)
+    apiFetch(`/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}${chatIdParam}`)
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load file");
         return r.json();
@@ -90,7 +95,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
         setEditContent(data.content);
       })
       .catch((err) => setError(err.message));
-  }, [filePath, projectId, isImage]);
+  }, [filePath, projectId, isImage, refreshKey]);
 
   useEffect(() => {
     if (monacoRef.current) {
@@ -131,9 +136,20 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [editing, handleSave]);
 
+  const sendIframeContext = useCallback(() => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    win.postMessage({ type: "theme", theme }, "*");
+    win.postMessage({ type: "context", chatId, projectId, filePath }, "*");
+  }, [theme, chatId, projectId, filePath]);
+
   useEffect(() => {
-    iframeRef.current?.contentWindow?.postMessage({ type: "theme", theme }, "*");
-  }, [theme]);
+    sendIframeContext();
+  }, [sendIframeContext]);
+
+  const handleRefresh = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
 
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     monacoRef.current = monaco;
@@ -148,7 +164,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
         </div>
         <div className={styles.imagePreview}>
           <img
-            src={`${API_URL}/projects/${projectId}/raw/${filePath}`}
+            src={rawUrl}
             alt={fileName}
           />
         </div>
@@ -197,6 +213,15 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
                   Edit
                 </button>
               </div>
+              {previewMode && (
+                <button
+                  className={styles.toolbarBtn}
+                  onClick={handleRefresh}
+                  title="Refresh preview"
+                >
+                  Refresh
+                </button>
+              )}
               {editing && (
                 <>
                   <button
@@ -266,7 +291,32 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
       {hasPreview && previewMode ? (
         isMarkdown ? (
           <div className={styles.markdownPreview}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                a: ({ href, children, ...rest }) => {
+                  if (href && onOpenFile && !href.startsWith("http") && !href.startsWith("#")) {
+                    const dir = filePath.substring(0, filePath.lastIndexOf("/"));
+                    const resolved = dir ? `${dir}/${href}` : href;
+                    return (
+                      <a
+                        {...rest}
+                        href={href}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          onOpenFile(resolved);
+                        }}
+                      >
+                        {children}
+                      </a>
+                    );
+                  }
+                  return <a href={href} {...rest} target="_blank" rel="noopener noreferrer">{children}</a>;
+                },
+              }}
+            >
+              {content}
+            </ReactMarkdown>
           </div>
         ) : isJson ? (
           <JsonTreeView data={content} />
@@ -275,7 +325,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
         ) : isSvg ? (
           <div className={styles.svgPreview}>
             <img
-              src={`${API_URL}/projects/${projectId}/raw/${filePath}`}
+              src={rawUrl}
               alt={fileName}
             />
           </div>
@@ -283,10 +333,10 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
           <div className={styles.htmlPreview}>
             <iframe
               ref={iframeRef}
-              src={`${API_URL}/projects/${projectId}/raw/${filePath}`}
+              src={rawUrl}
               sandbox="allow-scripts allow-same-origin"
               title={fileName}
-              onLoad={() => iframeRef.current?.contentWindow?.postMessage({ type: "theme", theme }, "*")}
+              onLoad={sendIframeContext}
             />
           </div>
         )

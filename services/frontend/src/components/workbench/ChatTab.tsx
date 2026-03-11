@@ -18,10 +18,11 @@ type ChatTabParams = {
   onScreencastStarted?: (chatId: string, title: string) => void;
   onNavigateAdmin?: (chatId?: string) => void;
   onAttentionChange?: (roomId: string, needsAttention: boolean) => void;
+  onOpenFile?: (filePath: string, chatId?: string) => void;
 };
 
 export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
-  const { roomId, room, memberId, members, projectId, onScreencastStarted, onNavigateAdmin, onAttentionChange } = params;
+  const { roomId, room, memberId, members, projectId, onScreencastStarted, onNavigateAdmin, onAttentionChange, onOpenFile } = params;
   const [workloads, setWorkloads] = useState<WorkloadChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>(room.primary_chat_id);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -147,9 +148,11 @@ export function ChatTab({ params }: IDockviewPanelProps<ChatTabParams>) {
       const adminMatch = url.match(/^\/admin\/chats\/(.+)$/);
       if (adminMatch && onNavigateAdmin) {
         onNavigateAdmin(adminMatch[1]);
+      } else if (!url.startsWith("http")) {
+        onOpenFile?.(url, activeChatId);
       }
     },
-    [onNavigateAdmin],
+    [onNavigateAdmin, onOpenFile, activeChatId],
   );
 
   // Find workload for the active chat (if viewing a workload chat)

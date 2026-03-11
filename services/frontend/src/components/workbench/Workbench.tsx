@@ -156,7 +156,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
         id: panelId,
         component: "chatTab",
         title: room.name,
-        params: { roomId, room, memberId, members, projectId, onScreencastStarted: openLiveView, onNavigateAdmin: navigateToAdmin, onAttentionChange: handleAttentionChange },
+        params: { roomId, room, memberId, members, projectId, onScreencastStarted: openLiveView, onNavigateAdmin: navigateToAdmin, onAttentionChange: handleAttentionChange, onOpenFile: openFile },
       });
       setActiveRoomId(roomId);
     },
@@ -176,7 +176,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
   }, []);
 
   const openFile = useCallback(
-    (filePath: string) => {
+    (filePath: string, chatId?: string) => {
       const api = apiRef.current;
       if (!api) return;
 
@@ -198,7 +198,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
         title: fileName,
         params: isSql
           ? { filePath, projectId, database: "data", onSavedOverwrite: closeStaleTabsForPath }
-          : { filePath, projectId },
+          : { filePath, projectId, chatId, onOpenFile: openFile },
       });
     },
     [projectId, closeStaleTabsForPath],

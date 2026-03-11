@@ -5,8 +5,8 @@ description: "Seed the claude_auth and gh_auth Docker volumes so the production 
 
 # Seed Auth
 
-Populate the `claude_auth` and `gh_auth` Docker named volumes with credentials
-so the AI service's Claude Code subprocesses and GitHub CLI work in production.
+Configure authentication for the AI service's Claude Code subprocesses and
+GitHub CLI.
 
 ## Usage
 
@@ -36,35 +36,59 @@ $COMPOSE up -d
 
 ## Claude auth
 
-Claude Code on macOS stores subscription credentials in the macOS keychain.
-The service name is `Claude Code-credentials` (with a space and capital C).
-The value is a JSON blob containing OAuth tokens.
+Claude Code authenticates via a long-lived OAuth token set in the environment
+variable `CLAUDE_CODE_OAUTH_TOKEN`. The token is valid for 1 year and is
+generated on a machine with a browser using `claude setup-token`.
 
-Inside the Linux container there is no system keychain, so Claude Code falls
-back to reading `/home/agent/.claude/.credentials.json`.
+The token is stored in `.env.prod` (production) and `.env.local` (development).
+Both files are gitignored.
 
-### Steps
+### Generating a new token
 
-1. Extract the credential from the host keychain into a temp file:
-
-```bash
-security find-generic-password -s "Claude Code-credentials" -w > /tmp/claude-cred.tmp
-```
-
-2. Pipe it into the container's `claude_auth` volume:
+Run on the host machine (not inside the container):
 
 ```bash
-cat /tmp/claude-cred.tmp | $COMPOSE exec -T ai-service \
-  bash -c 'cat > /home/agent/.claude/.credentials.json && chmod 600 /home/agent/.claude/.credentials.json'
+claude setup-token
 ```
 
-3. Clean up the temp file:
+This opens a browser for OAuth authentication and prints a token like
+`sk-ant-oat01-xxxxx...xxxxx`. Copy the token.
+
+### Setting the token
+
+Add or update the token in both env files:
 
 ```bash
-rm -f /tmp/claude-cred.tmp
+# .env.prod
+CLAUDE_CODE_OAUTH_TOKEN="sk-ant-oat01-your-token-here"
+
+# .env.local
+CLAUDE_CODE_OAUTH_TOKEN="sk-ant-oat01-your-token-here"
 ```
 
-4. If the container has a missing `.claude.json` warning, restore from backup:
+Then restart the AI service:
+
+```bash
+$COMPOSE up -d ai-service
+```
+
+### Verifying
+
+```bash
+$COMPOSE exec ai-service claude auth status 2>&1
+```
+
+Expected output must include:
+- `"authMethod": "oauth_token"`
+- `"loggedIn": true`
+
+If it shows `"authMethod": "api_key"` instead, the `ANTHROPIC_API_KEY`
+environment variable is set and taking precedence. Remove it from `.env.prod`
+and restart the ai-service.
+
+### Restoring .claude.json
+
+If the container reports a missing `.claude.json`, restore from backup:
 
 ```bash
 $COMPOSE exec ai-service bash -c '
@@ -74,24 +98,6 @@ $COMPOSE exec ai-service bash -c '
     echo "Restored .claude.json from backup"
   fi
 '
-```
-
-5. Verify:
-
-```bash
-$COMPOSE exec ai-service bash -c 'claude auth status 2>&1'
-```
-
-Expected output must include:
-- `"authMethod": "claude.ai"`
-- `"subscriptionType": "max"`
-
-If it shows `"authMethod": "api_key"` instead, the `ANTHROPIC_API_KEY`
-environment variable is set and taking precedence. Remove it from `.env.prod`
-and restart the ai-service:
-
-```bash
-$COMPOSE up -d ai-service
 ```
 
 ## GitHub auth
@@ -117,8 +123,10 @@ $COMPOSE exec ai-service gh auth status
 
 ## Volume persistence
 
-Credentials are stored in Docker named volumes (`claude_auth`, `gh_auth`).
-They survive container rebuilds, restarts, image updates, and `docker compose
-down`. They are only deleted by `docker compose down -v` (the `-v` flag
-explicitly removes volumes). After a `-v` teardown, re-run `/seed-auth` to
-restore credentials.
+The `claude_auth` volume (`/home/agent/.claude`) stores Claude Code's working
+data (projects, cache, session state). The `gh_auth` volume stores GitHub CLI
+credentials. Both survive container rebuilds, restarts, image updates, and
+`docker compose down`. They are only deleted by `docker compose down -v` (the
+`-v` flag explicitly removes volumes). After a `-v` teardown, re-run
+`/seed-auth` to restore GitHub credentials (Claude auth comes from the env
+var and requires no re-seeding).

@@ -1,10 +1,12 @@
 import json
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from ..blocks import convert_text_blocks
 from ..database import async_session
 from ..guards import get_current_user, get_unlocked_project
 from ..models.room import Room
@@ -12,9 +14,12 @@ from ..models.chat import Chat
 from ..models.message import Message
 from ..models.project import Project
 from ..models.project_member import ProjectMember
+from ..models.user import User
 from ..models.workload import Workload
+from ..websocket.manager import manager
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
+logger = logging.getLogger(__name__)
 
 
 class CreateRoomRequest(BaseModel):
@@ -178,6 +183,113 @@ def _extract_reply_to_id(content: str) -> str | None:
         return json.loads(content).get("reply_to_id")
     except (json.JSONDecodeError, TypeError):
         return None
+
+
+def _get_redis():
+    from ..main import redis_client
+
+    return redis_client
+
+
+def _extract_plain_text(blocks: list[dict]) -> str:
+    """Extract plain text from structured message blocks."""
+    return " ".join(b["value"] for b in blocks if b.get("type") == "text")
+
+
+class PostMessageRequest(BaseModel):
+    blocks: list[dict]
+    mentions: list[str] = []
+
+
+@router.post("/chats/{chat_id}/messages")
+async def post_message(
+    chat_id: uuid.UUID,
+    req: PostMessageRequest,
+    user: User = Depends(get_current_user),
+):
+    """Create a message via REST (same semantics as the WebSocket handler)."""
+    if not req.blocks:
+        raise HTTPException(status_code=400, detail="blocks must not be empty")
+
+    async with async_session() as session:
+        # Resolve chat → room → project
+        chat = await session.get(Chat, chat_id)
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found")
+
+        room = await session.get(Room, chat.room_id)
+        if not room:
+            raise HTTPException(status_code=404, detail="Room not found")
+
+        project = await session.get(Project, room.project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        if project.is_locked:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Project is locked: {project.lock_reason}",
+            )
+
+        # Resolve the user's project member
+        member = (
+            await session.execute(
+                select(ProjectMember).where(
+                    ProjectMember.project_id == room.project_id,
+                    ProjectMember.user_id == user.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if not member:
+            raise HTTPException(status_code=403, detail="Not a member of this project")
+
+        # Auto-convert @mentions, /skills, and [links]
+        blocks = req.blocks
+        mentions = req.mentions
+        blocks, mentions = await convert_text_blocks(blocks, room.project_id, mentions)
+
+        content = json.dumps({"blocks": blocks, "mentions": mentions})
+
+        # Persist
+        message = Message(
+            chat_id=chat_id,
+            member_id=member.id,
+            content=content,
+        )
+        session.add(message)
+        await session.commit()
+        await session.refresh(message)
+
+        # Capture values before session closes
+        member_id_str = str(member.id)
+        display_name = member.display_name
+        member_type = member.type
+        chat_type = chat.type
+        msg_data = {
+            "id": str(message.id),
+            "chat_id": str(chat_id),
+            "member_id": member_id_str,
+            "display_name": display_name,
+            "type": member_type,
+            "content": message.content,
+            "created_at": message.created_at.isoformat(),
+            "reply_to_id": None,
+        }
+
+    # Broadcast to all WebSocket connections in this chat
+    await manager.broadcast(chat_id, msg_data)
+
+    # Route to Redis (same logic as WS handler)
+    if chat_type in ("workload", "admin"):
+        plain_text = _extract_plain_text(blocks)
+        await _get_redis().publish(
+            "chat:messages",
+            json.dumps({"chat_id": str(chat_id), "content": plain_text}),
+        )
+        logger.info(
+            "REST: published %s message for chat %s", chat_type, str(chat_id)[:8]
+        )
+
+    return msg_data
 
 
 async def _messages_for_chat(session, chat_id: uuid.UUID):

@@ -2,6 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 import { DiffEditor, type Monaco } from "@monaco-editor/react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useTheme } from "@/hooks/useTheme";
 import { getLanguage } from "@/lib/fileIcons";
 import { apiFetch } from "@/lib/api";
@@ -29,8 +31,10 @@ function defineThemes(monaco: Monaco) {
       "editor.lineHighlightBackground": "#F0EDE8",
       "editorCursor.foreground": "#7B9E87",
       "editorIndentGuide.background": "#E4E0D8",
-      "diffEditor.insertedTextBackground": "rgba(123,158,135,0.15)",
-      "diffEditor.removedTextBackground": "rgba(204,68,68,0.12)",
+      "diffEditor.insertedTextBackground": "rgba(34,139,34,0.12)",
+      "diffEditor.removedTextBackground": "rgba(204,68,68,0.10)",
+      "diffEditor.insertedLineBackground": "rgba(34,139,34,0.06)",
+      "diffEditor.removedLineBackground": "rgba(204,68,68,0.06)",
     },
   });
 
@@ -47,8 +51,10 @@ function defineThemes(monaco: Monaco) {
       "editor.lineHighlightBackground": "#222120",
       "editorCursor.foreground": "#8FB39A",
       "editorIndentGuide.background": "#2E2D2B",
-      "diffEditor.insertedTextBackground": "rgba(143,179,154,0.18)",
-      "diffEditor.removedTextBackground": "rgba(214,102,102,0.15)",
+      "diffEditor.insertedTextBackground": "rgba(34,139,34,0.15)",
+      "diffEditor.removedTextBackground": "rgba(204,68,68,0.12)",
+      "diffEditor.insertedLineBackground": "rgba(34,139,34,0.08)",
+      "diffEditor.removedLineBackground": "rgba(204,68,68,0.08)",
     },
   });
 }
@@ -88,8 +94,16 @@ function toolVerb(toolName: string): string {
     case "Edit": return "wants to edit";
     case "MultiEdit": return "wants to edit";
     case "Read": return "wants to read";
+    case "ExitPlanMode": return "wants to exit plan mode";
     default: return "wants to use";
   }
+}
+
+function getPlanContent(block: ToolApprovalBlock): string | null {
+  if (block.tool_name !== "ExitPlanMode") return null;
+  const plan = block.tool_input.plan;
+  if (typeof plan === "string") return plan;
+  return null;
 }
 
 export function ToolApprovalCard({ block, disabled }: Props) {
@@ -104,6 +118,7 @@ export function ToolApprovalCard({ block, disabled }: Props) {
   const fileName = filePath?.split("/").pop() ?? "";
   const language = fileName ? getLanguage(fileName) : "plaintext";
   const showDiff = isWriteOrEdit(block.tool_name) && block.original_content != null;
+  const planContent = getPlanContent(block);
 
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     monacoRef.current = monaco;
@@ -191,13 +206,24 @@ export function ToolApprovalCard({ block, disabled }: Props) {
         <span className={styles.toolBadge}>{block.tool_name}</span>
         <span className={styles.headerLabel}>
           {toolVerb(block.tool_name)}{" "}
-          <span className={styles.headerSummary}>{block.input_summary}</span>
+          {!planContent && (
+            <span className={styles.headerSummary}>{block.input_summary}</span>
+          )}
         </span>
       </div>
 
       {block.tool_name === "Bash" && typeof block.tool_input.command === "string" && (
         <div className={styles.commandBox}>
           <code>{block.tool_input.command}</code>
+        </div>
+      )}
+
+      {planContent && (
+        <div className={styles.planContainer}>
+          <div className={styles.planHeader}>Plan</div>
+          <div className={styles.planContent}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{planContent}</ReactMarkdown>
+          </div>
         </div>
       )}
 

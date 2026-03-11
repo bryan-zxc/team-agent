@@ -1,0 +1,262 @@
+"""Seed: users + contoso project with sample data for validation testing.
+
+Drops/recreates all tables. Inserts users, a fully-formed project with:
+- Real git clone of https://github.com/bryan-zxc/popmart2.git
+- Project template overlaid onto the clone
+- Zimomo coordinator + Molly + Pucky worker agents
+- Sample data files copied to data/raw/
+- SOW copied to docs/pre-engagement/
+- DuckDB databases directory created
+- Initial commit pushed to remote
+
+Usage: docker compose exec api .venv/bin/python db/seeds/with_contoso.py
+"""
+
+import asyncio
+import base64
+import json
+import shutil
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+
+from base import connect, reset_schema
+
+REFERENCES_DIR = Path("/app/references")
+PROJECT_TEMPLATE_DIR = Path("/app/project-template")
+SAMPLE_DATA_DIR = Path("/app/sample_data")
+
+GIT_REPO_URL = "https://github.com/bryan-zxc/popmart2.git"
+CLONE_BASE = Path("/data/projects")
+
+ZIMOMO_PROFILE = """\
+# Zimomo
+
+## Pronoun
+he/him
+
+## Personality
+Authoritative, calm, and composed. He acts as a protective patriarch who prefers order over chaos. He interacts with a serious, guiding tone, providing firm direction and expecting adherence to structure. He does not engage in frivolity, focusing instead on leading the user through complex tasks with a steady hand.
+
+## Specialisation
+analysis and reporting
+
+## Work Done
+"""
+
+MOLLY_PROFILE = """\
+# Molly
+
+## Pronoun
+she/her
+
+## Personality
+Creative, expressive, and detail-oriented. She approaches every task with an artist's eye, transforming raw information into polished visual narratives. She communicates with warm enthusiasm but never sacrifices precision for flair — every design choice serves the message.
+
+## Specialisation
+presentations and visual storytelling
+
+## Work Done
+"""
+
+PUCKY_PROFILE = """\
+# Pucky
+
+## Pronoun
+he/him
+
+## Personality
+Curious, methodical, and quietly confident. He digs into data with genuine fascination, surfacing patterns others miss. He communicates findings with clarity and restraint, letting the numbers speak rather than dressing them up — but knows exactly when a well-placed chart makes the difference.
+
+## Specialisation
+data analysis and visualisation
+
+## Work Done
+"""
+
+
+def _load_avatar(name: str) -> str | None:
+    """Load a character headshot as a base64 data URL, or None if not found."""
+    path = REFERENCES_DIR / f"{name.lower()}.jpg"
+    if not path.exists():
+        return None
+    encoded = base64.b64encode(path.read_bytes()).decode()
+    return f"data:image/jpeg;base64,{encoded}"
+
+
+async def seed():
+    conn = await connect()
+    try:
+        await reset_schema(conn)
+
+        now = datetime.now(timezone.utc)
+
+        # --- Users ---
+        alice_id = uuid.uuid4()
+        bob_id = uuid.uuid4()
+
+        await conn.execute(
+            "INSERT INTO users (id, display_name, email, created_at) VALUES ($1, $2, $3, $4)",
+            alice_id, "Alice", "alice@example.com", now,
+        )
+        await conn.execute(
+            "INSERT INTO users (id, display_name, email, created_at) VALUES ($1, $2, $3, $4)",
+            bob_id, "Bob", "bob@example.com", now,
+        )
+        print("Inserted 2 users (Alice, Bob)")
+
+        # --- Project ---
+        project_id = uuid.uuid4()
+        clone_path = str(CLONE_BASE / str(project_id) / "repo")
+
+        clone_dir = Path(clone_path)
+        clone_dir.parent.mkdir(parents=True, exist_ok=True)
+
+        proc = await asyncio.create_subprocess_exec(
+            "git", "clone", GIT_REPO_URL, clone_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(f"Git clone failed: {stderr.decode().strip()}")
+        print(f"Cloned {GIT_REPO_URL} to {clone_path}")
+
+        # Overlay project template onto the clone
+        if PROJECT_TEMPLATE_DIR.is_dir():
+            shutil.copytree(
+                PROJECT_TEMPLATE_DIR, clone_path, dirs_exist_ok=True
+            )
+            print("Overlaid project template onto clone")
+
+        # --- Set up Python environment via uv ---
+        proc = await asyncio.create_subprocess_exec(
+            "uv", "sync",
+            cwd=clone_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            print(f"  uv sync failed: {stderr.decode().strip()}")
+        else:
+            print("Ran uv sync")
+
+        # --- Copy sample data to data/raw/ ---
+        raw_dir = Path(clone_path) / "data" / "raw"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        if SAMPLE_DATA_DIR.is_dir():
+            for f in SAMPLE_DATA_DIR.iterdir():
+                if f.is_file() and f.name != "sow.md":
+                    shutil.copy2(f, raw_dir / f.name)
+                    print(f"  Copied {f.name} to data/raw/")
+
+        # --- Copy SOW to docs/pre-engagement/ ---
+        pre_eng_dir = Path(clone_path) / "docs" / "pre-engagement"
+        pre_eng_dir.mkdir(parents=True, exist_ok=True)
+        sow_file = SAMPLE_DATA_DIR / "sow.md"
+        if sow_file.exists():
+            shutil.copy2(sow_file, pre_eng_dir / "sow.md")
+            print("Copied sow.md to docs/pre-engagement/")
+
+        # --- Create DuckDB databases directory and empty data.duckdb ---
+        db_dir = CLONE_BASE / str(project_id) / "databases"
+        db_dir.mkdir(parents=True, exist_ok=True)
+        import duckdb
+        duckdb.connect(str(db_dir / "data.duckdb")).close()
+        print(f"Created databases directory with data.duckdb: {db_dir}")
+
+        await conn.execute(
+            "INSERT INTO projects (id, name, git_repo_url, clone_path, created_at) "
+            "VALUES ($1, $2, $3, $4, $5)",
+            project_id, "contoso", GIT_REPO_URL, clone_path, now,
+        )
+        print("Inserted project: contoso")
+
+        # --- Write manifest and agent profiles ---
+        team_agent_dir = Path(clone_path) / ".team-agent"
+        agents_dir = team_agent_dir / "agents"
+        agents_dir.mkdir(parents=True, exist_ok=True)
+
+        manifest = {
+            "version": 1,
+            "env": "dev",
+            "project_id": str(project_id),
+            "project_name": "contoso",
+            "claimed_at": now.isoformat(),
+        }
+        (team_agent_dir / "manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n"
+        )
+        print("Wrote manifest.json")
+
+        (agents_dir / "zimomo.md").write_text(ZIMOMO_PROFILE)
+        (agents_dir / "molly.md").write_text(MOLLY_PROFILE)
+        (agents_dir / "pucky.md").write_text(PUCKY_PROFILE)
+        print("Wrote agent profiles (Zimomo, Molly, Pucky)")
+
+        # --- Initial commit + push ---
+        async def _run_git(*args: str) -> None:
+            proc = await asyncio.create_subprocess_exec(
+                "git", *args,
+                cwd=clone_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                print(f"  git {' '.join(args)} failed: {stderr.decode().strip()}")
+
+        await _run_git("add", ".")
+        await _run_git(
+            "-c", "user.name=seed",
+            "-c", "user.email=seed@team-agent",
+            "commit", "-m", "Initial seed: template + sample data + SOW",
+        )
+        await _run_git("push")
+        print("Committed and pushed to repo")
+
+        # --- Members ---
+        alice_member_id = uuid.uuid4()
+        await conn.execute(
+            "INSERT INTO project_members (id, project_id, user_id, display_name, type, created_at) "
+            "VALUES ($1, $2, $3, $4, $5, $6)",
+            alice_member_id, project_id, alice_id, "Alice", "human", now,
+        )
+
+        bob_member_id = uuid.uuid4()
+        await conn.execute(
+            "INSERT INTO project_members (id, project_id, user_id, display_name, type, created_at) "
+            "VALUES ($1, $2, $3, $4, $5, $6)",
+            bob_member_id, project_id, bob_id, "Bob", "human", now,
+        )
+
+        zimomo_member_id = uuid.uuid4()
+        await conn.execute(
+            "INSERT INTO project_members (id, project_id, user_id, display_name, type, avatar, created_at) "
+            "VALUES ($1, $2, NULL, $3, $4, $5, $6)",
+            zimomo_member_id, project_id, "Zimomo", "coordinator", _load_avatar("Zimomo"), now,
+        )
+
+        molly_member_id = uuid.uuid4()
+        await conn.execute(
+            "INSERT INTO project_members (id, project_id, user_id, display_name, type, avatar, created_at) "
+            "VALUES ($1, $2, NULL, $3, $4, $5, $6)",
+            molly_member_id, project_id, "Molly", "ai", _load_avatar("Molly"), now,
+        )
+
+        pucky_member_id = uuid.uuid4()
+        await conn.execute(
+            "INSERT INTO project_members (id, project_id, user_id, display_name, type, avatar, created_at) "
+            "VALUES ($1, $2, NULL, $3, $4, $5, $6)",
+            pucky_member_id, project_id, "Pucky", "ai", _load_avatar("Pucky"), now,
+        )
+        print("Inserted 5 members (Alice, Bob, Zimomo, Molly, Pucky)")
+
+        print("Seed complete — contoso project ready")
+    finally:
+        await conn.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(seed())

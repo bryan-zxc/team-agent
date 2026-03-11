@@ -12,6 +12,7 @@ type Favourite = {
 const DEFAULT_FAVOURITES: Favourite[] = [
   { path: "docs/governance/board.html", label: "Board" },
   { path: "docs/governance/timeline.html", label: "Timeline" },
+  { path: "data/validation/report.html", label: "Validation Report" },
 ];
 
 function storageKey(projectId: string) {

@@ -93,7 +93,13 @@
       "Bash(psql:*)",
       "Bash(gh pr:*)",
       "Bash(ruff check:*)",
-      "Bash(ruff format:*)"
+      "Bash(ruff format:*)",
+      "WebFetch(domain:duckdb.org)",
+      "WebFetch(domain:gist.github.com)",
+      "Bash(playwright-cli eval:*)",
+      "Bash(kill %1 2>/dev/null; echo \"done\")",
+      "Bash(mkdir -p /Users/bryanye/git/team-agent/services/api/project-template/data/validation/scripts && touch /Users/bryanye/git/team-agent/services/api/project-template/data/validation/scripts/.gitkeep)",
+      "Bash(vulture services/api/src/ --min-confidence 80 2>&1)"
     ],
     "deny": [
       "AskUserQuestion"

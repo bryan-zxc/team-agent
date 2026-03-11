@@ -5,7 +5,7 @@ import { Tree, type NodeRendererProps } from "react-arborist";
 import clsx from "clsx";
 import { getFileIcon } from "@/lib/fileIcons";
 import { SetiIcon } from "./SetiIcon";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, uploadFiles } from "@/lib/api";
 import { FileContextMenu } from "./FileContextMenu";
 import styles from "./FilesSidePanel.module.css";
 
@@ -40,6 +40,7 @@ function FileNodeRenderer({ node, style, dragHandle }: NodeRendererProps<FileNod
     <div
       ref={dragHandle}
       style={style}
+      data-node-id={node.data.id}
       className={clsx(styles.node, node.isSelected && styles.nodeSelected)}
       onClick={(e) => {
         e.stopPropagation();
@@ -63,6 +64,19 @@ function FileNodeRenderer({ node, style, dragHandle }: NodeRendererProps<FileNod
         <SetiIcon svg={getFileIcon(node.data.name)} size={16} />
       )}
       <span className={styles.nodeName}>{node.data.name}</span>
+      <span className={styles.nodeActions}>
+        <button
+          className={clsx(styles.actionBtn, styles.deleteBtn)}
+          title="Delete"
+          onClick={(e) => {
+            e.stopPropagation();
+            const event = new CustomEvent("file-delete-request", { detail: node.data });
+            window.dispatchEvent(event);
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+        </button>
+      </span>
     </div>
   );
 }
@@ -75,7 +89,12 @@ export function FilesSidePanel({ projectId, onFileClick }: FilesSidePanelProps) 
     y: number;
     node: FileNode;
   } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ loaded: number; total: number } | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [confirmDeleteNode, setConfirmDeleteNode] = useState<FileNode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadDirRef = useRef("data/raw/");
 
   useEffect(() => {
     setLoading(true);
@@ -84,6 +103,32 @@ export function FilesSidePanel({ projectId, onFileClick }: FilesSidePanelProps) 
       setLoading(false);
     });
   }, [projectId]);
+
+  // Listen for delete requests from memoized tree nodes
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const node = (e as CustomEvent<FileNode>).detail;
+      setConfirmDeleteNode(node);
+    };
+    window.addEventListener("file-delete-request", handler);
+    return () => window.removeEventListener("file-delete-request", handler);
+  }, []);
+
+  const refreshDirectory = useCallback(
+    async (dirPath: string) => {
+      const children = await fetchDirectory(projectId, dirPath);
+      if (dirPath === "") {
+        setData(children);
+      } else {
+        const updateNodes = (nodes: FileNode[]): FileNode[] =>
+          nodes.map((n) =>
+            n.id === dirPath ? { ...n, children } : n.children ? { ...n, children: updateNodes(n.children) } : n,
+          );
+        setData((prev) => updateNodes(prev));
+      }
+    },
+    [projectId],
+  );
 
   const handleToggle = useCallback(
     async (id: string) => {
@@ -147,19 +192,10 @@ export function FilesSidePanel({ projectId, onFileClick }: FilesSidePanelProps) 
         body: JSON.stringify({ path: parentPath ? `${parentPath}/${name}` : name, is_directory: isDir }),
       });
       if (res.ok) {
-        const children = await fetchDirectory(projectId, parentPath);
-        const updateNodes = (nodes: FileNode[]): FileNode[] =>
-          nodes.map((n) =>
-            n.id === parentPath ? { ...n, children } : n.children ? { ...n, children: updateNodes(n.children) } : n,
-          );
-        if (parentPath === "") {
-          setData(children);
-        } else {
-          setData((prev) => updateNodes(prev));
-        }
+        await refreshDirectory(parentPath);
       }
     },
-    [projectId],
+    [projectId, refreshDirectory],
   );
 
   const handleDelete = useCallback(
@@ -170,19 +206,10 @@ export function FilesSidePanel({ projectId, onFileClick }: FilesSidePanelProps) 
       );
       if (res.ok) {
         const parentPath = path.includes("/") ? path.substring(0, path.lastIndexOf("/")) : "";
-        const children = await fetchDirectory(projectId, parentPath);
-        const updateNodes = (nodes: FileNode[]): FileNode[] =>
-          nodes.map((n) =>
-            n.id === parentPath ? { ...n, children } : n.children ? { ...n, children: updateNodes(n.children) } : n,
-          );
-        if (parentPath === "") {
-          setData(children);
-        } else {
-          setData((prev) => updateNodes(prev));
-        }
+        await refreshDirectory(parentPath);
       }
     },
-    [projectId],
+    [projectId, refreshDirectory],
   );
 
   const handleRename = useCallback(
@@ -193,26 +220,101 @@ export function FilesSidePanel({ projectId, onFileClick }: FilesSidePanelProps) 
       });
       if (res.ok) {
         const parentPath = oldPath.includes("/") ? oldPath.substring(0, oldPath.lastIndexOf("/")) : "";
-        const children = await fetchDirectory(projectId, parentPath);
-        const updateNodes = (nodes: FileNode[]): FileNode[] =>
-          nodes.map((n) =>
-            n.id === parentPath ? { ...n, children } : n.children ? { ...n, children: updateNodes(n.children) } : n,
-          );
-        if (parentPath === "") {
-          setData(children);
-        } else {
-          setData((prev) => updateNodes(prev));
-        }
+        await refreshDirectory(parentPath);
       }
     },
-    [projectId],
+    [projectId, refreshDirectory],
   );
+
+  const executeDelete = useCallback(() => {
+    if (confirmDeleteNode) {
+      handleDelete(confirmDeleteNode.id);
+      setConfirmDeleteNode(null);
+    }
+  }, [confirmDeleteNode, handleDelete]);
+
+  const triggerUpload = useCallback(() => {
+    uploadDirRef.current = "data/raw/";
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleUploadToDirectory = useCallback((directory: string) => {
+    uploadDirRef.current = directory;
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      setUploadError(null);
+      setUploadProgress({ loaded: 0, total: 1 });
+
+      const { promise } = uploadFiles(
+        projectId,
+        files,
+        uploadDirRef.current,
+        (loaded, total) => setUploadProgress({ loaded, total }),
+      );
+
+      try {
+        const result = await promise;
+        if (result.errors.length > 0) {
+          setUploadError(result.errors.map((e) => `${e.filename}: ${e.detail}`).join(", "));
+        }
+        // Refresh from root to pick up any newly created intermediate directories
+        await refreshDirectory("");
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : "Upload failed");
+      } finally {
+        setUploadProgress(null);
+        // Reset input so re-selecting the same files triggers onChange
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    },
+    [projectId, refreshDirectory],
+  );
+
+  const progressPercent = uploadProgress
+    ? Math.round((uploadProgress.loaded / uploadProgress.total) * 100)
+    : 0;
 
   return (
     <div className={styles.panel} ref={containerRef} onContextMenu={handleContextMenu}>
       <div className={styles.header}>
         <span className={styles.headerLabel}>Explorer</span>
+        <button
+          className={styles.uploadBtn}
+          onClick={triggerUpload}
+          aria-label="Upload files"
+          title="Upload files to data/raw/"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className={styles.hiddenInput}
+          onChange={handleFileSelected}
+        />
       </div>
+
+      {uploadProgress && (
+        <div className={styles.uploadProgress}>
+          <div className={styles.uploadProgressBar} style={{ width: `${progressPercent}%` }} />
+          <span className={styles.uploadProgressText}>Uploading... {progressPercent}%</span>
+        </div>
+      )}
+
+      {uploadError && (
+        <div className={styles.uploadError}>{uploadError}</div>
+      )}
 
       {loading ? (
         <div className={styles.loading}>Loading files...</div>
@@ -237,6 +339,19 @@ export function FilesSidePanel({ projectId, onFileClick }: FilesSidePanelProps) 
         </div>
       )}
 
+      {confirmDeleteNode && (
+        <div className={styles.confirmOverlay} onClick={() => setConfirmDeleteNode(null)}>
+          <div className={styles.confirmDialog} onClick={(e) => e.stopPropagation()}>
+            <p className={styles.confirmTitle}>Delete this {confirmDeleteNode.isDirectory ? "folder" : "file"}?</p>
+            <p className={styles.confirmPath}>{confirmDeleteNode.id}</p>
+            <div className={styles.confirmActions}>
+              <button className={styles.confirmCancel} onClick={() => setConfirmDeleteNode(null)}>Cancel</button>
+              <button className={styles.confirmDelete} onClick={executeDelete}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {contextMenu && (
         <FileContextMenu
           x={contextMenu.x}
@@ -246,6 +361,7 @@ export function FilesSidePanel({ projectId, onFileClick }: FilesSidePanelProps) 
           onCreate={handleCreate}
           onDelete={handleDelete}
           onRename={handleRename}
+          onUpload={handleUploadToDirectory}
         />
       )}
     </div>

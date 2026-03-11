@@ -1,10 +1,21 @@
 """Pipeline runner — executes analysis steps defined in pipeline.yml."""
 
+import json
 import subprocess
 import sys
 from pathlib import Path
 
+import duckdb
 import yaml
+
+
+def get_db_connection() -> duckdb.DuckDBPyConnection:
+    """Connect to the project's DuckDB database via the manifest."""
+    project_root = Path(__file__).parent.parent
+    manifest_path = project_root / ".team-agent" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    db_path = f"/data/projects/{manifest['project_id']}/databases/data.duckdb"
+    return duckdb.connect(db_path)
 
 
 def run_pipeline(pipeline_path: Path) -> None:
@@ -30,18 +41,25 @@ def run_pipeline(pipeline_path: Path) -> None:
         if script.endswith(".py"):
             result = subprocess.run(
                 [sys.executable, str(script_path)],
-                cwd=str(base_dir),
+                cwd=str(base_dir.parent),
             )
+            if result.returncode != 0:
+                print(f"  FAILED (exit code {result.returncode})")
+                sys.exit(1)
+
         elif script.endswith(".sql"):
-            print(f"  SQL file: {script} (execute manually or via database connector)")
-            continue
+            sql = script_path.read_text()
+            try:
+                conn = get_db_connection()
+                conn.execute(sql)
+                conn.close()
+            except Exception as e:
+                print(f"  FAILED: {e}")
+                sys.exit(1)
+
         else:
             print(f"  Unknown file type: {script}")
             continue
-
-        if result.returncode != 0:
-            print(f"  FAILED (exit code {result.returncode})")
-            sys.exit(1)
 
         # Run checks if defined
         for check in step.get("checks", []):
@@ -65,11 +83,10 @@ if __name__ == "__main__":
         print("No pipeline.yml found. Create one to define your analysis steps.")
         print("\nExample pipeline.yml:")
         print("  steps:")
-        print("    - name: Clean raw data")
-        print("      script: clean_data.py")
-        print("      inputs: [../data/raw/transactions.csv]")
-        print("      outputs: [../data/processed/transactions_clean.csv]")
-        print("      checks: [check_clean.py]")
+        print("    - name: Ingest sales data")
+        print("      script: l10wrk_sales.py")
+        print("    - name: Sales by region")
+        print("      script: l20drv_sales_by_region.sql")
         sys.exit(0)
 
     run_pipeline(pipeline_file)

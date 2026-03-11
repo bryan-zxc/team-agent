@@ -349,17 +349,16 @@ If the run **fails**:
    ```
 2. Diagnose the root cause from the logs
 3. Fix the issue on develop, commit and push
-4. Create a new PR, merge it, and re-tag (delete old tag first):
+4. Create a new PR from develop to main, merge it
+5. Tag a new **patch** version (e.g. if v0.8.0 failed, tag v0.8.1):
    ```bash
-   git tag -d vX.Y.Z
-   git push origin :refs/tags/vX.Y.Z
    git checkout main && git pull origin main
    git tag -a vX.Y.Z -m "Release vX.Y.Z"
    git push origin vX.Y.Z
-   git checkout develop
+   git checkout develop && git merge main
    ```
-5. This triggers a new workflow run — go back to the polling step
-6. Repeat until deployment succeeds
+6. This triggers a new workflow run — go back to the polling step
+7. Repeat until deployment succeeds
 
 ### 15. Report result
 
@@ -368,10 +367,25 @@ Print:
 - Link to the successful run
 - Confirm deployment is live
 
+### 15.5. Sync develop with main
+
+After tagging, sync develop so it includes the merge commit:
+
+```bash
+git checkout develop
+git merge main
+git push origin develop
+```
+
+This prevents develop and main from diverging due to merge commits.
+
 ## Rules
 
 - Never auto-decide a version — always present a recommendation and wait for user approval
 - Never force-push to main
+- Never delete or move a tag once pushed — tags are immutable. If a deploy fails, fix and tag a new patch version instead
+- Always use `--merge` (not `--squash`) when merging PRs to main — squash merges cause develop and main to diverge
+- Always sync develop with main after merging (merge main back into develop)
 - Always return to the develop branch after the release
 - If any step fails, stop immediately and report the error
 - Production deploys from **main only** — the CI/CD pipeline triggers on version tag push, builds from main, and the Mac Mini checks out and runs main

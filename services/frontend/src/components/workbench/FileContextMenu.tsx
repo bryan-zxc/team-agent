@@ -17,6 +17,7 @@ type FileContextMenuProps = {
   onCreate: (parentPath: string, name: string, isDir: boolean) => void;
   onDelete: (path: string) => void;
   onRename: (oldPath: string, newName: string) => void;
+  onUpload?: (directory: string) => void;
 };
 
 export function FileContextMenu({
@@ -27,6 +28,7 @@ export function FileContextMenu({
   onCreate,
   onDelete,
   onRename,
+  onUpload,
 }: FileContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [inputMode, setInputMode] = useState<"newFile" | "newFolder" | "rename" | null>(null);
@@ -104,6 +106,11 @@ export function FileContextMenu({
       <button className={styles.item} onClick={() => { setInputValue(""); setInputMode("newFolder"); }}>
         New Folder
       </button>
+      {node.isDirectory && onUpload && (
+        <button className={styles.item} onClick={() => { onUpload(node.id); onClose(); }}>
+          Upload Files
+        </button>
+      )}
       <div className={styles.separator} />
       <button className={styles.item} onClick={() => { setInputValue(node.name); setInputMode("rename"); }}>
         Rename

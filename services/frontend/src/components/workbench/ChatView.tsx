@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { AnimatePresence } from "motion/react";
 import { useWebSocket, type TypingEvent, type ContentBlock } from "@/hooks/useWebSocket";
@@ -35,7 +36,7 @@ function getMessageText(content: string): string {
   return content;
 }
 
-function renderMessageContent(content: string): React.ReactNode {
+function renderMessageContent(content: string, onLinkClick?: (url: string) => void): React.ReactNode {
   try {
     const data = JSON.parse(content);
     if (data?.blocks) {
@@ -56,9 +57,18 @@ function renderMessageContent(content: string): React.ReactNode {
             );
           }
           if (block.type === "link") {
-            return <span key={i}>{block.label || block.url}</span>;
+            return (
+              <button
+                key={i}
+                className={styles.inlineLink}
+                onClick={() => onLinkClick?.(block.url!)}
+              >{block.label || block.url}
+              </button>
+            );
           }
-          return <span key={i}>{block.value}</span>;
+          return (
+            <span key={i}>{block.value}</span>
+          );
         },
       );
     }
@@ -121,38 +131,39 @@ function formatElapsed(ms: number): string {
 }
 
 function toolUseSummary(name: string, input: Record<string, unknown>): string {
+  const desc = input.description ? String(input.description) : "";
   switch (name) {
     case "Read":
-      return `Read ${input.file_path ?? "file"}`;
+      return desc || `Read ${input.file_path ?? "file"}`;
     case "Bash":
-      return `Run: ${truncate(String(input.command ?? ""), 60)}`;
+      return desc || `Run: ${truncate(String(input.command ?? ""), 60)}`;
     case "Edit":
-      return `Edit ${input.file_path ?? "file"}`;
+      return desc || `Edit ${input.file_path ?? "file"}`;
     case "Write":
-      return `Write ${input.file_path ?? "file"}`;
+      return desc || `Write ${input.file_path ?? "file"}`;
     case "MultiEdit":
-      return `Edit ${input.file_path ?? "file"}`;
+      return desc || `Edit ${input.file_path ?? "file"}`;
     case "Grep":
-      return `Search for '${input.pattern ?? ""}'`;
+      return desc || `Search for '${input.pattern ?? ""}'`;
     case "Glob":
-      return `Find files matching '${input.pattern ?? ""}'`;
+      return desc || `Find files matching '${input.pattern ?? ""}'`;
     case "WebSearch":
-      return `Search web for '${input.query ?? ""}'`;
+      return desc || `Search web for '${input.query ?? ""}'`;
     case "WebFetch":
-      return `Fetch ${truncate(String(input.url ?? ""), 50)}`;
+      return desc || `Fetch ${truncate(String(input.url ?? ""), 50)}`;
     case "TodoWrite": {
       const todos = Array.isArray(input.todos) ? input.todos : [];
       const done = todos.filter((t: { status: string }) => t.status === "completed").length;
-      return `Update tasks (${done} of ${todos.length} completed)`;
+      return desc || `Update tasks (${done} of ${todos.length} completed)`;
     }
     case "TaskCreate":
-      return `Create task: ${input.subject ?? ""}`;
+      return desc || `Create task: ${input.subject ?? ""}`;
     case "TaskUpdate":
-      return `Update task ${input.taskId ?? ""}`;
+      return desc || `Update task ${input.taskId ?? ""}`;
     case "TaskList":
-      return "List tasks";
+      return desc || "List tasks";
     default:
-      return name;
+      return desc || name;
   }
 }
 
@@ -232,7 +243,7 @@ function renderRichBlocks(blocks: any[], onLinkClick?: (url: string) => void): R
 }
 
 function renderMsgContent(msg: Message, onLinkClick?: (url: string) => void): React.ReactNode {
-  if (msg.type === "human") return renderMessageContent(msg.content);
+  if (msg.type === "human") return renderMessageContent(msg.content, onLinkClick);
   try {
     const data = JSON.parse(msg.content);
     if (data?.blocks) return renderRichBlocks(data.blocks, onLinkClick);
@@ -436,10 +447,14 @@ export function ChatView({
     prevCountRef.current = messages.length;
   }, [messages, onAiMessage]);
 
-  // Clear resuming state when workload transitions to running
+  // Clear resuming state when workload transitions to running or awaiting approval
   // Clear agent activity when workload stops running
   useEffect(() => {
-    if (prevStatusRef.current !== "running" && workloadStatus === "running") {
+    if (
+      prevStatusRef.current !== "running" &&
+      prevStatusRef.current !== "awaiting_approval" &&
+      (workloadStatus === "running" || workloadStatus === "awaiting_approval")
+    ) {
       setResuming(false);
     }
     if (prevStatusRef.current === "running" && workloadStatus !== "running") {
