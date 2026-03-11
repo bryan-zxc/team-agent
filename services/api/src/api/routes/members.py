@@ -1,15 +1,18 @@
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ..config import settings
 from ..database import async_session
 from ..guards import get_current_user, get_unlocked_project
+from ..models.activity_heartbeat import ActivityHeartbeat
 from ..models.llm_usage import LLMUsage
 from ..models.project import Project
 from ..models.project_member import ProjectMember
@@ -249,3 +252,69 @@ async def update_margin(
         await session.commit()
 
         return {"margin_percent": member.margin_percent}
+
+
+@router.post("/projects/{project_id}/members/{member_id}/heartbeat")
+async def record_heartbeat(project_id: uuid.UUID, member_id: uuid.UUID):
+    """Record one minute of active time for a human member."""
+    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+
+    async with async_session() as session:
+        member = await session.get(ProjectMember, member_id)
+        if not member or member.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Member not found")
+        if member.type != "human":
+            raise HTTPException(status_code=400, detail="Only human members track active time")
+
+        stmt = (
+            pg_insert(ActivityHeartbeat)
+            .values(
+                id=uuid.uuid4(),
+                member_id=member_id,
+                project_id=project_id,
+                recorded_at=now,
+            )
+            .on_conflict_do_nothing()
+        )
+        await session.execute(stmt)
+        await session.commit()
+
+    return {"status": "ok"}
+
+
+@router.get("/projects/{project_id}/members/{member_id}/active-time")
+async def get_active_time(project_id: uuid.UUID, member_id: uuid.UUID):
+    """Return aggregated active time for a member."""
+    now = datetime.now(timezone.utc)
+    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_week = (now - timedelta(days=now.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+
+    async with async_session() as session:
+        member = await session.get(ProjectMember, member_id)
+        if not member or member.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Member not found")
+
+        row = (
+            await session.execute(
+                select(
+                    func.count()
+                    .filter(ActivityHeartbeat.recorded_at >= start_of_today)
+                    .label("today_minutes"),
+                    func.count()
+                    .filter(ActivityHeartbeat.recorded_at >= start_of_week)
+                    .label("week_minutes"),
+                    func.count().label("lifetime_minutes"),
+                ).where(
+                    ActivityHeartbeat.member_id == member_id,
+                    ActivityHeartbeat.project_id == project_id,
+                )
+            )
+        ).one()
+
+        return {
+            "today_minutes": row.today_minutes,
+            "week_minutes": row.week_minutes,
+            "lifetime_minutes": row.lifetime_minutes,
+        }

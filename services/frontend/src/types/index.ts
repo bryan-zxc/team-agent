@@ -62,6 +62,12 @@ export type MemberCosts = {
   nsr: number;
 };
 
+export type MemberActiveTime = {
+  today_minutes: number;
+  week_minutes: number;
+  lifetime_minutes: number;
+};
+
 export type AvailableUser = {
   id: string;
   display_name: string;

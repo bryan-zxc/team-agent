@@ -17,8 +17,8 @@ export function MemberList({ members, onAddClick, onMemberClick }: MemberListPro
         {members.map((member) => (
           <button
             key={member.id}
-            className={clsx(styles.memberItem, member.type !== "human" && styles.memberItemClickable)}
-            onClick={() => member.type !== "human" && onMemberClick?.(member.id)}
+            className={clsx(styles.memberItem, styles.memberItemClickable)}
+            onClick={() => onMemberClick?.(member.id)}
           >
             {member.avatar ? (
               <img src={member.avatar} alt={member.display_name} className={styles.avatarImg} />

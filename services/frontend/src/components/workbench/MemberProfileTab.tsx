@@ -6,7 +6,8 @@ import { apiFetch } from "@/lib/api";
 import { MemberProfile } from "@/components/members/MemberProfile";
 import { MemberProfileEditor } from "@/components/members/MemberProfileEditor";
 import { CostCard } from "@/components/members/CostCard";
-import type { MemberCosts } from "@/types";
+import { TimeCards } from "@/components/members/TimeCards";
+import type { MemberActiveTime, MemberCosts } from "@/types";
 
 type Params = {
   projectId: string;
@@ -26,22 +27,50 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
   const [content, setContent] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [costs, setCosts] = useState<MemberCosts | null>(null);
+  const [activeTime, setActiveTime] = useState<MemberActiveTime | null>(null);
   const marginTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isAiMember = memberType === "ai" || memberType === "coordinator";
+  const isHuman = memberType === "human";
 
+  // AI members: fetch profile
   useEffect(() => {
+    if (!isAiMember) return;
     apiFetch(`/projects/${projectId}/members/${memberId}/profile`)
       .then((r) => r.json())
       .then((data) => setContent(data.content ?? ""));
-  }, [projectId, memberId]);
+  }, [projectId, memberId, isAiMember]);
 
+  // AI members: fetch costs
   useEffect(() => {
     if (!isAiMember) return;
     apiFetch(`/projects/${projectId}/members/${memberId}/costs`)
       .then((r) => r.json())
       .then((data) => setCosts(data));
   }, [projectId, memberId, isAiMember]);
+
+  // Human members: fetch active time
+  const fetchActiveTime = useCallback(() => {
+    apiFetch(`/projects/${projectId}/members/${memberId}/active-time`)
+      .then((r) => r.json())
+      .then((data) => setActiveTime(data));
+  }, [projectId, memberId]);
+
+  useEffect(() => {
+    if (!isHuman) return;
+    fetchActiveTime();
+  }, [isHuman, fetchActiveTime]);
+
+  const handleRefresh = useCallback(() => {
+    if (isAiMember) {
+      apiFetch(`/projects/${projectId}/members/${memberId}/costs`)
+        .then((r) => r.json())
+        .then((data) => setCosts(data));
+    }
+    if (isHuman) {
+      fetchActiveTime();
+    }
+  }, [projectId, memberId, isAiMember, isHuman, fetchActiveTime]);
 
   const handleMarginChange = useCallback(
     (margin: number) => {
@@ -71,9 +100,10 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
     [projectId, memberId],
   );
 
-  if (content === null) return null;
+  // AI members wait for profile content; humans render immediately
+  if (isAiMember && content === null) return null;
 
-  if (editing) {
+  if (editing && content !== null) {
     return (
       <MemberProfileEditor
         content={content}
@@ -86,8 +116,9 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
   return (
     <MemberProfile
       name={memberName}
-      content={content}
-      onEdit={() => setEditing(true)}
+      content={isAiMember ? content ?? undefined : undefined}
+      onEdit={isAiMember ? () => setEditing(true) : undefined}
+      onRefresh={handleRefresh}
       costCard={
         isAiMember && costs ? (
           <CostCard
@@ -95,6 +126,15 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
             middleStat={{ label: "Tokens", value: formatTokens(costs.total_tokens) }}
             marginPercent={costs.margin_percent}
             onMarginChange={handleMarginChange}
+          />
+        ) : undefined
+      }
+      timeCards={
+        isHuman && activeTime ? (
+          <TimeCards
+            todayMinutes={activeTime.today_minutes}
+            weekMinutes={activeTime.week_minutes}
+            lifetimeMinutes={activeTime.lifetime_minutes}
           />
         ) : undefined
       }
