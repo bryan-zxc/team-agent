@@ -180,6 +180,9 @@ async def _listen_for_cost_tracking():
             try:
                 data = json.loads(raw["data"])
 
+                member_id = data.get("member_id")
+                project_id = data.get("project_id")
+
                 record = LLMUsage(
                     model=data["model"],
                     provider=data["provider"],
@@ -191,6 +194,8 @@ async def _listen_for_cost_tracking():
                     session_id=data.get("session_id"),
                     num_turns=data.get("num_turns"),
                     duration_ms=data.get("duration_ms"),
+                    member_id=uuid.UUID(member_id) if member_id else None,
+                    project_id=uuid.UUID(project_id) if project_id else None,
                 )
                 async with async_session() as session:
                     session.add(record)

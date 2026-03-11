@@ -52,6 +52,14 @@ export type Member = {
   type: "human" | "ai" | "coordinator";
   user_id: string | null;
   avatar: string | null;
+  margin_percent: number | null;
+};
+
+export type MemberCosts = {
+  total_cost: number;
+  total_tokens: number;
+  margin_percent: number;
+  nsr: number;
 };
 
 export type AvailableUser = {

@@ -10,6 +10,7 @@ import redis.asyncio as aioredis
 from .admin import fetch_admin_chat_data, start_admin_session
 from .agents import generate_agent_profile
 from .config import settings
+from .cost import set_cost_context
 from .runner import run_agent
 from .session import route_message
 from .tool_approval import resolve_tool_approval
@@ -77,12 +78,12 @@ async def _load_orchestrator(chat_id: str) -> dict:
     """Look up the coordinator for the project that owns this chat.
 
     Joins chat → room → project → project_members to find the member
-    with type='coordinator'. Returns {id, display_name}.
+    with type='coordinator'. Returns {id, display_name, project_id}.
     """
     conn = await asyncpg.connect(_dsn)
     try:
         row = await conn.fetchrow(
-            "SELECT pm.id, pm.display_name "
+            "SELECT pm.id, pm.display_name, r.project_id "
             "FROM chats c "
             "JOIN rooms r ON r.id = c.room_id "
             "JOIN project_members pm ON pm.project_id = r.project_id "
@@ -91,7 +92,11 @@ async def _load_orchestrator(chat_id: str) -> dict:
         )
         if not row:
             raise ValueError(f"No coordinator member found for chat {chat_id}")
-        return {"id": str(row["id"]), "display_name": row["display_name"]}
+        return {
+            "id": str(row["id"]),
+            "display_name": row["display_name"],
+            "project_id": str(row["project_id"]),
+        }
     finally:
         await conn.close()
 
@@ -322,6 +327,11 @@ async def listen(redis_client: aioredis.Redis):
         # Fetch full conversation history for context
         conversation = await _load_chat_history(chat_id)
         logger.info("Loaded %d messages from database", len(conversation))
+
+        set_cost_context(
+            member_id=orchestrator["id"],
+            project_id=orchestrator["project_id"],
+        )
 
         agent_response = await run_agent(
             conversation,

@@ -5,11 +5,12 @@ from pathlib import Path
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from ..config import settings
 from ..database import async_session
 from ..guards import get_current_user, get_unlocked_project
+from ..models.llm_usage import LLMUsage
 from ..models.project import Project
 from ..models.project_member import ProjectMember
 from ..models.user import User
@@ -56,6 +57,7 @@ async def list_members(project_id: uuid.UUID):
                 "type": m.type,
                 "user_id": str(m.user_id) if m.user_id else None,
                 "avatar": m.avatar,
+                "margin_percent": m.margin_percent,
             }
             for m in members
         ]
@@ -186,3 +188,64 @@ async def update_profile(
     path.write_text(req.content)
 
     return {"status": "ok"}
+
+
+@router.get("/projects/{project_id}/members/{member_id}/costs")
+async def get_member_costs(project_id: uuid.UUID, member_id: uuid.UUID):
+    """Return aggregated cost data for a member."""
+    async with async_session() as session:
+        member = await session.get(ProjectMember, member_id)
+        if not member or member.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Member not found")
+
+        row = (
+            await session.execute(
+                select(
+                    func.coalesce(func.sum(LLMUsage.cost), 0.0).label("total_cost"),
+                    func.coalesce(
+                        func.sum(
+                            func.coalesce(LLMUsage.input_tokens, 0)
+                            + func.coalesce(LLMUsage.output_tokens, 0)
+                        ),
+                        0,
+                    ).label("total_tokens"),
+                ).where(
+                    LLMUsage.member_id == member_id,
+                    LLMUsage.project_id == project_id,
+                )
+            )
+        ).one()
+
+        total_cost = float(row.total_cost)
+        total_tokens = int(row.total_tokens)
+        margin = member.margin_percent if member.margin_percent is not None else 30.0
+        nsr = total_cost * (1 + margin / 100)
+
+        return {
+            "total_cost": round(total_cost, 4),
+            "total_tokens": total_tokens,
+            "margin_percent": margin,
+            "nsr": round(nsr, 2),
+        }
+
+
+class UpdateMarginRequest(BaseModel):
+    margin_percent: float
+
+
+@router.put("/projects/{project_id}/members/{member_id}/margin")
+async def update_margin(
+    project_id: uuid.UUID,
+    member_id: uuid.UUID,
+    req: UpdateMarginRequest,
+):
+    """Update the charge-out margin for a member."""
+    async with async_session() as session:
+        member = await session.get(ProjectMember, member_id)
+        if not member or member.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Member not found")
+
+        member.margin_percent = req.margin_percent
+        await session.commit()
+
+        return {"margin_percent": member.margin_percent}

@@ -1,8 +1,8 @@
 """Cost tracking module for the AI service."""
 
-from .tracker import CostTracker
+from .tracker import CostTracker, set_cost_context
 
-__all__ = ["CostTracker"]
+__all__ = ["CostTracker", "set_cost_context"]
 
 _cost_tracker: CostTracker | None = None
 

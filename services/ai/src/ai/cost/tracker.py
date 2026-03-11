@@ -1,11 +1,24 @@
 """Unified cost tracker — publishes usage data to Redis for API service to persist."""
 
+import contextvars
 import json
 import logging
 
 import redis.asyncio as aioredis
 
 logger = logging.getLogger(__name__)
+
+# Context variable for threading member/project through the LLM call chain
+_cost_context: contextvars.ContextVar[dict] = contextvars.ContextVar(
+    "cost_context", default={}
+)
+
+
+def set_cost_context(
+    *, member_id: str | None = None, project_id: str | None = None
+) -> None:
+    """Set the cost attribution context for subsequent LLM calls."""
+    _cost_context.set({"member_id": member_id, "project_id": project_id})
 
 
 class CostTracker:
@@ -25,6 +38,7 @@ class CostTracker:
         caller: str,
     ) -> None:
         """Track cost from Google Gemini or OpenAI LLM calls."""
+        ctx = _cost_context.get()
         try:
             await self._redis.publish(
                 "cost:usage",
@@ -37,6 +51,8 @@ class CostTracker:
                         "cost": cost,
                         "request_type": request_type,
                         "caller": caller,
+                        "member_id": ctx.get("member_id"),
+                        "project_id": ctx.get("project_id"),
                     }
                 ),
             )
@@ -52,6 +68,8 @@ class CostTracker:
         session_id: str,
         num_turns: int,
         duration_ms: int,
+        member_id: str | None = None,
+        project_id: str | None = None,
     ) -> None:
         """Track cost from Claude Agent SDK ResultMessage."""
         if total_cost_usd is None:
@@ -78,6 +96,8 @@ class CostTracker:
                         "session_id": session_id,
                         "num_turns": num_turns,
                         "duration_ms": duration_ms,
+                        "member_id": member_id,
+                        "project_id": project_id,
                     }
                 ),
             )

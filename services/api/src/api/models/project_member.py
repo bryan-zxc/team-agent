@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Float, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,3 +24,6 @@ class ProjectMember(UUIDPrimaryKey, TimestampMixin, Base):
     display_name: Mapped[str] = mapped_column(String, nullable=False)
     type: Mapped[str] = mapped_column(String, nullable=False)
     avatar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    margin_percent: Mapped[float | None] = mapped_column(
+        Float, nullable=True, server_default="30.0"
+    )

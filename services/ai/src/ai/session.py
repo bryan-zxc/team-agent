@@ -600,12 +600,35 @@ async def relay_messages(
                 stop_heartbeat()
 
                 logger.info(
-                    "Session %s completed (session_id: %s, error: %s, turns: %d)",
+                    "Session %s completed (session_id: %s, error: %s, turns: %d, cost: %s)",
                     session_key[:8],
                     msg.session_id,
                     msg.is_error,
                     msg.num_turns,
+                    f"${msg.total_cost_usd:.4f}" if msg.total_cost_usd else "n/a",
                 )
+
+                # Persist SDK session cost
+                if msg.total_cost_usd is not None:
+                    try:
+                        from .cost import get_cost_tracker
+
+                        await get_cost_tracker().track_sdk_cost(
+                            total_cost_usd=msg.total_cost_usd,
+                            model="claude-opus-4",
+                            usage=msg.usage,
+                            caller="claude_sdk",
+                            session_id=msg.session_id,
+                            num_turns=msg.num_turns,
+                            duration_ms=msg.duration_ms,
+                            member_id=member_id,
+                            project_id=project_id,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Failed to track SDK cost for session %s",
+                            session_key[:8],
+                        )
 
                 # Update chat status and session_id
                 # If escalation already set "investigating", preserve it

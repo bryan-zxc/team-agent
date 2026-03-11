@@ -8,9 +8,10 @@ type MemberProfileProps = {
   name: string;
   content: string;
   onEdit: () => void;
+  costCard?: React.ReactNode;
 };
 
-export function MemberProfile({ name, content, onEdit }: MemberProfileProps) {
+export function MemberProfile({ name, content, onEdit, costCard }: MemberProfileProps) {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -25,6 +26,7 @@ export function MemberProfile({ name, content, onEdit }: MemberProfileProps) {
         </div>
         <button className={styles.editBtn} onClick={onEdit}>Edit</button>
       </div>
+      {costCard}
       <div className={styles.markdown}>
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
       </div>

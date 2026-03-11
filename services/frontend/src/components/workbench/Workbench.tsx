@@ -511,7 +511,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
                   id: panelId,
                   component: "memberTab",
                   title: member.display_name,
-                  params: { projectId, memberId: id, memberName: member.display_name },
+                  params: { projectId, memberId: id, memberName: member.display_name, memberType: member.type },
                 });
               }}
             />
