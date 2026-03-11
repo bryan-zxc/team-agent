@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import mimetypes
 import uuid
 from pathlib import Path
@@ -12,6 +13,8 @@ from ..guards import get_current_user, get_unlocked_project
 from ..models.chat import Chat
 from ..models.project import Project
 from ..models.workload import Workload
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -45,6 +48,8 @@ async def _resolve_repo_path(
             return clone_path
 
     slug = workload.worktree_branch.removeprefix("workload/")
+    if ".." in slug or "/" in slug or "\x00" in slug:
+        return clone_path
     worktree_path = clone_path.parent / "worktrees" / slug
 
     if worktree_path.is_dir():
@@ -386,7 +391,8 @@ async def commit_and_push(
     # Stage
     rc, _, stderr = await _run_git("add", *req.paths, cwd=cwd)
     if rc != 0:
-        raise HTTPException(status_code=500, detail=f"git add failed: {stderr}")
+        logger.error("git add failed: %s", stderr)
+        raise HTTPException(status_code=500, detail="git add failed")
 
     # Commit
     rc, _, stderr = await _run_git(
@@ -400,11 +406,13 @@ async def commit_and_push(
         cwd=cwd,
     )
     if rc != 0 and "nothing to commit" not in stderr:
-        raise HTTPException(status_code=500, detail=f"git commit failed: {stderr}")
+        logger.error("git commit failed: %s", stderr)
+        raise HTTPException(status_code=500, detail="git commit failed")
 
     # Push
     rc, _, stderr = await _run_git("push", cwd=cwd)
     if rc != 0:
-        raise HTTPException(status_code=500, detail=f"git push failed: {stderr}")
+        logger.error("git push failed: %s", stderr)
+        raise HTTPException(status_code=500, detail="git push failed")
 
     return {"ok": True}

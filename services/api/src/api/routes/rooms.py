@@ -259,29 +259,34 @@ async def post_message(
         await session.commit()
         await session.refresh(message)
 
-    msg_data = {
-        "id": str(message.id),
-        "chat_id": str(chat_id),
-        "member_id": str(member.id),
-        "display_name": member.display_name,
-        "type": member.type,
-        "content": message.content,
-        "created_at": message.created_at.isoformat(),
-        "reply_to_id": None,
-    }
+        # Capture values before session closes
+        member_id_str = str(member.id)
+        display_name = member.display_name
+        member_type = member.type
+        chat_type = chat.type
+        msg_data = {
+            "id": str(message.id),
+            "chat_id": str(chat_id),
+            "member_id": member_id_str,
+            "display_name": display_name,
+            "type": member_type,
+            "content": message.content,
+            "created_at": message.created_at.isoformat(),
+            "reply_to_id": None,
+        }
 
     # Broadcast to all WebSocket connections in this chat
     await manager.broadcast(chat_id, msg_data)
 
     # Route to Redis (same logic as WS handler)
-    if chat.type in ("workload", "admin"):
+    if chat_type in ("workload", "admin"):
         plain_text = _extract_plain_text(blocks)
         await _get_redis().publish(
             "chat:messages",
             json.dumps({"chat_id": str(chat_id), "content": plain_text}),
         )
         logger.info(
-            "REST: published %s message for chat %s", chat.type, str(chat_id)[:8]
+            "REST: published %s message for chat %s", chat_type, str(chat_id)[:8]
         )
 
     return msg_data
