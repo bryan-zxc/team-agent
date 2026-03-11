@@ -2,7 +2,7 @@ import re
 import uuid
 from pathlib import Path
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from .database import async_session
 from .models.project import Project
@@ -11,7 +11,9 @@ from .models.project_member import ProjectMember
 # Patterns matched inside text blocks (order matters for priority)
 _LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")  # [label](url)
 _MENTION_RE = re.compile(r"@(\S+)")  # @name
-_SKILL_RE = re.compile(r"(?<!\S)/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)(?!\S)")  # /skill-name
+_SKILL_RE = re.compile(
+    r"(?<!\S)/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)(?!\S)"
+)  # /skill-name
 
 # Combined pattern: match any of the three, leftmost wins
 _COMBINED_RE = re.compile(
@@ -26,9 +28,7 @@ async def _get_member_map(
 ) -> dict[str, ProjectMember]:
     """Return {lowercase_display_name: member} for all project members."""
     async with async_session() as session:
-        stmt = select(ProjectMember).where(
-            ProjectMember.project_id == project_id
-        )
+        stmt = select(ProjectMember).where(ProjectMember.project_id == project_id)
         result = await session.execute(stmt)
         members = result.scalars().all()
     return {m.display_name.lower(): m for m in members}
@@ -136,9 +136,7 @@ async def convert_text_blocks(
             result_blocks.append(block)
             continue
 
-        split_blocks, added_mentions = _split_text_block(
-            value, member_map, skill_names
-        )
+        split_blocks, added_mentions = _split_text_block(value, member_map, skill_names)
         result_blocks.extend(split_blocks)
 
         for mid in added_mentions:

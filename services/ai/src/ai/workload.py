@@ -171,7 +171,8 @@ async def _ensure_worktree(clone_path: str, slug: str) -> Path:
     # Set up Python environment if pyproject.toml exists
     if (worktree_path / "pyproject.toml").exists():
         uv_proc = await asyncio.create_subprocess_exec(
-            "uv", "sync",
+            "uv",
+            "sync",
             cwd=str(worktree_path),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

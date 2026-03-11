@@ -245,9 +245,7 @@ async def post_message(
         # Auto-convert @mentions, /skills, and [links]
         blocks = req.blocks
         mentions = req.mentions
-        blocks, mentions = await convert_text_blocks(
-            blocks, room.project_id, mentions
-        )
+        blocks, mentions = await convert_text_blocks(blocks, room.project_id, mentions)
 
         content = json.dumps({"blocks": blocks, "mentions": mentions})
 
@@ -282,7 +280,9 @@ async def post_message(
             "chat:messages",
             json.dumps({"chat_id": str(chat_id), "content": plain_text}),
         )
-        logger.info("REST: published %s message for chat %s", chat.type, str(chat_id)[:8])
+        logger.info(
+            "REST: published %s message for chat %s", chat.type, str(chat_id)[:8]
+        )
 
     return msg_data
 

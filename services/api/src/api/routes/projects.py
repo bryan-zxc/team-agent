@@ -212,7 +212,8 @@ async def create_project(
 
             # Set up Python environment via uv
             uv_proc = await asyncio.create_subprocess_exec(
-                "uv", "sync",
+                "uv",
+                "sync",
                 cwd=clone_path,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -283,7 +284,8 @@ async def create_project(
             # Set up Python environment if pyproject.toml exists
             if (Path(clone_path) / "pyproject.toml").exists():
                 uv_proc = await asyncio.create_subprocess_exec(
-                    "uv", "sync",
+                    "uv",
+                    "sync",
                     cwd=clone_path,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,

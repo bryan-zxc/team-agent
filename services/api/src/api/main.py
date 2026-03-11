@@ -111,12 +111,13 @@ async def _listen_for_ai_responses():
                     if isinstance(content_data, dict) and "blocks" in content_data:
                         pid = await _resolve_project_id(msg_data["chat_id"])
                         if pid:
-                            content_data["blocks"], content_data["mentions"] = (
-                                await convert_text_blocks(
-                                    content_data["blocks"],
-                                    pid,
-                                    content_data.get("mentions", []),
-                                )
+                            (
+                                content_data["blocks"],
+                                content_data["mentions"],
+                            ) = await convert_text_blocks(
+                                content_data["blocks"],
+                                pid,
+                                content_data.get("mentions", []),
                             )
                             msg_data["content"] = json.dumps(content_data)
                 except (json.JSONDecodeError, KeyError, TypeError):

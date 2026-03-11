@@ -132,9 +132,7 @@ async def list_files(project_id: uuid.UUID, path: str = ""):
 
 
 @router.get("/projects/{project_id}/files/content")
-async def read_file(
-    project_id: uuid.UUID, path: str, chat_id: uuid.UUID | None = None
-):
+async def read_file(project_id: uuid.UUID, path: str, chat_id: uuid.UUID | None = None):
     clone_path = await _resolve_repo_path(project_id, chat_id)
     target = _validate_path(clone_path, path)
 
@@ -392,9 +390,13 @@ async def commit_and_push(
 
     # Commit
     rc, _, stderr = await _run_git(
-        "-c", "user.name=team-agent",
-        "-c", "user.email=noreply@team-agent",
-        "commit", "-m", req.message,
+        "-c",
+        "user.name=team-agent",
+        "-c",
+        "user.email=noreply@team-agent",
+        "commit",
+        "-m",
+        req.message,
         cwd=cwd,
     )
     if rc != 0 and "nothing to commit" not in stderr:

@@ -47,7 +47,9 @@ class Settings(BaseSettings):
             return hosts.get("github.com", {}).get("oauth_token")
         except Exception:
             logging.getLogger(__name__).warning(
-                "Failed to read GitHub token from %s", hosts_path, exc_info=True,
+                "Failed to read GitHub token from %s",
+                hosts_path,
+                exc_info=True,
             )
             return None
 

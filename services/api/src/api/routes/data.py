@@ -107,8 +107,7 @@ async def execute_query(
                     # Materialise into a temp table so we can count,
                     # sort, and paginate efficiently in DuckDB.
                     conn.execute(
-                        "CREATE OR REPLACE TEMP TABLE __last_result AS "
-                        f"({stmt})"
+                        f"CREATE OR REPLACE TEMP TABLE __last_result AS ({stmt})"
                     )
 
                     count_result = conn.execute(
