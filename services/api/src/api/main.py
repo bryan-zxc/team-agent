@@ -50,20 +50,23 @@ async def _listen_for_chat_status():
         async for raw in pubsub.listen():
             if raw["type"] != "message":
                 continue
-            event = json.loads(raw["data"])
-            room_id = event.get("room_id")
-            if not room_id:
-                continue
+            try:
+                event = json.loads(raw["data"])
+                room_id = event.get("room_id")
+                if not room_id:
+                    continue
 
-            # Add _event marker so frontend can distinguish from chat messages
-            chat_type = event.get("chat_type")
-            if chat_type == "workload":
-                event["_event"] = "workload_status"
-            elif chat_type == "admin":
-                event["_event"] = "admin_status"
-            else:
-                event["_event"] = "workload_status"
-            await manager.broadcast_room(uuid.UUID(room_id), event)
+                # Add _event marker so frontend can distinguish from chat messages
+                chat_type = event.get("chat_type")
+                if chat_type == "workload":
+                    event["_event"] = "workload_status"
+                elif chat_type == "admin":
+                    event["_event"] = "admin_status"
+                else:
+                    event["_event"] = "workload_status"
+                await manager.broadcast_room(uuid.UUID(room_id), event)
+            except Exception:
+                logger.exception("Failed to process chat:status message")
     except asyncio.CancelledError:
         pass
     finally:
@@ -92,46 +95,49 @@ async def _listen_for_ai_responses():
         async for raw in pubsub.listen():
             if raw["type"] != "message":
                 continue
-            msg_data = json.loads(raw["data"])
-
-            # Ephemeral events (e.g. agent_activity) — broadcast without persisting
-            if msg_data.get("_event"):
-                chat_id = msg_data.get("chat_id")
-                if chat_id:
-                    await manager.broadcast(uuid.UUID(chat_id), msg_data)
-                continue
-
-            # Auto-convert @mentions, /skills, and [links] in text blocks
             try:
-                content_data = json.loads(msg_data["content"])
-                if isinstance(content_data, dict) and "blocks" in content_data:
-                    pid = await _resolve_project_id(msg_data["chat_id"])
-                    if pid:
-                        content_data["blocks"], content_data["mentions"] = (
-                            await convert_text_blocks(
-                                content_data["blocks"],
-                                pid,
-                                content_data.get("mentions", []),
+                msg_data = json.loads(raw["data"])
+
+                # Ephemeral events (e.g. agent_activity) — broadcast without persisting
+                if msg_data.get("_event"):
+                    chat_id = msg_data.get("chat_id")
+                    if chat_id:
+                        await manager.broadcast(uuid.UUID(chat_id), msg_data)
+                    continue
+
+                # Auto-convert @mentions, /skills, and [links] in text blocks
+                try:
+                    content_data = json.loads(msg_data["content"])
+                    if isinstance(content_data, dict) and "blocks" in content_data:
+                        pid = await _resolve_project_id(msg_data["chat_id"])
+                        if pid:
+                            content_data["blocks"], content_data["mentions"] = (
+                                await convert_text_blocks(
+                                    content_data["blocks"],
+                                    pid,
+                                    content_data.get("mentions", []),
+                                )
                             )
-                        )
-                        msg_data["content"] = json.dumps(content_data)
-            except (json.JSONDecodeError, KeyError, TypeError):
-                pass  # Non-JSON or legacy content — skip conversion
+                            msg_data["content"] = json.dumps(content_data)
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    pass  # Non-JSON or legacy content — skip conversion
 
-            # Persist to PostgreSQL
-            message = Message(
-                id=uuid.UUID(msg_data["id"]),
-                chat_id=uuid.UUID(msg_data["chat_id"]),
-                member_id=uuid.UUID(msg_data["member_id"]),
-                content=msg_data["content"],
-            )
-            async with async_session() as session:
-                session.add(message)
-                await session.commit()
-                await session.refresh(message)
+                # Persist to PostgreSQL
+                message = Message(
+                    id=uuid.UUID(msg_data["id"]),
+                    chat_id=uuid.UUID(msg_data["chat_id"]),
+                    member_id=uuid.UUID(msg_data["member_id"]),
+                    content=msg_data["content"],
+                )
+                async with async_session() as session:
+                    session.add(message)
+                    await session.commit()
+                    await session.refresh(message)
 
-            # Broadcast to connected WebSocket clients
-            await manager.broadcast(uuid.UUID(msg_data["chat_id"]), msg_data)
+                # Broadcast to connected WebSocket clients
+                await manager.broadcast(uuid.UUID(msg_data["chat_id"]), msg_data)
+            except Exception:
+                logger.exception("Failed to process chat:responses message")
     except asyncio.CancelledError:
         pass
     finally:
@@ -170,23 +176,26 @@ async def _listen_for_cost_tracking():
         async for raw in pubsub.listen():
             if raw["type"] != "message":
                 continue
-            data = json.loads(raw["data"])
+            try:
+                data = json.loads(raw["data"])
 
-            record = LLMUsage(
-                model=data["model"],
-                provider=data["provider"],
-                input_tokens=data.get("input_tokens"),
-                output_tokens=data.get("output_tokens"),
-                cost=data["cost"],
-                request_type=data["request_type"],
-                caller=data["caller"],
-                session_id=data.get("session_id"),
-                num_turns=data.get("num_turns"),
-                duration_ms=data.get("duration_ms"),
-            )
-            async with async_session() as session:
-                session.add(record)
-                await session.commit()
+                record = LLMUsage(
+                    model=data["model"],
+                    provider=data["provider"],
+                    input_tokens=data.get("input_tokens"),
+                    output_tokens=data.get("output_tokens"),
+                    cost=data["cost"],
+                    request_type=data["request_type"],
+                    caller=data["caller"],
+                    session_id=data.get("session_id"),
+                    num_turns=data.get("num_turns"),
+                    duration_ms=data.get("duration_ms"),
+                )
+                async with async_session() as session:
+                    session.add(record)
+                    await session.commit()
+            except Exception:
+                logger.exception("Failed to process cost:usage message")
     except asyncio.CancelledError:
         pass
     finally:

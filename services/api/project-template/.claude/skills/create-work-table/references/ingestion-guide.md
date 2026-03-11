@@ -112,7 +112,7 @@ conn.execute("""
 
 ## Handling faulty rows
 
-When the optimistic approach fails (type errors, malformed rows), use `store_rejects` to let good rows through while capturing the bad ones:
+**Never use `ignore_errors`.** It silently discards rows with no way to recover them. Always use `store_rejects` so every rejected row is captured in the `reject_errors` table for inspection.
 
 ```python
 conn.execute("""
@@ -140,7 +140,21 @@ This gives the exact line number, column, original CSV content, and error messag
 
 ## Resolving rejected rows
 
-After inspecting the rejects, fix and insert them. Choose the approach based on complexity:
+**Every row must be accounted for.** Inspect the rejects, diagnose the cause, and always attempt to fix the ingestion so all rows make it into the table.
+
+### Processing failures — fix silently
+
+If the data itself is correct but we failed to process it, that is our problem — fix the ingestion script and re-run. No DV item needed.
+
+- **Encoding / special characters** — re-read with explicit encoding (`encoding = 'latin-1'`, `encoding = 'windows-1252'`), or read all columns as VARCHAR first, clean in SQL/Python, then cast
+- **Currency symbols, thousand separators** — strip formatting before casting
+- **Quoting issues** — adjust `quote` / `escape` parameters in `read_csv`
+
+### Data quality issues — fix and record
+
+If the source data itself is non-compliant (e.g. a date column that is consistently `YYYY-MM-DD` except for a handful of rows in a different format, or unexpected values in a typed column), still attempt to fix it. Then record the finding as a DV item via `/append-dv` with the proposed solution describing how it was resolved — the client needs to know what we found and how we handled it.
+
+If the issue truly cannot be resolved and rows must be excluded, record it as a DV item with the proposed solution being exclusion. Extract the excluded rows into a `val_` table (see below) so the client can inspect them and confirm.
 
 ### Simple fix in DuckDB (e.g. alternative date format)
 
@@ -180,6 +194,21 @@ df_rejects = conn.execute("""
 
 conn.execute("INSERT INTO l10wrk_sales SELECT * FROM df_fixed")
 ```
+
+### Extracting rejected rows into a val_ table
+
+When rejected rows must be excluded and need client confirmation, materialise them as actual row-level data — never as a summary. Re-read the source file with all columns as VARCHAR (so nothing is rejected), then filter to only the rows that failed:
+
+```python
+conn.execute("""
+    CREATE OR REPLACE TABLE val_sales_rejects AS
+    SELECT *
+    FROM read_csv('data/raw/sales.csv', auto_detect = false, all_varchar = true)
+    WHERE rowid IN (SELECT line FROM reject_errors)
+""")
+```
+
+The `val_` table must contain the actual problematic rows so the client can see the data and decide. A summary table with counts is useless.
 
 ## Multi-file datasets
 

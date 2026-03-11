@@ -430,8 +430,8 @@ async def switch_mode(chat_id: str, req: SwitchModeRequest):
             if chat.permission_mode == req.permission_mode:
                 return {"status": "no_change"}
 
-        # 1. Interrupt if running
-        if chat.status == "running":
+        # 1. Interrupt if running or awaiting approval
+        if chat.status in ("running", "awaiting_approval"):
             async with httpx.AsyncClient(timeout=10.0) as http:
                 resp = await http.post(
                     f"{settings.ai_service_url}/chats/{chat_id}/interrupt",

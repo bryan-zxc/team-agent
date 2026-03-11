@@ -1,19 +1,15 @@
-"""Seed: users + popmart project with Zimomo + two worker agents.
+"""Seed: users + contoso project with sample data for validation testing.
 
 Drops/recreates all tables. Inserts users, a fully-formed project with:
-- Real git clone of https://github.com/bryan-zxc/popmart.git
-- Project template overlaid onto the clone (skills, scripts, config)
-- Zimomo coordinator agent (profile written to {clone_path}/.team-agent/agents/zimomo.md)
-- Molly worker agent — presentations and visual storytelling
-- Pucky worker agent — data analysis and visualisation
-- Manifest file written to {clone_path}/.team-agent/manifest.json
-- Alice and Bob as human members
-- No rooms — rooms are created through the UI
-- Initial commit with template + manifest + agent profiles (pushed to remote)
+- Real git clone of https://github.com/bryan-zxc/popmart2.git
+- Project template overlaid onto the clone
+- Zimomo coordinator + Molly + Pucky worker agents
+- Sample data files copied to data/raw/
+- SOW copied to docs/pre-engagement/
+- DuckDB databases directory created
+- Initial commit pushed to remote
 
-No LLM calls — all agent profiles are written directly by the seed.
-
-Usage: docker compose exec api .venv/bin/python db/seeds/with_project.py
+Usage: docker compose exec api .venv/bin/python db/seeds/with_contoso.py
 """
 
 import asyncio
@@ -28,17 +24,9 @@ from base import connect, reset_schema
 
 REFERENCES_DIR = Path("/app/references")
 PROJECT_TEMPLATE_DIR = Path("/app/project-template")
+SAMPLE_DATA_DIR = Path("/app/sample_data")
 
-
-def _load_avatar(name: str) -> str | None:
-    """Load a character headshot as a base64 data URL, or None if not found."""
-    path = REFERENCES_DIR / f"{name.lower()}.jpg"
-    if not path.exists():
-        return None
-    encoded = base64.b64encode(path.read_bytes()).decode()
-    return f"data:image/jpeg;base64,{encoded}"
-
-GIT_REPO_URL = "https://github.com/bryan-zxc/popmart.git"
+GIT_REPO_URL = "https://github.com/bryan-zxc/popmart2.git"
 CLONE_BASE = Path("/data/projects")
 
 ZIMOMO_PROFILE = """\
@@ -87,6 +75,15 @@ data analysis and visualisation
 """
 
 
+def _load_avatar(name: str) -> str | None:
+    """Load a character headshot as a base64 data URL, or None if not found."""
+    path = REFERENCES_DIR / f"{name.lower()}.jpg"
+    if not path.exists():
+        return None
+    encoded = base64.b64encode(path.read_bytes()).decode()
+    return f"data:image/jpeg;base64,{encoded}"
+
+
 async def seed():
     conn = await connect()
     try:
@@ -125,9 +122,7 @@ async def seed():
             raise RuntimeError(f"Git clone failed: {stderr.decode().strip()}")
         print(f"Cloned {GIT_REPO_URL} to {clone_path}")
 
-        # Overlay project template onto the clone (overwrites matching files,
-        # leaves other repo files in place). This ensures the seed always has
-        # the latest skills, scripts, and config from the template.
+        # Overlay project template onto the clone
         if PROJECT_TEMPLATE_DIR.is_dir():
             shutil.copytree(
                 PROJECT_TEMPLATE_DIR, clone_path, dirs_exist_ok=True
@@ -147,14 +142,38 @@ async def seed():
         else:
             print("Ran uv sync")
 
+        # --- Copy sample data to data/raw/ ---
+        raw_dir = Path(clone_path) / "data" / "raw"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        if SAMPLE_DATA_DIR.is_dir():
+            for f in SAMPLE_DATA_DIR.iterdir():
+                if f.is_file() and f.name != "sow.md":
+                    shutil.copy2(f, raw_dir / f.name)
+                    print(f"  Copied {f.name} to data/raw/")
+
+        # --- Copy SOW to docs/pre-engagement/ ---
+        pre_eng_dir = Path(clone_path) / "docs" / "pre-engagement"
+        pre_eng_dir.mkdir(parents=True, exist_ok=True)
+        sow_file = SAMPLE_DATA_DIR / "sow.md"
+        if sow_file.exists():
+            shutil.copy2(sow_file, pre_eng_dir / "sow.md")
+            print("Copied sow.md to docs/pre-engagement/")
+
+        # --- Create DuckDB databases directory and empty data.duckdb ---
+        db_dir = CLONE_BASE / str(project_id) / "databases"
+        db_dir.mkdir(parents=True, exist_ok=True)
+        import duckdb
+        duckdb.connect(str(db_dir / "data.duckdb")).close()
+        print(f"Created databases directory with data.duckdb: {db_dir}")
+
         await conn.execute(
             "INSERT INTO projects (id, name, git_repo_url, clone_path, created_at) "
             "VALUES ($1, $2, $3, $4, $5)",
-            project_id, "popmart", GIT_REPO_URL, clone_path, now,
+            project_id, "contoso", GIT_REPO_URL, clone_path, now,
         )
-        print("Inserted project: popmart")
+        print("Inserted project: contoso")
 
-        # --- Write manifest and Zimomo profile into the cloned repo ---
+        # --- Write manifest and agent profiles ---
         team_agent_dir = Path(clone_path) / ".team-agent"
         agents_dir = team_agent_dir / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
@@ -163,7 +182,7 @@ async def seed():
             "version": 1,
             "env": "dev",
             "project_id": str(project_id),
-            "project_name": "popmart",
+            "project_name": "contoso",
             "claimed_at": now.isoformat(),
         }
         (team_agent_dir / "manifest.json").write_text(
@@ -176,7 +195,7 @@ async def seed():
         (agents_dir / "pucky.md").write_text(PUCKY_PROFILE)
         print("Wrote agent profiles (Zimomo, Molly, Pucky)")
 
-        # --- Initial commit (local only — don't push to upstream in dev seed) ---
+        # --- Initial commit + push ---
         async def _run_git(*args: str) -> None:
             proc = await asyncio.create_subprocess_exec(
                 "git", *args,
@@ -192,10 +211,10 @@ async def seed():
         await _run_git(
             "-c", "user.name=seed",
             "-c", "user.email=seed@team-agent",
-            "commit", "-m", "Initial seed: template + manifest + agent profiles",
+            "commit", "-m", "Initial seed: template + sample data + SOW",
         )
         await _run_git("push")
-        print("Committed and pushed template + .team-agent/ to repo")
+        print("Committed and pushed to repo")
 
         # --- Members ---
         alice_member_id = uuid.uuid4()
@@ -234,7 +253,7 @@ async def seed():
         )
         print("Inserted 5 members (Alice, Bob, Zimomo, Molly, Pucky)")
 
-        print("Seed complete — popmart project ready")
+        print("Seed complete — contoso project ready")
     finally:
         await conn.close()
 

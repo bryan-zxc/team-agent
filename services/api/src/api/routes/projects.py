@@ -210,6 +210,19 @@ async def create_project(
             # Copy template scaffold and initialise repo
             shutil.copytree(str(PROJECT_TEMPLATE), clone_path)
 
+            # Set up Python environment via uv
+            uv_proc = await asyncio.create_subprocess_exec(
+                "uv", "sync",
+                cwd=clone_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, uv_stderr = await uv_proc.communicate()
+            if uv_proc.returncode != 0:
+                logger.warning("uv sync failed: %s", uv_stderr.decode().strip())
+            else:
+                logger.info("Ran uv sync for project %s", req.name)
+
             # Create .team-agent/agents/ directory and write manifest
             (Path(clone_path) / ".team-agent" / "agents").mkdir(
                 parents=True, exist_ok=True
@@ -266,6 +279,20 @@ async def create_project(
                 )
 
             project.clone_path = clone_path
+
+            # Set up Python environment if pyproject.toml exists
+            if (Path(clone_path) / "pyproject.toml").exists():
+                uv_proc = await asyncio.create_subprocess_exec(
+                    "uv", "sync",
+                    cwd=clone_path,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                _, uv_stderr = await uv_proc.communicate()
+                if uv_proc.returncode != 0:
+                    logger.warning("uv sync failed: %s", uv_stderr.decode().strip())
+                else:
+                    logger.info("Ran uv sync for project %s", req.name)
 
             # Read the actual checked-out branch and store it
             branch_proc = await asyncio.create_subprocess_exec(

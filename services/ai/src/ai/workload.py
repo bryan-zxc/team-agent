@@ -167,6 +167,21 @@ async def _ensure_worktree(clone_path: str, slug: str) -> Path:
             raise RuntimeError(f"Failed to create worktree: {error_msg}")
 
     logger.info("Created worktree at %s (branch: %s)", worktree_path, branch_name)
+
+    # Set up Python environment if pyproject.toml exists
+    if (worktree_path / "pyproject.toml").exists():
+        uv_proc = await asyncio.create_subprocess_exec(
+            "uv", "sync",
+            cwd=str(worktree_path),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, uv_stderr = await uv_proc.communicate()
+        if uv_proc.returncode != 0:
+            logger.warning("uv sync failed in worktree: %s", uv_stderr.decode().strip())
+        else:
+            logger.info("Ran uv sync in worktree %s", worktree_path)
+
     return worktree_path
 
 

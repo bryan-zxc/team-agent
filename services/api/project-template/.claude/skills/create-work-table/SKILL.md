@@ -38,7 +38,7 @@ If the user provides a file but no table name, suggest one based on the file con
 Run the diagnostic script to sample the file and get DuckDB's type inferences. Use `--output-rows 100` to include sample data rows for the type review page:
 
 ```bash
-python .claude/skills/create-work-table/scripts/sample_file.py \
+uv run python .claude/skills/create-work-table/scripts/sample_file.py \
   --file-path <path-to-file> \
   --limit 10000 \
   --output-rows 100
@@ -112,6 +112,12 @@ Save the script to `analysis/l10wrk_<tablename>.py`. One script per table, named
 
 Execute the script to create the table.
 
+### 5a. Handle rejected rows
+
+If the ingestion script reports rejected rows (via `store_rejects`), read `references/ingestion-guide.md` for how to diagnose and resolve them. Always attempt to fix the ingestion so all rows make it into the table.
+
+If rows were rejected due to a data quality issue in the source (not a processing failure on our side), use `/record-data-check` to formally record the finding. `/record-data-check` will create the check script, materialise a `val_` table with the actual rejected rows if client input is needed, and call `/append-dv` to add it to the data validation report.
+
 ### 6. Add to pipeline
 
 Add the script as a step in `analysis/pipeline.yml`, creating the file if it doesn't exist:
@@ -127,7 +133,7 @@ steps:
 After the table is created, run the column stats script. Pass the approved classification from step 4 so the script knows which stats to compute for each column:
 
 ```bash
-python .claude/skills/create-work-table/scripts/column_stats.py \
+uv run python .claude/skills/create-work-table/scripts/column_stats.py \
   --db-path <path-to-duckdb> \
   --table-name l10wrk_<tablename> \
   --column-types '{"customer_id": "categorical", "revenue": "numeric", "receipt_date": "date", "region": "categorical"}'

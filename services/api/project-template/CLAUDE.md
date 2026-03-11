@@ -1,4 +1,15 @@
-# Project Data
+# Project
+
+## Python and Dependencies
+
+This project uses `uv` for Python dependency management.
+
+- **Run scripts:** `uv run python <script>` — never bare `python`
+- **Add a package:** `uv add <package>` — never `pip install` or manual edits to `pyproject.toml`
+- **Remove a package:** `uv remove <package>`
+- **Sync environment:** `uv sync` — installs all dependencies from the lock file
+
+# Data
 
 ## File Paths
 

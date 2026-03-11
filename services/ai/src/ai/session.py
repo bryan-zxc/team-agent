@@ -43,8 +43,28 @@ def register_session(session_key: str, session_dict: dict) -> None:
 
 
 def unregister_session(session_key: str) -> dict | None:
-    """Remove a session from the registry, returning it (or None)."""
-    return _sessions.pop(session_key, None)
+    """Remove a session from the registry, returning it (or None).
+
+    Automatically rejects any pending tool approvals so blocked futures
+    unblock cleanly instead of hanging indefinitely.
+    """
+    session = _sessions.pop(session_key, None)
+    if session:
+        _reject_pending_approvals(session, session_key)
+    return session
+
+
+def _reject_pending_approvals(session: dict, session_key: str) -> None:
+    """Reject all pending tool approval futures in a session."""
+    pending = session.get("pending_approvals", {})
+    for req_id, future in pending.items():
+        if not future.done():
+            future.set_result({"decision": "deny", "reason": "Session interrupted"})
+            logger.info(
+                "Auto-denied pending approval %s (session %s)",
+                req_id[:8],
+                session_key[:8],
+            )
 
 
 # ── SDK content block conversion ──────────────────────────────────────

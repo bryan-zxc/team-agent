@@ -166,7 +166,7 @@
 .messageGroup {
   display: flex;
   gap: 10px;
-  max-width: 640px;
+  max-width: 75%;
   animation: msgIn 0.3s ease;
 }
 
@@ -273,6 +273,7 @@
   border-bottom-left-radius: 16px;
   border-bottom-right-radius: 6px;
   box-shadow: none;
+  min-width: 200px;
 }
 
 /* ── Queued messages (held during tool approval) ── */

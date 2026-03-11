@@ -64,7 +64,7 @@ row_count = len(result)
 For Python scripts (when the check logic is too complex for pure SQL), run with bash:
 
 ```bash
-python data/validation/scripts/chk_<name>.py
+uv run python data/validation/scripts/chk_<name>.py
 ```
 
 Capture:
@@ -103,7 +103,7 @@ Present the finding and your assessment to the human. If the human agrees it nee
 
 ### 6. If escalating to DV report
 
-Modify the check script to also materialise the result into a `val_*` table:
+Modify the check script to also materialise the result into a `val_*` table. The `val_*` table must contain actual row-level sample data that the client can investigate — never summary statistics, aggregate counts, or description strings. If the client cannot look at the table and understand what is wrong with each row, the table is useless.
 
 ```sql
 -- Check: order_id uniqueness in l10wrk_orders

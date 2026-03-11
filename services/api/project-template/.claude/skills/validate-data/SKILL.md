@@ -26,14 +26,14 @@ db_path = f"/data/projects/{project_id}/databases/data.duckdb"
 On every invocation, assess current state before leading the user. Check:
 
 1. What files are in `data/raw/`?
-2. What tables exist in DuckDB? (`SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'`)
+2. What tables are documented in `docs/tables/tables.md`?
 3. What's in `data/validation/data-check-register.md`? (any checks recorded?)
 4. What's in `data/validation/report_data.json`? (any issues raised?)
 5. What's in `analysis/README.md`? (any agreed deliverables?)
 6. Does `analysis/pipeline.yml` exist? (any pipeline steps defined?)
 
 Based on the state, determine which phase to resume from:
-- No tables and raw files exist → start at Phase 1
+- No tables documented and raw files exist → start at Phase 1
 - Tables exist but no analysis plan → start at Phase 2
 - Analysis plan exists but no delivery plan → start at Phase 3
 - Delivery plan exists but checks are incomplete → start at Phase 4

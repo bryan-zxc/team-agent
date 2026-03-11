@@ -67,9 +67,7 @@ function renderMessageContent(content: string, onLinkClick?: (url: string) => vo
             );
           }
           return (
-            <div key={i} className={styles.markdownContent}>
-              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{block.value}</ReactMarkdown>
-            </div>
+            <span key={i}>{block.value}</span>
           );
         },
       );
@@ -449,10 +447,14 @@ export function ChatView({
     prevCountRef.current = messages.length;
   }, [messages, onAiMessage]);
 
-  // Clear resuming state when workload transitions to running
+  // Clear resuming state when workload transitions to running or awaiting approval
   // Clear agent activity when workload stops running
   useEffect(() => {
-    if (prevStatusRef.current !== "running" && workloadStatus === "running") {
+    if (
+      prevStatusRef.current !== "running" &&
+      prevStatusRef.current !== "awaiting_approval" &&
+      (workloadStatus === "running" || workloadStatus === "awaiting_approval")
+    ) {
       setResuming(false);
     }
     if (prevStatusRef.current === "running" && workloadStatus !== "running") {
