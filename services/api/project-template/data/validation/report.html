@@ -309,7 +309,7 @@ body {
   color: var(--disabled);
   font-family: var(--mono);
 }
-.sample-scroll { overflow-x: auto; max-height: 280px; }
+.sample-scroll { overflow-x: auto; max-height: 320px; overflow-y: auto; }
 .sample-table {
   width: 100%;
   border-collapse: collapse;
@@ -327,6 +327,15 @@ body {
   letter-spacing: 0.3px;
   position: sticky;
   top: 0;
+  cursor: pointer;
+  user-select: none;
+  z-index: 1;
+}
+.sample-table th:hover { color: var(--subheading); }
+.sample-table th .sort-indicator {
+  font-size: 10px;
+  margin-left: 4px;
+  color: var(--accent);
 }
 .sample-table td {
   padding: 6px 14px;
@@ -337,6 +346,24 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .sample-table tr:last-child td { border-bottom: none; }
+.sample-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  background: var(--elevated);
+}
+.sample-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
 
 /* ── Decision Inputs ── */
 .decision-grid {
@@ -489,13 +516,17 @@ body {
 
 <script>
 // ── State ──
-let reportData = null;
-let selectedId = null;
-let isDark = true;
-const drafts = {};
+var reportData = null;
+var selectedId = null;
+var isDark = true;
+var drafts = {};
+var sampleCache = {}; // keyed by issue id: { columns, rows, totalRows, sort, loading }
+
+var PAGE_SIZE = 100;
+var SCROLL_THRESHOLD = 200;
 
 // Context injected by parent FileTab via postMessage
-let ctx = { chatId: null, projectId: null, filePath: null };
+var ctx = { chatId: null, projectId: null, filePath: null };
 
 // ── Theme ──
 function toggleTheme() {
@@ -512,8 +543,6 @@ function applyTheme(theme) {
 
 // ── API helpers ──
 function apiBase() {
-  // Derive API base from current page URL when embedded in iframe,
-  // or fall back to same-origin
   return "";
 }
 
@@ -526,10 +555,10 @@ function jsonPath() {
 
 async function fetchReportData() {
   if (!ctx.projectId) return;
-  const chatParam = ctx.chatId ? "?chat_id=" + ctx.chatId : "";
-  const url = apiBase() + "/projects/" + ctx.projectId + "/raw/" + jsonPath() + chatParam;
+  var chatParam = ctx.chatId ? "?chat_id=" + ctx.chatId : "";
+  var url = apiBase() + "/projects/" + ctx.projectId + "/raw/" + jsonPath() + chatParam;
   try {
-    const resp = await fetch(url, { credentials: "include" });
+    var resp = await fetch(url, { credentials: "include" });
     if (!resp.ok) return;
     reportData = await resp.json();
     render();
@@ -541,10 +570,10 @@ async function fetchReportData() {
 async function saveReportData() {
   if (!ctx.projectId || !reportData) return false;
   collectDrafts();
-  const chatParam = ctx.chatId ? "&chat_id=" + ctx.chatId : "";
-  const url = apiBase() + "/projects/" + ctx.projectId + "/files/content?path=" + encodeURIComponent(jsonPath()) + chatParam;
+  var chatParam = ctx.chatId ? "&chat_id=" + ctx.chatId : "";
+  var url = apiBase() + "/projects/" + ctx.projectId + "/files/content?path=" + encodeURIComponent(jsonPath()) + chatParam;
   try {
-    const resp = await fetch(url, {
+    var resp = await fetch(url, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -559,10 +588,10 @@ async function saveReportData() {
 
 async function commitAndPush() {
   if (!ctx.projectId) return false;
-  const chatParam = ctx.chatId ? "?chat_id=" + ctx.chatId : "";
-  const url = apiBase() + "/projects/" + ctx.projectId + "/files/commit" + chatParam;
+  var chatParam = ctx.chatId ? "?chat_id=" + ctx.chatId : "";
+  var url = apiBase() + "/projects/" + ctx.projectId + "/files/commit" + chatParam;
   try {
-    const resp = await fetch(url, {
+    var resp = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -580,9 +609,9 @@ async function commitAndPush() {
 
 async function postChatMessage(text) {
   if (!ctx.chatId) return false;
-  const url = apiBase() + "/chats/" + ctx.chatId + "/messages";
+  var url = apiBase() + "/chats/" + ctx.chatId + "/messages";
   try {
-    const resp = await fetch(url, {
+    var resp = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -595,6 +624,156 @@ async function postChatMessage(text) {
   } catch (err) {
     console.error("Failed to post message:", err);
     return false;
+  }
+}
+
+// ── Sample data from DuckDB ──
+async function fetchSampleData(issueId, tableName, offset, sortCol, sortDir, append) {
+  if (!ctx.projectId || !tableName) return;
+  var cache = sampleCache[issueId];
+  if (!cache) {
+    cache = { columns: [], rows: [], totalRows: 0, sort: null, loading: false };
+    sampleCache[issueId] = cache;
+  }
+  if (cache.loading) return;
+  cache.loading = true;
+  updateSampleUI(issueId);
+
+  var sql = 'SELECT * FROM "' + tableName.replace(/"/g, '""') + '"';
+  try {
+    var resp = await fetch(apiBase() + "/projects/" + ctx.projectId + "/data/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        database: "data",
+        sql: sql,
+        offset: offset,
+        limit: PAGE_SIZE,
+        sort_column: sortCol || null,
+        sort_direction: sortDir || "asc",
+      }),
+    });
+    var data = await resp.json();
+    if (data.results && data.results.length > 0) {
+      var result = data.results[data.results.length - 1];
+      cache.columns = result.columns;
+      cache.totalRows = result.total_rows;
+      if (append) {
+        cache.rows = cache.rows.concat(result.rows);
+      } else {
+        cache.rows = result.rows;
+      }
+    }
+  } catch (err) {
+    console.error("Failed to fetch sample data:", err);
+  }
+  cache.loading = false;
+  updateSampleUI(issueId);
+}
+
+function updateSampleUI(issueId) {
+  // Only update if this issue is currently displayed
+  if (issueId !== selectedId) return;
+  var body = document.getElementById("sample-body");
+  if (!body || !body.classList.contains("visible")) return;
+  renderSampleGrid(issueId);
+}
+
+function renderSampleGrid(issueId) {
+  var container = document.getElementById("sample-grid-container");
+  if (!container) return;
+  var cache = sampleCache[issueId];
+  if (!cache) {
+    container.innerHTML = '<div class="sample-loading">No data</div>';
+    return;
+  }
+  if (cache.columns.length === 0 && cache.loading) {
+    container.innerHTML = '<div class="sample-loading">Loading...</div>';
+    return;
+  }
+  if (cache.columns.length === 0) {
+    container.innerHTML = '<div class="sample-loading">No data available</div>';
+    return;
+  }
+
+  var sort = cache.sort;
+  var headerHtml = cache.columns.map(function(col) {
+    var indicator = "";
+    if (sort && sort.column === col) {
+      indicator = '<span class="sort-indicator">' + (sort.direction === "asc" ? " \u25B2" : " \u25BC") + '</span>';
+    }
+    return '<th data-col="' + escapeHtml(col) + '">' + escapeHtml(col) + indicator + '</th>';
+  }).join("");
+
+  var rowsHtml = cache.rows.map(function(row) {
+    return "<tr>" + row.map(function(v) {
+      return "<td>" + escapeHtml(v === null ? "" : String(v)) + "</td>";
+    }).join("") + "</tr>";
+  }).join("");
+
+  var statusText = cache.rows.length + " of " + cache.totalRows + " rows";
+  var loadingText = cache.loading ? "Loading..." : "";
+
+  container.innerHTML =
+    '<div class="sample-scroll" id="sample-scroll">' +
+      '<table class="sample-table">' +
+        '<thead><tr>' + headerHtml + '</tr></thead>' +
+        '<tbody>' + rowsHtml + '</tbody>' +
+      '</table>' +
+    '</div>' +
+    '<div class="sample-status-bar">' +
+      '<span>' + statusText + '</span>' +
+      '<span>' + loadingText + '</span>' +
+    '</div>';
+
+  // Bind sort handlers on headers
+  var ths = container.querySelectorAll("th[data-col]");
+  ths.forEach(function(th) {
+    th.addEventListener("click", function() {
+      var col = this.getAttribute("data-col");
+      handleSampleSort(issueId, col);
+    });
+  });
+
+  // Bind scroll handler for loading more
+  var scrollEl = document.getElementById("sample-scroll");
+  if (scrollEl) {
+    scrollEl.addEventListener("scroll", function() {
+      handleSampleScroll(issueId, this);
+    });
+  }
+}
+
+function handleSampleSort(issueId, colName) {
+  var cache = sampleCache[issueId];
+  if (!cache || cache.loading) return;
+  var sort = cache.sort;
+  if (sort && sort.column === colName) {
+    if (sort.direction === "asc") {
+      cache.sort = { column: colName, direction: "desc" };
+    } else {
+      cache.sort = null;
+    }
+  } else {
+    cache.sort = { column: colName, direction: "asc" };
+  }
+
+  var issue = reportData.issues.find(function(i) { return i.id === issueId; });
+  if (!issue) return;
+  var s = cache.sort;
+  fetchSampleData(issueId, issue.sample_table, 0, s ? s.column : null, s ? s.direction : "asc", false);
+}
+
+function handleSampleScroll(issueId, el) {
+  var cache = sampleCache[issueId];
+  if (!cache || cache.loading) return;
+  if (cache.rows.length >= cache.totalRows) return;
+  if (el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_THRESHOLD) {
+    var issue = reportData.issues.find(function(i) { return i.id === issueId; });
+    if (!issue) return;
+    var s = cache.sort;
+    fetchSampleData(issueId, issue.sample_table, cache.rows.length, s ? s.column : null, s ? s.direction : "asc", true);
   }
 }
 
@@ -712,16 +891,8 @@ function renderDetail() {
   var comments = getComments(issue);
   var isDecided = decision && decision.trim().length > 0;
 
-  var sampleHeaders = "";
-  var sampleRows = "";
-  var sampleCount = 0;
-  if (issue.sample_preview && issue.sample_preview.columns) {
-    sampleHeaders = issue.sample_preview.columns.map(function(c) { return "<th>" + escapeHtml(c) + "</th>"; }).join("");
-    sampleRows = (issue.sample_preview.rows || []).map(function(row) {
-      return "<tr>" + row.map(function(v) { return "<td>" + escapeHtml(String(v)) + "</td>"; }).join("") + "</tr>";
-    }).join("");
-    sampleCount = (issue.sample_preview.rows || []).length;
-  }
+  var cachedInfo = sampleCache[issue.id];
+  var totalLabel = cachedInfo ? cachedInfo.totalRows + " rows" : "rows";
 
   panel.innerHTML =
     '<div class="detail-content">' +
@@ -746,19 +917,14 @@ function renderDetail() {
       '</div>' +
       '<div class="sample-card">' +
         '<div class="sample-card-header">' +
-          '<button class="sample-toggle-btn" id="sample-toggle-btn" onclick="toggleSample()">' +
+          '<button class="sample-toggle-btn" id="sample-toggle-btn" onclick="toggleSample(\'' + issue.id + '\')">' +
             '<span class="material-symbols-outlined">expand_more</span>' +
-            'Sample data (' + sampleCount + ' rows)' +
+            'Sample data (' + totalLabel + ')' +
           '</button>' +
           '<span class="sample-table-name">' + escapeHtml(issue.sample_table || "") + '</span>' +
         '</div>' +
         '<div class="sample-card-body" id="sample-body">' +
-          '<div class="sample-scroll">' +
-            '<table class="sample-table">' +
-              '<thead><tr>' + sampleHeaders + '</tr></thead>' +
-              '<tbody>' + sampleRows + '</tbody>' +
-            '</table>' +
-          '</div>' +
+          '<div id="sample-grid-container"><div class="sample-loading">Click to load data</div></div>' +
         '</div>' +
       '</div>' +
       '<div class="decision-grid">' +
@@ -799,11 +965,27 @@ function selectIssue(id) {
   renderDetail();
 }
 
-function toggleSample() {
+function toggleSample(issueId) {
   var body = document.getElementById("sample-body");
   var btn = document.getElementById("sample-toggle-btn");
-  if (body) body.classList.toggle("visible");
-  if (btn) btn.classList.toggle("expanded");
+  if (!body || !btn) return;
+
+  var wasHidden = !body.classList.contains("visible");
+  body.classList.toggle("visible");
+  btn.classList.toggle("expanded");
+
+  // Fetch data on first expand if not already cached
+  if (wasHidden && issueId) {
+    var issue = reportData.issues.find(function(i) { return i.id === issueId; });
+    if (issue && issue.sample_table) {
+      var cache = sampleCache[issueId];
+      if (!cache || cache.columns.length === 0) {
+        fetchSampleData(issueId, issue.sample_table, 0, null, "asc", false);
+      } else {
+        renderSampleGrid(issueId);
+      }
+    }
+  }
 }
 
 function updateStats() {
@@ -842,7 +1024,6 @@ async function handleFinalise() {
   btn.disabled = true;
   btn.textContent = "Finalising...";
 
-  // Save first
   var saved = await saveReportData();
   if (!saved) {
     btn.disabled = false;
@@ -851,7 +1032,6 @@ async function handleFinalise() {
     return;
   }
 
-  // Commit and push
   var committed = await commitAndPush();
   if (!committed) {
     btn.disabled = false;
@@ -860,7 +1040,6 @@ async function handleFinalise() {
     return;
   }
 
-  // Post summary to chat
   var total = reportData.issues.length;
   var decided = 0;
   reportData.issues.forEach(function(i) {

@@ -76,7 +76,8 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   const previewLabel = isJson ? "Tree" : isCsv ? "Table" : "Preview";
   const monacoTheme = theme === "dark" ? "team-agent-dark" : "team-agent-light";
   const chatIdParam = chatId ? `&chat_id=${chatId}` : "";
-  const rawUrl = `${API_URL}/projects/${projectId}/raw/${filePath}${chatId ? `?chat_id=${chatId}` : ""}`;
+  const [refreshKey, setRefreshKey] = useState(0);
+  const rawUrl = `${API_URL}/projects/${projectId}/raw/${filePath}${chatId ? `?chat_id=${chatId}` : ""}${refreshKey ? `${chatId ? "&" : "?"}t=${refreshKey}` : ""}`;
   const [previewMode, setPreviewMode] = useState(hasPreview);
   const [wordWrap, setWordWrap] = useState<"on" | "off">(
     isMarkdown ? "on" : "off",
@@ -94,7 +95,7 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
         setEditContent(data.content);
       })
       .catch((err) => setError(err.message));
-  }, [filePath, projectId, isImage]);
+  }, [filePath, projectId, isImage, refreshKey]);
 
   useEffect(() => {
     if (monacoRef.current) {
@@ -145,6 +146,10 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   useEffect(() => {
     sendIframeContext();
   }, [sendIframeContext]);
+
+  const handleRefresh = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
 
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     monacoRef.current = monaco;
@@ -208,6 +213,15 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
                   Edit
                 </button>
               </div>
+              {previewMode && (
+                <button
+                  className={styles.toolbarBtn}
+                  onClick={handleRefresh}
+                  title="Refresh preview"
+                >
+                  Refresh
+                </button>
+              )}
               {editing && (
                 <>
                   <button
