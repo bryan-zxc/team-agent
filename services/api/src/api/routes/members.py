@@ -1,13 +1,14 @@
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm.attributes import flag_modified
 
 from ..config import settings
 from ..database import async_session
@@ -16,6 +17,7 @@ from ..models.activity_heartbeat import ActivityHeartbeat
 from ..models.llm_usage import LLMUsage
 from ..models.project import Project
 from ..models.project_member import ProjectMember
+from ..models.timesheet import Timesheet
 from ..models.user import User
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
@@ -60,7 +62,7 @@ async def list_members(project_id: uuid.UUID):
                 "type": m.type,
                 "user_id": str(m.user_id) if m.user_id else None,
                 "avatar": m.avatar,
-                "margin_percent": m.margin_percent,
+                "settings": m.settings or {},
             }
             for m in members
         ]
@@ -221,7 +223,7 @@ async def get_member_costs(project_id: uuid.UUID, member_id: uuid.UUID):
 
         total_cost = float(row.total_cost)
         total_tokens = int(row.total_tokens)
-        margin = member.margin_percent if member.margin_percent is not None else 30.0
+        margin = member.margin_percent
         nsr = total_cost * (1 + margin / 100)
 
         return {
@@ -248,7 +250,10 @@ async def update_margin(
         if not member or member.project_id != project_id:
             raise HTTPException(status_code=404, detail="Member not found")
 
-        member.margin_percent = req.margin_percent
+        current = dict(member.settings or {})
+        current["margin_percent"] = req.margin_percent
+        member.settings = current
+        flag_modified(member, "settings")
         await session.commit()
 
         return {"margin_percent": member.margin_percent}
@@ -318,3 +323,159 @@ async def get_active_time(project_id: uuid.UUID, member_id: uuid.UUID):
             "week_minutes": row.week_minutes,
             "lifetime_minutes": row.lifetime_minutes,
         }
+
+
+@router.get("/projects/{project_id}/members/{member_id}/heartbeat-daily")
+async def heartbeat_daily(
+    project_id: uuid.UUID,
+    member_id: uuid.UUID,
+    start: str = Query(...),
+    end: str = Query(...),
+):
+    """Return daily minute counts from heartbeats for a date range."""
+    start_date = date.fromisoformat(start)
+    end_date = date.fromisoformat(end)
+
+    async with async_session() as session:
+        member = await session.get(ProjectMember, member_id)
+        if not member or member.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Member not found")
+
+        rows = (
+            await session.execute(
+                select(
+                    func.date(ActivityHeartbeat.recorded_at).label("day"),
+                    func.count().label("minutes"),
+                )
+                .where(
+                    ActivityHeartbeat.member_id == member_id,
+                    ActivityHeartbeat.project_id == project_id,
+                    func.date(ActivityHeartbeat.recorded_at) >= start_date,
+                    func.date(ActivityHeartbeat.recorded_at) <= end_date,
+                )
+                .group_by(func.date(ActivityHeartbeat.recorded_at))
+                .order_by(func.date(ActivityHeartbeat.recorded_at))
+            )
+        ).all()
+
+        return [{"date": str(row.day), "minutes": row.minutes} for row in rows]
+
+
+@router.get("/projects/{project_id}/members/{member_id}/settings")
+async def get_member_settings(project_id: uuid.UUID, member_id: uuid.UUID):
+    """Return configurable settings for a member."""
+    async with async_session() as session:
+        member = await session.get(ProjectMember, member_id)
+        if not member or member.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Member not found")
+
+        return {
+            "settings": member.settings or {},
+            "defaults": {"margin_percent": 30.0, "timesheet_markup": 30.0},
+        }
+
+
+ALLOWED_SETTINGS = {"margin_percent", "timesheet_markup"}
+
+
+class UpdateSettingsRequest(BaseModel):
+    settings: dict
+
+
+@router.put("/projects/{project_id}/members/{member_id}/settings")
+async def update_member_settings(
+    project_id: uuid.UUID,
+    member_id: uuid.UUID,
+    req: UpdateSettingsRequest,
+):
+    """Update configurable settings for a member."""
+    invalid = set(req.settings.keys()) - ALLOWED_SETTINGS
+    if invalid:
+        raise HTTPException(status_code=422, detail=f"Unknown settings: {invalid}")
+
+    async with async_session() as session:
+        member = await session.get(ProjectMember, member_id)
+        if not member or member.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Member not found")
+
+        current = dict(member.settings or {})
+        current.update(req.settings)
+        member.settings = current
+        flag_modified(member, "settings")
+        await session.commit()
+
+        return {"settings": member.settings}
+
+
+class TimesheetEntry(BaseModel):
+    date: str
+    hours: float
+
+
+class TimesheetBulkRequest(BaseModel):
+    entries: list[TimesheetEntry]
+
+
+@router.post("/projects/{project_id}/members/{member_id}/timesheets")
+async def upsert_timesheets(
+    project_id: uuid.UUID,
+    member_id: uuid.UUID,
+    req: TimesheetBulkRequest,
+):
+    """Bulk upsert timesheet entries for a member."""
+    async with async_session() as session:
+        member = await session.get(ProjectMember, member_id)
+        if not member or member.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Member not found")
+
+        for entry in req.entries:
+            stmt = (
+                pg_insert(Timesheet)
+                .values(
+                    id=uuid.uuid4(),
+                    project_id=project_id,
+                    member_id=member_id,
+                    date=date.fromisoformat(entry.date),
+                    hours=entry.hours,
+                )
+                .on_conflict_do_update(
+                    constraint="uq_timesheets_project_member_date",
+                    set_={"hours": entry.hours},
+                )
+            )
+            await session.execute(stmt)
+
+        await session.commit()
+        return {"status": "ok", "count": len(req.entries)}
+
+
+@router.get("/projects/{project_id}/members/{member_id}/timesheets")
+async def get_timesheets(
+    project_id: uuid.UUID,
+    member_id: uuid.UUID,
+    start: str = Query(...),
+    end: str = Query(...),
+):
+    """Return timesheet entries for a member in a date range."""
+    start_date = date.fromisoformat(start)
+    end_date = date.fromisoformat(end)
+
+    async with async_session() as session:
+        member = await session.get(ProjectMember, member_id)
+        if not member or member.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Member not found")
+
+        rows = (
+            await session.execute(
+                select(Timesheet)
+                .where(
+                    Timesheet.project_id == project_id,
+                    Timesheet.member_id == member_id,
+                    Timesheet.date >= start_date,
+                    Timesheet.date <= end_date,
+                )
+                .order_by(Timesheet.date)
+            )
+        ).scalars().all()
+
+        return [{"date": str(t.date), "hours": t.hours} for t in rows]

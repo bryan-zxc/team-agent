@@ -513,6 +513,8 @@ async def start_workload_session(
     # Build a clean environment for the Claude CLI subprocess
     cli_env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     cli_env["PLAYWRIGHT_MCP_SANDBOX"] = "false"
+    cli_env["INTERNAL_API_KEY"] = settings.internal_api_key
+    cli_env["API_BASE_URL"] = settings.api_service_url
 
     # Per-agent git identity
     agent_name = workload_data["display_name"]

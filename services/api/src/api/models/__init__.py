@@ -9,6 +9,7 @@ from .workload import Workload
 from .llm_usage import LLMUsage
 from .session import Session
 from .activity_heartbeat import ActivityHeartbeat
+from .timesheet import Timesheet
 
 __all__ = [
     "Base",
@@ -22,4 +23,5 @@ __all__ = [
     "LLMUsage",
     "Session",
     "ActivityHeartbeat",
+    "Timesheet",
 ]

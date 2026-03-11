@@ -52,7 +52,7 @@ export type Member = {
   type: "human" | "ai" | "coordinator";
   user_id: string | null;
   avatar: string | null;
-  margin_percent: number | null;
+  settings: Record<string, number>;
 };
 
 export type MemberCosts = {
