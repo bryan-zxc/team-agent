@@ -331,17 +331,23 @@ async def get_daily_activity(
         target_date.year, target_date.month, target_date.day, tzinfo=timezone.utc
     )
     day_end = datetime(
-        target_date.year, target_date.month, target_date.day, 23, 59, 59, 999999,
+        target_date.year,
+        target_date.month,
+        target_date.day,
+        23,
+        59,
+        59,
+        999999,
         tzinfo=timezone.utc,
     )
 
     async with async_session() as session:
         # Get all rooms for the project
         rooms = (
-            await session.execute(
-                select(Room).where(Room.project_id == project_id)
-            )
-        ).scalars().all()
+            (await session.execute(select(Room).where(Room.project_id == project_id)))
+            .scalars()
+            .all()
+        )
 
         if not rooms:
             return {"date": target_date.isoformat(), "chats": [], "members": []}
@@ -351,10 +357,10 @@ async def get_daily_activity(
 
         # Get all chats for those rooms
         chats = (
-            await session.execute(
-                select(Chat).where(Chat.room_id.in_(room_ids))
-            )
-        ).scalars().all()
+            (await session.execute(select(Chat).where(Chat.room_id.in_(room_ids))))
+            .scalars()
+            .all()
+        )
 
         if not chats:
             return {"date": target_date.isoformat(), "chats": [], "members": []}
@@ -394,12 +400,14 @@ async def get_daily_activity(
 
         # Get project members
         members = (
-            await session.execute(
-                select(ProjectMember).where(
-                    ProjectMember.project_id == project_id
+            (
+                await session.execute(
+                    select(ProjectMember).where(ProjectMember.project_id == project_id)
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         return {
             "date": target_date.isoformat(),

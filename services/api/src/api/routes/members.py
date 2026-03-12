@@ -269,7 +269,9 @@ async def record_heartbeat(project_id: uuid.UUID, member_id: uuid.UUID):
         if not member or member.project_id != project_id:
             raise HTTPException(status_code=404, detail="Member not found")
         if member.type != "human":
-            raise HTTPException(status_code=400, detail="Only human members track active time")
+            raise HTTPException(
+                status_code=400, detail="Only human members track active time"
+            )
 
         stmt = (
             pg_insert(ActivityHeartbeat)
@@ -466,17 +468,21 @@ async def get_timesheets(
             raise HTTPException(status_code=404, detail="Member not found")
 
         rows = (
-            await session.execute(
-                select(Timesheet)
-                .where(
-                    Timesheet.project_id == project_id,
-                    Timesheet.member_id == member_id,
-                    Timesheet.date >= start_date,
-                    Timesheet.date <= end_date,
+            (
+                await session.execute(
+                    select(Timesheet)
+                    .where(
+                        Timesheet.project_id == project_id,
+                        Timesheet.member_id == member_id,
+                        Timesheet.date >= start_date,
+                        Timesheet.date <= end_date,
+                    )
+                    .order_by(Timesheet.date)
                 )
-                .order_by(Timesheet.date)
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         return [{"date": str(t.date), "hours": t.hours} for t in rows]
 

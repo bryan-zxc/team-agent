@@ -11,7 +11,9 @@ from .base import Base, UUIDPrimaryKey, TimestampMixin
 class Timesheet(UUIDPrimaryKey, TimestampMixin, Base):
     __tablename__ = "timesheets"
     __table_args__ = (
-        UniqueConstraint("project_id", "member_id", "date", name="uq_timesheets_project_member_date"),
+        UniqueConstraint(
+            "project_id", "member_id", "date", name="uq_timesheets_project_member_date"
+        ),
         Index("ix_timesheets_member_date", "member_id", "date"),
     )
 

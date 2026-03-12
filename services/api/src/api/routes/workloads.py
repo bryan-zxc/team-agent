@@ -117,7 +117,13 @@ async def get_tool_approvals(
         target_date.year, target_date.month, target_date.day, tzinfo=timezone.utc
     )
     day_end = datetime(
-        target_date.year, target_date.month, target_date.day, 23, 59, 59, 999999,
+        target_date.year,
+        target_date.month,
+        target_date.day,
+        23,
+        59,
+        59,
+        999999,
         tzinfo=timezone.utc,
     )
 

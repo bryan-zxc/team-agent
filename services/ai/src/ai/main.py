@@ -189,7 +189,7 @@ async def summarise(req: SummariseRequest):
         logger.error("Summarise failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
-    text = result.output_text if hasattr(result, "output_text") else str(result)
+    text = result.output_text if hasattr(result, "output_text") else str(result)  # type: ignore[reportAttributeAccessIssue]
     return {"summary": text}
 
 
