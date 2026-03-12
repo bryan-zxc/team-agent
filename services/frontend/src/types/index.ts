@@ -68,6 +68,14 @@ export type MemberActiveTime = {
   lifetime_minutes: number;
 };
 
+export type HumanCosts = {
+  rate: number;
+  total_hours: number;
+  total_activity_minutes: number;
+  avg_markup_percent: number;
+  nsr: number;
+};
+
 export type AvailableUser = {
   id: string;
   display_name: string;

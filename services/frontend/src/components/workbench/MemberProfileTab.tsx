@@ -6,8 +6,9 @@ import { apiFetch } from "@/lib/api";
 import { MemberProfile } from "@/components/members/MemberProfile";
 import { MemberProfileEditor } from "@/components/members/MemberProfileEditor";
 import { CostCard } from "@/components/members/CostCard";
+import { HumanCostCard } from "@/components/members/HumanCostCard";
 import { TimeCards } from "@/components/members/TimeCards";
-import type { MemberActiveTime, MemberCosts } from "@/types";
+import type { HumanCosts, MemberActiveTime, MemberCosts } from "@/types";
 
 type Params = {
   projectId: string;
@@ -27,8 +28,10 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
   const [content, setContent] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [costs, setCosts] = useState<MemberCosts | null>(null);
+  const [humanCosts, setHumanCosts] = useState<HumanCosts | null>(null);
   const [activeTime, setActiveTime] = useState<MemberActiveTime | null>(null);
   const marginTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isAiMember = memberType === "ai" || memberType === "coordinator";
   const isHuman = memberType === "human";
@@ -48,6 +51,18 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
       .then((r) => r.json())
       .then((data) => setCosts(data));
   }, [projectId, memberId, isAiMember]);
+
+  // Human members: fetch costs
+  const fetchHumanCosts = useCallback(() => {
+    apiFetch(`/projects/${projectId}/members/${memberId}/human-costs`)
+      .then((r) => r.json())
+      .then((data) => setHumanCosts(data));
+  }, [projectId, memberId]);
+
+  useEffect(() => {
+    if (!isHuman) return;
+    fetchHumanCosts();
+  }, [isHuman, fetchHumanCosts]);
 
   // Human members: fetch active time
   const fetchActiveTime = useCallback(() => {
@@ -69,8 +84,9 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
     }
     if (isHuman) {
       fetchActiveTime();
+      fetchHumanCosts();
     }
-  }, [projectId, memberId, isAiMember, isHuman, fetchActiveTime]);
+  }, [projectId, memberId, isAiMember, isHuman, fetchActiveTime, fetchHumanCosts]);
 
   const handleMarginChange = useCallback(
     (margin: number) => {
@@ -82,6 +98,22 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
         apiFetch(`/projects/${projectId}/members/${memberId}/margin`, {
           method: "PUT",
           body: JSON.stringify({ margin_percent: margin }),
+        });
+      }, 600);
+    },
+    [projectId, memberId],
+  );
+
+  const handleRateChange = useCallback(
+    (rate: number) => {
+      setHumanCosts((prev) =>
+        prev ? { ...prev, rate, nsr: rate * prev.total_hours } : prev,
+      );
+      if (rateTimer.current) clearTimeout(rateTimer.current);
+      rateTimer.current = setTimeout(() => {
+        apiFetch(`/projects/${projectId}/members/${memberId}/settings`, {
+          method: "PUT",
+          body: JSON.stringify({ settings: { rate } }),
         });
       }, 600);
     },
@@ -126,6 +158,13 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
             middleStat={{ label: "Tokens", value: formatTokens(costs.total_tokens) }}
             marginPercent={costs.margin_percent}
             onMarginChange={handleMarginChange}
+          />
+        ) : isHuman && humanCosts ? (
+          <HumanCostCard
+            rate={humanCosts.rate}
+            totalHours={humanCosts.total_hours}
+            avgMarkupPercent={humanCosts.avg_markup_percent}
+            onRateChange={handleRateChange}
           />
         ) : undefined
       }

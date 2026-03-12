@@ -371,11 +371,11 @@ async def get_member_settings(project_id: uuid.UUID, member_id: uuid.UUID):
 
         return {
             "settings": member.settings or {},
-            "defaults": {"margin_percent": 30.0, "timesheet_markup": 30.0},
+            "defaults": {"margin_percent": 30.0, "timesheet_markup": 30.0, "rate": 0.0},
         }
 
 
-ALLOWED_SETTINGS = {"margin_percent", "timesheet_markup"}
+ALLOWED_SETTINGS = {"margin_percent", "timesheet_markup", "rate"}
 
 
 class UpdateSettingsRequest(BaseModel):
@@ -479,3 +479,136 @@ async def get_timesheets(
         ).scalars().all()
 
         return [{"date": str(t.date), "hours": t.hours} for t in rows]
+
+
+@router.get("/projects/{project_id}/members/{member_id}/human-costs")
+async def get_human_costs(project_id: uuid.UUID, member_id: uuid.UUID):
+    """Return aggregated cost data for a human member."""
+    async with async_session() as session:
+        member = await session.get(ProjectMember, member_id)
+        if not member or member.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Member not found")
+
+        hours_row = (
+            await session.execute(
+                select(
+                    func.coalesce(func.sum(Timesheet.hours), 0.0).label("total_hours"),
+                ).where(
+                    Timesheet.member_id == member_id,
+                    Timesheet.project_id == project_id,
+                )
+            )
+        ).one()
+
+        activity_row = (
+            await session.execute(
+                select(func.count().label("total_minutes")).where(
+                    ActivityHeartbeat.member_id == member_id,
+                    ActivityHeartbeat.project_id == project_id,
+                )
+            )
+        ).one()
+
+        total_hours = float(hours_row.total_hours)
+        total_activity_minutes = int(activity_row.total_minutes)
+        rate = member.rate
+
+        activity_hours = total_activity_minutes / 60
+        if activity_hours > 0 and total_hours > 0:
+            avg_markup = ((total_hours / activity_hours) - 1) * 100
+        else:
+            avg_markup = 0.0
+
+        return {
+            "rate": rate,
+            "total_hours": round(total_hours, 1),
+            "total_activity_minutes": total_activity_minutes,
+            "avg_markup_percent": round(avg_markup, 1),
+            "nsr": round(rate * total_hours, 2),
+        }
+
+
+@router.get("/projects/{project_id}/resourcing")
+async def get_resourcing(project_id: uuid.UUID):
+    """Return all members with daily actuals for the resourcing dashboard."""
+    async with async_session() as session:
+        members = (
+            (
+                await session.execute(
+                    select(ProjectMember)
+                    .where(ProjectMember.project_id == project_id)
+                    .order_by(ProjectMember.created_at)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        result = []
+        for m in members:
+            entry = {
+                "id": str(m.id),
+                "name": m.display_name,
+                "type": m.type,
+                "settings": m.settings or {},
+            }
+
+            if m.type == "human":
+                # Timesheet hours by date
+                ts_rows = (
+                    await session.execute(
+                        select(Timesheet.date, Timesheet.hours)
+                        .where(
+                            Timesheet.member_id == m.id,
+                            Timesheet.project_id == project_id,
+                        )
+                        .order_by(Timesheet.date)
+                    )
+                ).all()
+                entry["timesheets"] = [
+                    {"date": str(r.date), "hours": r.hours} for r in ts_rows
+                ]
+
+                # Activity minutes by date
+                act_rows = (
+                    await session.execute(
+                        select(
+                            func.date(ActivityHeartbeat.recorded_at).label("day"),
+                            func.count().label("minutes"),
+                        )
+                        .where(
+                            ActivityHeartbeat.member_id == m.id,
+                            ActivityHeartbeat.project_id == project_id,
+                        )
+                        .group_by(func.date(ActivityHeartbeat.recorded_at))
+                        .order_by(func.date(ActivityHeartbeat.recorded_at))
+                    )
+                ).all()
+                entry["activity"] = [
+                    {"date": str(r.day), "minutes": r.minutes} for r in act_rows
+                ]
+
+            elif m.type in ("ai", "coordinator"):
+                # LLM costs by date
+                cost_rows = (
+                    await session.execute(
+                        select(
+                            func.date(LLMUsage.created_at).label("day"),
+                            func.sum(LLMUsage.cost).label("cost"),
+                        )
+                        .where(
+                            LLMUsage.member_id == m.id,
+                            LLMUsage.project_id == project_id,
+                        )
+                        .group_by(func.date(LLMUsage.created_at))
+                        .order_by(func.date(LLMUsage.created_at))
+                    )
+                ).all()
+                entry["costs"] = [
+                    {"date": str(r.day), "cost": round(float(r.cost), 2)}
+                    for r in cost_rows
+                ]
+
+            result.append(entry)
+
+        return {"members": result}

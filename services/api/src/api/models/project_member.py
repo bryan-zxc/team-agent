@@ -36,3 +36,7 @@ class ProjectMember(UUIDPrimaryKey, TimestampMixin, Base):
     @property
     def timesheet_markup(self) -> float:
         return (self.settings or {}).get("timesheet_markup", 30.0)
+
+    @property
+    def rate(self) -> float:
+        return (self.settings or {}).get("rate", 0.0)
