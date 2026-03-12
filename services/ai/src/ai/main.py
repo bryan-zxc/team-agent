@@ -10,7 +10,8 @@ from pydantic import BaseModel
 
 from .agents import generate_agent_profile
 from .config import memory_handler, settings, setup_logging
-from .cost import init_cost_tracker
+from .cost import init_cost_tracker, set_cost_context
+from .llm import llm
 from .admin import shutdown_all_admin_sessions
 from .listener import (
     listen,
@@ -154,6 +155,42 @@ async def generate_agent(req: GenerateAgentRequest):
         "type": "ai",
         "avatar": result.get("avatar"),
     }
+
+
+class SummariseRequest(BaseModel):
+    text: str
+    context: str
+    member_id: str
+    project_id: str
+
+
+_SUMMARISE_SYSTEM = (
+    "You are summarising project activity for a daily standup report. "
+    "Given a dialogue transcript from a one-hour window of a project chat, "
+    "write a detailed summary of what happened. "
+    "Give full attention to human instructions, decisions, and conversation — "
+    "capture what they asked for, what they decided, and what guidance they gave. "
+    "Condense tool approval actions (allow/deny) into a single line. "
+    "Focus on outcomes, direction, and context — not mechanical details."
+)
+
+
+@app.post("/summarise")
+async def summarise(req: SummariseRequest):
+    """Summarise a chunk of chat dialogue using LLM."""
+    set_cost_context(member_id=req.member_id, project_id=req.project_id)
+    try:
+        result = await llm.a_get_response(
+            messages=[{"role": "user", "content": req.text}],
+            system_instruction=_SUMMARISE_SYSTEM,
+            temperature=0.3,
+        )
+    except Exception as e:
+        logger.error("Summarise failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    text = result.output_text if hasattr(result, "output_text") else str(result)
+    return {"summary": text}
 
 
 @app.post("/terminals")

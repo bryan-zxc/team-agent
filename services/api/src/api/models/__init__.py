@@ -10,6 +10,7 @@ from .llm_usage import LLMUsage
 from .session import Session
 from .activity_heartbeat import ActivityHeartbeat
 from .timesheet import Timesheet
+from .tool_approval_event import ToolApprovalEvent
 
 __all__ = [
     "Base",
@@ -24,4 +25,5 @@ __all__ = [
     "Session",
     "ActivityHeartbeat",
     "Timesheet",
+    "ToolApprovalEvent",
 ]

@@ -88,9 +88,19 @@ export function SqlTab({ params, api: panelApi }: IDockviewPanelProps<SqlTabPara
     apiFetch(
       `/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`,
     )
-      .then((r) => r.json())
-      .then((data) => setSql(data.content))
-      .catch(() => setError("Failed to load file"));
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => null);
+          const detail = body?.detail ?? "Failed to load file";
+          if (r.status === 404) {
+            throw new Error(`File not found: ${filePath}`);
+          }
+          throw new Error(detail);
+        }
+        return r.json();
+      })
+      .then((data) => setSql(data.content ?? ""))
+      .catch((e) => setError(e.message ?? "Failed to load file"));
   }, [filePath, projectId]);
 
   useEffect(() => {

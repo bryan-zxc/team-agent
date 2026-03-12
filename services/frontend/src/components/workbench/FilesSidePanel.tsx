@@ -93,6 +93,7 @@ export function FilesSidePanel({ projectId, onFileClick }: FilesSidePanelProps) 
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [confirmDeleteNode, setConfirmDeleteNode] = useState<FileNode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const treeWrapperRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadDirRef = useRef("data/raw/");
 
@@ -321,7 +322,7 @@ export function FilesSidePanel({ projectId, onFileClick }: FilesSidePanelProps) 
       ) : data.length === 0 ? (
         <div className={styles.empty}>No files found</div>
       ) : (
-        <div className={styles.treeWrapper}>
+        <div className={styles.treeWrapper} ref={treeWrapperRef}>
           <Tree
             data={data}
             onToggle={handleToggle}
@@ -333,6 +334,7 @@ export function FilesSidePanel({ projectId, onFileClick }: FilesSidePanelProps) 
             height={600}
             disableDrag
             disableDrop
+            dndRootElement={treeWrapperRef.current}
           >
             {FileNodeRenderer}
           </Tree>

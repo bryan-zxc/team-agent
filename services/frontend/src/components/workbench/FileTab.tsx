@@ -86,8 +86,14 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
   useEffect(() => {
     if (isImage) return;
     apiFetch(`/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}${chatIdParam}`)
-      .then((r) => {
-        if (!r.ok) throw new Error("Failed to load file");
+      .then(async (r) => {
+        if (!r.ok) {
+          if (r.status === 404) {
+            throw new Error(`File not found: ${filePath}`);
+          }
+          const body = await r.json().catch(() => null);
+          throw new Error(body?.detail ?? "Failed to load file");
+        }
         return r.json();
       })
       .then((data) => {
@@ -297,14 +303,22 @@ export function FileTab({ params }: IDockviewPanelProps<FileTabParams>) {
                 a: ({ href, children, ...rest }) => {
                   if (href && onOpenFile && !href.startsWith("http") && !href.startsWith("#")) {
                     const dir = filePath.substring(0, filePath.lastIndexOf("/"));
-                    const resolved = dir ? `${dir}/${href}` : href;
+                    const joined = dir ? `${dir}/${href}` : href;
+                    // Normalise ../.. segments so the backend receives a clean path
+                    const parts = joined.split("/");
+                    const resolved: string[] = [];
+                    for (const p of parts) {
+                      if (p === "..") resolved.pop();
+                      else if (p !== "." && p !== "") resolved.push(p);
+                    }
+                    const normalisedPath = resolved.join("/");
                     return (
                       <a
                         {...rest}
                         href={href}
                         onClick={(e) => {
                           e.preventDefault();
-                          onOpenFile(resolved);
+                          onOpenFile(normalisedPath);
                         }}
                       >
                         {children}

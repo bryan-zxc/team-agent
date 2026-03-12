@@ -515,6 +515,8 @@ async def start_workload_session(
     cli_env["PLAYWRIGHT_MCP_SANDBOX"] = "false"
     cli_env["INTERNAL_API_KEY"] = settings.internal_api_key
     cli_env["API_BASE_URL"] = settings.api_service_url
+    cli_env["AI_SERVICE_URL"] = "http://ai-service:8001"
+    cli_env["AGENT_MEMBER_ID"] = workload_data["member_id"]
 
     # Per-agent git identity
     agent_name = workload_data["display_name"]
