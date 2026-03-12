@@ -196,7 +196,14 @@ function weekMonday(d) {
   const day = dt.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   dt.setDate(dt.getDate() + diff);
-  return dt.toISOString().slice(0, 10);
+  return localDateStr(dt);
+}
+
+function localDateStr(dt) {
+  var y = dt.getFullYear();
+  var m = String(dt.getMonth() + 1).padStart(2, '0');
+  var d = String(dt.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
 }
 
 // ── Data loading ──
@@ -264,14 +271,14 @@ function processData(manifest, resourcing, forecast) {
       dt.setDate(dt.getDate() + d);
       days.push({
         label: dt.toLocaleString('en-AU', { weekday: 'short' }) + ' ' + dt.getDate(),
-        date: dt.toISOString().slice(0, 10),
+        date: localDateStr(dt),
       });
     }
-    weeks.push({ label: label, days: days, startDate: s.toISOString().slice(0, 10), index: w });
+    weeks.push({ label: label, days: days, startDate: localDateStr(s), index: w });
   }
 
   // Determine current week (last week that has any actuals, based on today)
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr(new Date());
   currentWeek = -1;
   for (let i = 0; i < weeks.length; i++) {
     if (weeks[i].startDate <= today) currentWeek = i;
@@ -310,19 +317,27 @@ function processData(manifest, resourcing, forecast) {
 
     // Forecast data for this member
     var fc = (forecast.members || {})[m.name] || null;
-    var fcWeekly = fc ? (fc.weekly || []) : [];
+    var fcDaily = fc ? (fc.daily || {}) : {};
 
     // Build weekly/daily arrays
     for (let wi = 0; wi < weeks.length; wi++) {
       var wk = weeks[wi];
-      var weekForecast = wi < fcWeekly.length ? fcWeekly[wi] : null;
-      entry.wf.push(weekForecast);
 
-      // Daily forecast: distribute weekly evenly across 5 business days
+      // Daily forecast: look up exact date values
       var dailyForecast = [];
+      var weekForecast = 0;
+      var hasAnyForecast = false;
       for (let d = 0; d < 5; d++) {
-        dailyForecast.push(weekForecast !== null ? weekForecast / 5 : null);
+        var fVal = fcDaily[wk.days[d].date];
+        if (fVal !== undefined) {
+          dailyForecast.push(fVal);
+          weekForecast += fVal;
+          hasAnyForecast = true;
+        } else {
+          dailyForecast.push(null);
+        }
       }
+      entry.wf.push(hasAnyForecast ? weekForecast : null);
       entry.df.push(dailyForecast);
 
       // Daily actuals
@@ -351,6 +366,53 @@ function processData(manifest, resourcing, forecast) {
     }
 
     return entry;
+  });
+
+  // Add forecast-only members (people in forecast.json but not yet in the project)
+  var knownNames = new Set(data.map(function(d) { return d.name; }));
+  var fcMembers = forecast.members || {};
+  Object.keys(fcMembers).forEach(function(name) {
+    if (knownNames.has(name)) return;
+    var fc = fcMembers[name];
+    var fcDaily = fc.daily || {};
+    // Detect type: human values are ≤7.5, agent values are 100
+    var sampleVal = 0;
+    for (var k in fcDaily) { if (fcDaily[k] > 0) { sampleVal = fcDaily[k]; break; } }
+    var isAi = sampleVal > 50;
+
+    var entry = {
+      id: 'forecast-' + name,
+      name: name,
+      initial: name.charAt(0).toUpperCase(),
+      type: isAi ? 'ai' : 'human',
+      rate: 0,
+      margin: isAi ? 200 : 30,
+      wf: [], wa: [], df: [], da: [],
+      forecastOnly: true,
+    };
+
+    for (let wi = 0; wi < weeks.length; wi++) {
+      var wk = weeks[wi];
+      var dailyForecast = [];
+      var weekForecast = 0;
+      var hasAnyForecast = false;
+      for (let d = 0; d < 5; d++) {
+        var fVal = fcDaily[wk.days[d].date];
+        if (fVal !== undefined) {
+          dailyForecast.push(fVal);
+          weekForecast += fVal;
+          hasAnyForecast = true;
+        } else {
+          dailyForecast.push(null);
+        }
+      }
+      entry.wf.push(hasAnyForecast ? weekForecast : null);
+      entry.df.push(dailyForecast);
+      entry.wa.push(0);
+      entry.da.push([0, 0, 0, 0, 0]);
+    }
+
+    data.push(entry);
   });
 }
 

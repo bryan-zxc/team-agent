@@ -170,6 +170,7 @@ async def start_admin_session(
         resume=chat_data.get("session_id") if is_resume else None,
         system_prompt=system_prompt,  # type: ignore[reportArgumentType]
         permission_mode=permission_mode,
+        disallowed_tools=["AskUserQuestion"],
         can_use_tool=can_use_tool,
         setting_sources=["project", "user"],
         env=cli_env,

@@ -529,6 +529,7 @@ async def start_workload_session(
         resume=workload_data.get("session_id") if is_resume else None,
         system_prompt=_build_system_prompt(agent_profile, workload_data),  # type: ignore[reportArgumentType]
         permission_mode=workload_data.get("permission_mode", "default"),
+        disallowed_tools=["AskUserQuestion"],
         can_use_tool=can_use_tool,
         hooks={"Stop": [HookMatcher(hooks=[stop_hook])]},
         setting_sources=["project"],
