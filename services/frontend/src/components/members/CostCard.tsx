@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import styles from "./CostCard.module.css";
 
 type CostCardProps = {
@@ -23,6 +23,7 @@ export function CostCard({
   onMarginChange,
 }: CostCardProps) {
   const [marginDraft, setMarginDraft] = useState(String(marginPercent));
+  useEffect(() => { setMarginDraft(String(marginPercent)); }, [marginPercent]);
   const nsr = totalCost * (1 + marginPercent / 100);
 
   const handleMarginBlur = useCallback(() => {

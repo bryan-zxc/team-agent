@@ -14,10 +14,10 @@ class ToolApprovalEvent(UUIDPrimaryKey, TimestampMixin, Base):
     )
 
     chat_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("chats.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("chats.id", ondelete="CASCADE"), nullable=False
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     tool_name: Mapped[str] = mapped_column(String, nullable=False)
     decision: Mapped[str] = mapped_column(String, nullable=False)

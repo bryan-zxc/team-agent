@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import styles from "./HumanCostCard.module.css";
 
 type HumanCostCardProps = {
@@ -13,7 +13,7 @@ type HumanCostCardProps = {
 function formatCurrency(value: number): string {
   if (value >= 1000) return `$${(value / 1000).toFixed(1)}k`;
   if (value >= 1) return `$${value.toFixed(2)}`;
-  return `$${value.toFixed(2)}`;
+  return `$${value.toFixed(4)}`;
 }
 
 export function HumanCostCard({
@@ -23,6 +23,7 @@ export function HumanCostCard({
   onRateChange,
 }: HumanCostCardProps) {
   const [rateDraft, setRateDraft] = useState(String(rate));
+  useEffect(() => { setRateDraft(String(rate)); }, [rate]);
   const nsr = rate * totalHours;
 
   const handleRateBlur = useCallback(() => {

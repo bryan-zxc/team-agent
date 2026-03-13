@@ -615,7 +615,7 @@ async def relay_messages(
 
                         await get_cost_tracker().track_sdk_cost(
                             total_cost_usd=msg.total_cost_usd,
-                            model="claude-opus-4",
+                            model=settings.model,
                             usage=msg.usage,
                             caller="claude_sdk",
                             session_id=msg.session_id,

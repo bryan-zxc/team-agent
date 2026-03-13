@@ -1,7 +1,8 @@
 import json
 import logging
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -324,22 +325,14 @@ async def get_daily_activity(
     target_date: date = Query(None, alias="date"),
 ):
     """Return chats with activity on a given date (lightweight — no message bodies)."""
+    aest = ZoneInfo("Australia/Sydney")
     if target_date is None:
-        target_date = datetime.now(timezone.utc).date()
+        target_date = datetime.now(aest).date()
 
     day_start = datetime(
-        target_date.year, target_date.month, target_date.day, tzinfo=timezone.utc
+        target_date.year, target_date.month, target_date.day, tzinfo=aest
     )
-    day_end = datetime(
-        target_date.year,
-        target_date.month,
-        target_date.day,
-        23,
-        59,
-        59,
-        999999,
-        tzinfo=timezone.utc,
-    )
+    day_next = day_start + timedelta(days=1)
 
     async with async_session() as session:
         # Get all rooms for the project
@@ -374,7 +367,7 @@ async def get_daily_activity(
                 .where(
                     Message.chat_id.in_(chat_ids),
                     Message.created_at >= day_start,
-                    Message.created_at <= day_end,
+                    Message.created_at < day_next,
                 )
                 .group_by(Message.chat_id)
             )

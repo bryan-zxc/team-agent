@@ -40,23 +40,35 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
   useEffect(() => {
     if (!isAiMember) return;
     apiFetch(`/projects/${projectId}/members/${memberId}/profile`)
-      .then((r) => r.json())
-      .then((data) => setContent(data.content ?? ""));
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load profile");
+        return r.json();
+      })
+      .then((data) => setContent(data.content ?? ""))
+      .catch(() => setContent(""));
   }, [projectId, memberId, isAiMember]);
 
   // AI members: fetch costs
   useEffect(() => {
     if (!isAiMember) return;
     apiFetch(`/projects/${projectId}/members/${memberId}/costs`)
-      .then((r) => r.json())
-      .then((data) => setCosts(data));
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load costs");
+        return r.json();
+      })
+      .then((data) => setCosts(data))
+      .catch(() => {});
   }, [projectId, memberId, isAiMember]);
 
   // Human members: fetch costs
   const fetchHumanCosts = useCallback(() => {
     apiFetch(`/projects/${projectId}/members/${memberId}/human-costs`)
-      .then((r) => r.json())
-      .then((data) => setHumanCosts(data));
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load costs");
+        return r.json();
+      })
+      .then((data) => setHumanCosts(data))
+      .catch(() => {});
   }, [projectId, memberId]);
 
   useEffect(() => {
@@ -67,8 +79,12 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
   // Human members: fetch active time
   const fetchActiveTime = useCallback(() => {
     apiFetch(`/projects/${projectId}/members/${memberId}/active-time`)
-      .then((r) => r.json())
-      .then((data) => setActiveTime(data));
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load active time");
+        return r.json();
+      })
+      .then((data) => setActiveTime(data))
+      .catch(() => {});
   }, [projectId, memberId]);
 
   useEffect(() => {
@@ -79,8 +95,12 @@ export function MemberProfileTab({ params }: IDockviewPanelProps<Params>) {
   const handleRefresh = useCallback(() => {
     if (isAiMember) {
       apiFetch(`/projects/${projectId}/members/${memberId}/costs`)
-        .then((r) => r.json())
-        .then((data) => setCosts(data));
+        .then((r) => {
+          if (!r.ok) throw new Error("Failed to refresh costs");
+          return r.json();
+        })
+        .then((data) => setCosts(data))
+        .catch(() => {});
     }
     if (isHuman) {
       fetchActiveTime();
