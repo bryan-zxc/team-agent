@@ -17,6 +17,9 @@ DATABASE_URL = os.environ.get(
 DSN = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
 
 DROP_TABLES = """
+DROP TABLE IF EXISTS tool_approval_events CASCADE;
+DROP TABLE IF EXISTS timesheets CASCADE;
+DROP TABLE IF EXISTS activity_heartbeats CASCADE;
 DROP TABLE IF EXISTS sessions CASCADE;
 DROP TABLE IF EXISTS alembic_version CASCADE;
 DROP TABLE IF EXISTS llm_usage CASCADE;

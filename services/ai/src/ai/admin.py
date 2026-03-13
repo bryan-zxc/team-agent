@@ -156,6 +156,8 @@ async def start_admin_session(
     # Build environment
     cli_env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     cli_env["PLAYWRIGHT_MCP_SANDBOX"] = "false"
+    cli_env["AI_SERVICE_URL"] = "http://ai-service:8001"
+    cli_env["AGENT_MEMBER_ID"] = chat_data["member_id"]
 
     # Git identity — attribute commits to coordinator
     cli_env["GIT_AUTHOR_NAME"] = coordinator_name
@@ -170,6 +172,7 @@ async def start_admin_session(
         resume=chat_data.get("session_id") if is_resume else None,
         system_prompt=system_prompt,  # type: ignore[reportArgumentType]
         permission_mode=permission_mode,
+        disallowed_tools=["AskUserQuestion"],
         can_use_tool=can_use_tool,
         setting_sources=["project", "user"],
         env=cli_env,

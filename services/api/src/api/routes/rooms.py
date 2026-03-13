@@ -1,10 +1,12 @@
 import json
 import logging
 import uuid
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from ..blocks import convert_text_blocks
 from ..database import async_session
@@ -315,3 +317,100 @@ async def _messages_for_chat(session, chat_id: uuid.UUID):
         }
         for msg, display_name, member_type in rows
     ]
+
+
+@router.get("/projects/{project_id}/daily-activity")
+async def get_daily_activity(
+    project_id: uuid.UUID,
+    target_date: date = Query(None, alias="date"),
+):
+    """Return chats with activity on a given date (lightweight — no message bodies)."""
+    aest = ZoneInfo("Australia/Sydney")
+    if target_date is None:
+        target_date = datetime.now(aest).date()
+
+    day_start = datetime(
+        target_date.year, target_date.month, target_date.day, tzinfo=aest
+    )
+    day_next = day_start + timedelta(days=1)
+
+    async with async_session() as session:
+        # Get all rooms for the project
+        rooms = (
+            (await session.execute(select(Room).where(Room.project_id == project_id)))
+            .scalars()
+            .all()
+        )
+
+        if not rooms:
+            return {"date": target_date.isoformat(), "chats": [], "members": []}
+
+        room_map = {r.id: r for r in rooms}
+        room_ids = list(room_map.keys())
+
+        # Get all chats for those rooms
+        chats = (
+            (await session.execute(select(Chat).where(Chat.room_id.in_(room_ids))))
+            .scalars()
+            .all()
+        )
+
+        if not chats:
+            return {"date": target_date.isoformat(), "chats": [], "members": []}
+
+        chat_ids = [c.id for c in chats]
+
+        # Count messages per chat on the target date
+        msg_counts = (
+            await session.execute(
+                select(Message.chat_id, func.count(Message.id))
+                .where(
+                    Message.chat_id.in_(chat_ids),
+                    Message.created_at >= day_start,
+                    Message.created_at < day_next,
+                )
+                .group_by(Message.chat_id)
+            )
+        ).all()
+
+        count_map = {chat_id: count for chat_id, count in msg_counts}
+
+        # Build response — only chats with activity
+        active_chats = []
+        for chat in chats:
+            count = count_map.get(chat.id, 0)
+            if count == 0:
+                continue
+            room = room_map[chat.room_id]
+            active_chats.append(
+                {
+                    "chat_id": str(chat.id),
+                    "chat_type": chat.type,
+                    "room_name": room.name,
+                    "message_count": count,
+                }
+            )
+
+        # Get project members
+        members = (
+            (
+                await session.execute(
+                    select(ProjectMember).where(ProjectMember.project_id == project_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        return {
+            "date": target_date.isoformat(),
+            "chats": active_chats,
+            "members": [
+                {
+                    "id": str(m.id),
+                    "display_name": m.display_name,
+                    "type": m.type,
+                }
+                for m in members
+            ],
+        }

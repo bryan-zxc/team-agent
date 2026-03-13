@@ -513,6 +513,10 @@ async def start_workload_session(
     # Build a clean environment for the Claude CLI subprocess
     cli_env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     cli_env["PLAYWRIGHT_MCP_SANDBOX"] = "false"
+    cli_env["INTERNAL_API_KEY"] = settings.internal_api_key
+    cli_env["API_BASE_URL"] = settings.api_service_url
+    cli_env["AI_SERVICE_URL"] = "http://ai-service:8001"
+    cli_env["AGENT_MEMBER_ID"] = workload_data["member_id"]
 
     # Per-agent git identity
     agent_name = workload_data["display_name"]
@@ -527,6 +531,7 @@ async def start_workload_session(
         resume=workload_data.get("session_id") if is_resume else None,
         system_prompt=_build_system_prompt(agent_profile, workload_data),  # type: ignore[reportArgumentType]
         permission_mode=workload_data.get("permission_mode", "default"),
+        disallowed_tools=["AskUserQuestion"],
         can_use_tool=can_use_tool,
         hooks={"Stop": [HookMatcher(hooks=[stop_hook])]},
         setting_sources=["project"],

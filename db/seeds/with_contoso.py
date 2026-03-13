@@ -125,7 +125,10 @@ async def seed():
         # Overlay project template onto the clone
         if PROJECT_TEMPLATE_DIR.is_dir():
             shutil.copytree(
-                PROJECT_TEMPLATE_DIR, clone_path, dirs_exist_ok=True
+                PROJECT_TEMPLATE_DIR,
+                clone_path,
+                dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns(".venv", "__pycache__"),
             )
             print("Overlaid project template onto clone")
 

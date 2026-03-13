@@ -1,11 +1,11 @@
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -16,6 +16,8 @@ from ..models.chat import Chat
 from ..models.project import Project
 from ..models.project_member import ProjectMember
 from ..models.room import Room
+from ..models.tool_approval_event import ToolApprovalEvent
+from ..models.user import User
 from ..models.workload import Workload
 
 logger = logging.getLogger(__name__)
@@ -61,10 +63,27 @@ class SwitchModeRequest(BaseModel):
 
 
 @router.post("/chats/{chat_id}/tool-approval", status_code=202)
-async def submit_tool_approval(chat_id: str, req: ToolApprovalRequest):
+async def submit_tool_approval(
+    chat_id: str,
+    req: ToolApprovalRequest,
+    user: User = Depends(get_current_user),
+):
     """Submit a human decision for a pending tool approval request."""
     if req.decision == "deny" and not req.reason:
         raise HTTPException(status_code=422, detail="Reason is required when denying.")
+
+    # Persist the approval event for standup/activity reporting
+    async with async_session() as session:
+        event = ToolApprovalEvent(
+            chat_id=uuid.UUID(chat_id),
+            user_id=user.id,
+            tool_name=req.tool_name,
+            decision=req.decision,
+            approval_request_id=req.approval_request_id,
+            reason=req.reason,
+        )
+        session.add(event)
+        await session.commit()
 
     payload = {
         "chat_id": chat_id,
@@ -83,6 +102,56 @@ async def submit_tool_approval(chat_id: str, req: ToolApprovalRequest):
     )
 
     return {"status": "accepted"}
+
+
+@router.get("/chats/{chat_id}/tool-approvals")
+async def get_tool_approvals(
+    chat_id: str,
+    target_date: date = Query(None, alias="date"),
+):
+    """Return tool approval events for a chat on a given date."""
+    if target_date is None:
+        target_date = datetime.now(timezone.utc).date()
+
+    day_start = datetime(
+        target_date.year, target_date.month, target_date.day, tzinfo=timezone.utc
+    )
+    day_end = datetime(
+        target_date.year,
+        target_date.month,
+        target_date.day,
+        23,
+        59,
+        59,
+        999999,
+        tzinfo=timezone.utc,
+    )
+
+    async with async_session() as session:
+        rows = (
+            await session.execute(
+                select(ToolApprovalEvent, User.display_name)
+                .join(User, ToolApprovalEvent.user_id == User.id)
+                .where(
+                    ToolApprovalEvent.chat_id == uuid.UUID(chat_id),
+                    ToolApprovalEvent.created_at >= day_start,
+                    ToolApprovalEvent.created_at <= day_end,
+                )
+                .order_by(ToolApprovalEvent.created_at)
+            )
+        ).all()
+
+    return [
+        {
+            "id": str(event.id),
+            "user_name": display_name,
+            "tool_name": event.tool_name,
+            "decision": event.decision,
+            "reason": event.reason,
+            "created_at": event.created_at.isoformat(),
+        }
+        for event, display_name in rows
+    ]
 
 
 @router.post("/chats/{chat_id}/interrupt")

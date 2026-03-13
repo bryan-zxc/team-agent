@@ -24,6 +24,7 @@ import { DataSidePanel } from "./DataSidePanel";
 import { ProjectTopBar } from "./ProjectTopBar";
 import { AddMemberModal } from "@/components/members/AddMemberModal";
 import { useAuth } from "@/hooks/useAuth";
+import { useActivityHeartbeat } from "@/hooks/useActivityHeartbeat";
 import { AttentionProvider } from "@/hooks/useAttention";
 import { apiFetch } from "@/lib/api";
 import type { AdminChat, Member, Project, Room } from "@/types";
@@ -67,6 +68,8 @@ export function Workbench({ projectId }: WorkbenchProps) {
   const [adminHistoryChatId, setAdminHistoryChatId] = useState<string | null>(null);
   const [attentionRoomIds, setAttentionRoomIds] = useState<Set<string>>(new Set());
   const apiRef = useRef<DockviewApi | null>(null);
+
+  useActivityHeartbeat(projectId, memberId);
 
   const isLocked = project?.is_locked ?? false;
   const adminNeedsAttention = adminChats.some(
@@ -511,7 +514,7 @@ export function Workbench({ projectId }: WorkbenchProps) {
                   id: panelId,
                   component: "memberTab",
                   title: member.display_name,
-                  params: { projectId, memberId: id, memberName: member.display_name },
+                  params: { projectId, memberId: id, memberName: member.display_name, memberType: member.type },
                 });
               }}
             />
