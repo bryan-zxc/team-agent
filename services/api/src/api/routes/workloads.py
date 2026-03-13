@@ -456,8 +456,25 @@ async def dispatch_workloads(req: DispatchRequest):
 
         await session.commit()
 
+    redis = _get_redis()
+
+    # Notify frontend so workload panel updates immediately
+    for r in results:
+        await redis.publish(
+            "chat:status",
+            json.dumps(
+                {
+                    "chat_id": r["chat_id"],
+                    "status": "assigned",
+                    "room_id": r["room_id"],
+                    "chat_type": "workload",
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ),
+        )
+
     # Publish to Redis so AI service starts sessions
-    await _get_redis().publish(
+    await redis.publish(
         "dispatch:confirmed",
         json.dumps({"clone_path": clone_path, "workloads": results}),
     )

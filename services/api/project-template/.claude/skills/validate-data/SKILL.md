@@ -25,7 +25,7 @@ db_path = f"/data/projects/{project_id}/databases/data.duckdb"
 
 On every invocation, assess current state before leading the user. Check:
 
-1. What files are in `data/raw/`?
+1. What files are in the raw data directory? (use the absolute `data_dir` path from the manifest — `data/raw/` is gitignored and won't exist in a worktree)
 2. What tables are documented in `docs/tables/tables.md`?
 3. What's in `data/validation/data-check-register.md`? (any checks recorded?)
 4. What's in `data/validation/report_data.json`? (any issues raised?)
@@ -43,7 +43,7 @@ Present the state assessment to the user before proceeding.
 
 ### Phase 1: Ingest raw data
 
-Walk through `data/raw/` and convert each data file to a working table using `/create-work-table`.
+Walk through the raw data directory (use the absolute `data_dir` path) and convert each data file to a working table using `/create-work-table`.
 
 **What to ingest:**
 - CSV, TSV, Excel, Parquet, JSON files containing actual data rows

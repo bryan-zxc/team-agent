@@ -11,7 +11,7 @@ Read `references/layers.md` (via the `create-table` skill) for the full layer na
 
 ## Data and database paths
 
-Source data files live in `data/raw/` and the database lives outside the repo. If the relative path doesn't work, you are in a git worktree — use absolute paths derived from the manifest instead:
+Source data files live in `data/raw/` which is gitignored — it exists only in the main repo, not in worktrees. Always use the absolute path derived from the manifest:
 
 ```python
 import json
@@ -28,7 +28,7 @@ db_path = f"/data/projects/{project_id}/databases/data.duckdb"
 ### 1. Identify the file and table name
 
 Confirm with the user:
-- **Source file** — typically in `data/raw/`
+- **Source file** — use the absolute `data_dir` path from the manifest (not the relative `data/raw/` which won't exist in a worktree)
 - **Table name** — must follow the pattern `l10wrk_<descriptive_name>` (lowercase, underscores, describes the content not the file)
 
 If the user provides a file but no table name, suggest one based on the file content.

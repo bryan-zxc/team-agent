@@ -13,7 +13,7 @@ This project uses `uv` for Python dependency management.
 
 ## File Paths
 
-Source data lives in `data/raw/` inside the main repository. If the relative path doesn't work, you are in a git worktree — use absolute paths derived from the manifest instead:
+Source data lives in `data/raw/` which is gitignored — it only exists in the main repo checkout, never in worktrees. **Always use absolute paths** derived from the manifest:
 
 ```python
 import json
