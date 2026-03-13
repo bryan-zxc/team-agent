@@ -42,13 +42,13 @@ def _profile_path(clone_path: Path, agent_name: str) -> Path:
 
 
 async def _get_existing_agent_names(project_name: str) -> list[str]:
-    """Load existing AI agent names for a project from the database."""
+    """Load existing AI/coordinator agent names for a project from the database."""
     conn = await asyncpg.connect(_dsn)
     try:
         rows = await conn.fetch(
             "SELECT pm.display_name FROM project_members pm "
             "JOIN projects p ON p.id = pm.project_id "
-            "WHERE pm.type = 'ai' AND p.name = $1",
+            "WHERE pm.type IN ('ai', 'coordinator') AND p.name = $1",
             project_name,
         )
         return [r["display_name"] for r in rows]

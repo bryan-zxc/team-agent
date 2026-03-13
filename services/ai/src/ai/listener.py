@@ -318,79 +318,87 @@ async def listen(redis_client: aioredis.Redis):
             chat_id[:8],
         )
 
-        # Ensure at least one delegate agent exists before the coordinator runs
-        await _ensure_delegate_exists(project_name)
+        try:
+            # Ensure at least one delegate agent exists before the coordinator runs
+            try:
+                await asyncio.wait_for(_ensure_delegate_exists(project_name), timeout=120)
+            except asyncio.TimeoutError:
+                logger.error("Timed out creating delegate agent for '%s'", project_name)
+            except Exception:
+                logger.exception("Failed to ensure delegate agent for '%s'", project_name)
 
-        # Get agent names for the dynamic Literal constraint
-        agent_names = await _get_agent_names(project_name)
+            # Get agent names for the dynamic Literal constraint
+            agent_names = await _get_agent_names(project_name)
 
-        # Fetch full conversation history for context
-        conversation = await _load_chat_history(chat_id)
-        logger.info("Loaded %d messages from database", len(conversation))
+            # Fetch full conversation history for context
+            conversation = await _load_chat_history(chat_id)
+            logger.info("Loaded %d messages from database", len(conversation))
 
-        set_cost_context(
-            member_id=orchestrator["id"],
-            project_id=orchestrator["project_id"],
-        )
-
-        agent_response = await run_agent(
-            conversation,
-            project_name,
-            agent_names,
-            orchestrator["display_name"],
-        )
-        content = agent_response.response  # type: ignore[reportAttributeAccessIssue]
-        logger.info("Agent returned %d chars", len(content))
-
-        if agent_response.workloads:  # type: ignore[reportAttributeAccessIssue]
-            dispatch_items = [
-                {
-                    "owner": w.owner,
-                    "title": w.title,
-                    "description": w.description,
-                    "background_context": w.background_context,
-                    "problem": w.problem,
-                }
-                for w in agent_response.workloads  # type: ignore[reportAttributeAccessIssue]
-            ]
-            blocks = [
-                {"type": "text", "value": content},
-                {
-                    "type": "dispatch_card",
-                    "dispatch_id": str(uuid.uuid4()),
-                    "chat_id": chat_id,
-                    "workloads": dispatch_items,
-                },
-            ]
-            logger.info(
-                "Dispatch card with %d workloads: %s",
-                len(dispatch_items),
-                ", ".join(f"{w['owner']}: {w['title']}" for w in dispatch_items),
+            set_cost_context(
+                member_id=orchestrator["id"],
+                project_id=orchestrator["project_id"],
             )
-        else:
-            blocks = [{"type": "text", "value": content}]
 
-        # Wrap response in structured format for consistency
-        structured_content = json.dumps(
-            {
-                "blocks": blocks,
-                "mentions": [],
+            agent_response = await run_agent(
+                conversation,
+                project_name,
+                agent_names,
+                orchestrator["display_name"],
+            )
+            content = agent_response.response  # type: ignore[reportAttributeAccessIssue]
+            logger.info("Agent returned %d chars", len(content))
+
+            if agent_response.workloads:  # type: ignore[reportAttributeAccessIssue]
+                dispatch_items = [
+                    {
+                        "owner": w.owner,
+                        "title": w.title,
+                        "description": w.description,
+                        "background_context": w.background_context,
+                        "problem": w.problem,
+                    }
+                    for w in agent_response.workloads  # type: ignore[reportAttributeAccessIssue]
+                ]
+                blocks = [
+                    {"type": "text", "value": content},
+                    {
+                        "type": "dispatch_card",
+                        "dispatch_id": str(uuid.uuid4()),
+                        "chat_id": chat_id,
+                        "workloads": dispatch_items,
+                    },
+                ]
+                logger.info(
+                    "Dispatch card with %d workloads: %s",
+                    len(dispatch_items),
+                    ", ".join(f"{w['owner']}: {w['title']}" for w in dispatch_items),
+                )
+            else:
+                blocks = [{"type": "text", "value": content}]
+
+            # Wrap response in structured format for consistency
+            structured_content = json.dumps(
+                {
+                    "blocks": blocks,
+                    "mentions": [],
+                }
+            )
+
+            response = {
+                "id": str(uuid.uuid4()),
+                "chat_id": chat_id,
+                "member_id": orchestrator["id"],
+                "display_name": orchestrator["display_name"],
+                "type": "coordinator",
+                "content": structured_content,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "reply_to_id": None,
             }
-        )
 
-        response = {
-            "id": str(uuid.uuid4()),
-            "chat_id": chat_id,
-            "member_id": orchestrator["id"],
-            "display_name": orchestrator["display_name"],
-            "type": "coordinator",
-            "content": structured_content,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "reply_to_id": None,
-        }
-
-        await redis_client.publish("chat:responses", json.dumps(response))
-        logger.info("Published response to chat:responses")
+            await redis_client.publish("chat:responses", json.dumps(response))
+            logger.info("Published response to chat:responses")
+        except Exception:
+            logger.exception("Error handling AI respond for chat %s", chat_id[:8])
 
 
 async def _resume_and_deliver(
